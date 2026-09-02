@@ -28,6 +28,7 @@ Usage:
 Output: one finding per line, `SEVERITY  where: message`. Exit code always 0
 (advisory); grep for `warn` to gate. Stdlib + pyyaml + git.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -68,13 +69,23 @@ def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, st
         return [("warn", label, "new file is not a parseable SDF -- fix that first")]
     for sname in old:
         if sname not in new:
-            rows.append(("warn", f"{label}: {sname}",
-                         "slice removed -- removed-slices CI fails unless the package left the archive"))
+            rows.append(
+                (
+                    "warn",
+                    f"{label}: {sname}",
+                    "slice removed -- removed-slices CI fails unless the package left the archive",
+                )
+            )
             continue
         gone = old[sname] - new[sname]
         for path in sorted(gone):
-            rows.append(("warn", f"{label}: {sname}",
-                         f"path removed from published slice: {path} (append-only regression)"))
+            rows.append(
+                (
+                    "warn",
+                    f"{label}: {sname}",
+                    f"path removed from published slice: {path} (append-only regression)",
+                )
+            )
     return rows
 
 
@@ -90,7 +101,13 @@ def run_base(base: str, pathspecs: list[str]) -> list[tuple[str, str, str]]:
     specs = pathspecs or ["slices/*.yaml"]
     status = git(["diff", "--name-status", base, "--", *specs])
     if status is None:
-        return [("warn", base, "git diff failed -- is this a chisel-releases checkout, and is the ref present?")]
+        return [
+            (
+                "warn",
+                base,
+                "git diff failed -- is this a chisel-releases checkout, and is the ref present?",
+            )
+        ]
     rows: list[tuple[str, str, str]] = []
     for line in status.splitlines():
         parts = line.split("\t")
@@ -98,13 +115,25 @@ def run_base(base: str, pathspecs: list[str]) -> list[tuple[str, str, str]]:
             continue
         code, path = parts[0], parts[-1]
         if code.startswith("D"):
-            rows.append(("warn", path, "SDF removed -- removed-slices CI fails unless the package left the archive"))
+            rows.append(
+                (
+                    "warn",
+                    path,
+                    "SDF removed -- removed-slices CI fails unless the package left the archive",
+                )
+            )
         elif code.startswith("R") and len(parts) >= 3:
             # rename: old path is parts[1], new is parts[2]. the old filename is
             # gone (removed-slices CI fails on it, e.g. a soname bump), and the
             # rename may also drop slices/paths -- compare old vs new content.
             old_path, new_path = parts[1], parts[2]
-            rows.append(("warn", old_path, "SDF renamed away -- removed-slices CI fails unless the package left the archive"))
+            rows.append(
+                (
+                    "warn",
+                    old_path,
+                    "SDF renamed away -- removed-slices CI fails unless the package left the archive",
+                )
+            )
             old_text = git(["show", f"{base}:{old_path}"])
             new = Path(new_path)
             if old_text is not None and new.exists():
@@ -130,9 +159,14 @@ def main(argv: list[str]) -> int:
         rows = run_base(argv[1], argv[2:])
     elif len(argv) == 2:
         old, new = Path(argv[0]), Path(argv[1])
-        rows = compare(old.read_text(encoding="utf-8"), new.read_text(encoding="utf-8"), str(new))
+        rows = compare(
+            old.read_text(encoding="utf-8"), new.read_text(encoding="utf-8"), str(new)
+        )
     else:
-        print("usage: check-diff.py --base <ref> [<pathspec> ...] | <old.yaml> <new.yaml>", file=sys.stderr)
+        print(
+            "usage: check-diff.py --base <ref> [<pathspec> ...] | <old.yaml> <new.yaml>",
+            file=sys.stderr,
+        )
         return 2
 
     for sev, where, msg in rows:

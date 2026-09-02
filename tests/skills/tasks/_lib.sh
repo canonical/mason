@@ -6,17 +6,22 @@
 set -euo pipefail
 
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # tests/skills/tasks
-_repo_root="$(cd "$_here/../../.." && pwd)"           # mason repo root (cli.js)
+_repo_root="$(cd "$_here/../../.." && pwd)"           # mason repo root (skills/)
 _cases_dir="$_here/../cases"                          # tests/skills/cases
 
 # _clone: chisel-releases@$BRANCH into the workdir (the agent's cwd), record the
-# branch so format-version scorers can gate on it.
+# branch and its manifest format (parsed from the cloned chisel.yaml) so
+# format-version scorers gate on the real branch, not a hardcoded table.
 _clone() {
     git clone --quiet --depth 1 --branch "$BRANCH" \
         https://github.com/canonical/chisel-releases.git "$PATS_WORKDIR"
     cd "$PATS_WORKDIR"
     mkdir -p "$PATS_OUTPUT_DIR"
     printf '%s\n' "$BRANCH" >"$PATS_OUTPUT_DIR/${PATS_TASK_ID}.branch"
+    # first digit of the format line: "v3" / "chisel-v1" / "1" -> 3 / 1 / 1.
+    local fmt
+    fmt="$(grep -m1 '^format:' chisel.yaml | grep -oE '[0-9]+' | head -n1 || true)"
+    printf '%s\n' "$fmt" >"$PATS_OUTPUT_DIR/${PATS_TASK_ID}.format"
 }
 
 # _reinit_git: rebuild git history so HEAD no longer carries the removed target
@@ -37,14 +42,18 @@ _reinit_git() {
         commit --quiet -m "chisel-releases base (target slice removed)"
 }
 
-# _install: install the skill only for the agent under test (-> its skills dir),
-# picked off the harness kind pats exposes.
+# _install: copy every skill into the discovery dir of the agent under test,
+# picked off the harness kind pats exposes. claude code reads .claude/skills/;
+# codex, opencode and copilot all read .agents/skills/. plain copies, same as
+# any installer would leave behind.
 _install() {
-    local a=claude
+    local dest=".claude/skills"
     case "$PATS_AGENT_KIND" in
-        opencode-*) a=opencode ;;
+        (claude-*) dest=".claude/skills" ;;
+        (*) dest=".agents/skills" ;;
     esac
-    node "$_repo_root/scripts/cli.js" install "$a" --target "$PATS_WORKDIR" --force --quiet
+    mkdir -p "$PATS_WORKDIR/$dest"
+    cp -R "$_repo_root"/skills/. "$PATS_WORKDIR/$dest/"
 }
 
 # prepare_knockout: stash the real slice as ground truth, then remove it + the

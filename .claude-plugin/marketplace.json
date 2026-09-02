@@ -10,7 +10,7 @@
     {
       "name": "mason",
       "description": "Cross-agent skill + helpers for authoring and reviewing chisel slice definition files (sdfs) against canonical/chisel-releases.",
-      "source": "./mason",
+      "source": "./",
       "category": "development"
     }
   ]

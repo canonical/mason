@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# orientation: deterministic orientation for the slice-authoring agent -- run
+# FIRST, every time. prints where you are, where the skill's read-only files are,
+# the target release + manifest format parsed from ./chisel.yaml, and the live
+# release landscape (which branches exist, their format, and which are still
+# maintained -- discovered, never hardcoded). work from this, not from guesses.
+#
+# usage: orientation [<package>]
+set -euo pipefail
+
+mason_root="$(cd "$(dirname "$0")/.." && pwd)"
+echo "working dir (chisel-releases checkout): $(pwd)"
+echo "skill dir (read-only):                  $mason_root"
+echo "  reference: $mason_root/shared/CHISEL.md"
+echo "  helpers:   $mason_root/scripts/ -- deb-list.py (--sdf drafts an SDF), scaffold-test.py,"
+echo "             check-slice.py, check-test.py, check-diff.py, review-diff.py, try-cut"
+
+# what can you actually run here? the scripts degrade, but knowing upfront saves
+# wasted attempts (e.g. no chisel -> skip try-cut, lean on the install-slices CI).
+echo "tools:"
+for t in chisel dpkg-deb spread uv python3 git; do
+    if command -v "$t" >/dev/null 2>&1; then avail="yes"; else avail="NO"; fi
+    case "$t" in
+        chisel)   use="try-cut / chisel cut";;
+        dpkg-deb) use="deb-list.py (inspect + --sdf)";;
+        spread)   use="integration tests";;
+        uv)       use="runs the check-*/scaffold scripts (or python3 + pyyaml)";;
+        python3)  use="deb-list.py (+ check-*/scaffold scripts w/out uv)";;
+        git)      use="check-diff.py / review-diff.py";;
+    esac
+    printf "  %-9s %-4s (%s)\n" "$t" "$avail" "$use"
+done
+
+# discover the live release landscape -- which ubuntu-XX.XX branches exist, their
+# manifest format, and whether they are still maintained. a branch EXISTING does
+# not establish maintenance: EOL branches stay in the repo, frozen. so read
+# maintenance.end-of-life from each branch's chisel.yaml and compare with today,
+# the same way the upstream forward-port-missing check decides "supported". this
+# is the source of truth for the live release set -- do not guess it. best-effort:
+# degrades to a one-line note when there is no network.
+discover_releases() {
+    # url overridable for a mirror / fork / air-gapped clone (and hermetic tests).
+    local url="${MASON_CHISEL_RELEASES_URL:-https://github.com/canonical/chisel-releases.git}"
+    local raw="https://raw.githubusercontent.com/canonical/chisel-releases"
+    local today branches b cy fmt eol state
+    today="$(date +%F)"
+
+    branches="$(git ls-remote --heads "$url" 'ubuntu-*' 2>/dev/null \
+        | sed 's|.*refs/heads/||' | sort)"
+    if [ -z "$branches" ]; then
+        echo "live releases:   (chisel-releases remote unreachable -- skipped)"
+        return 0
+    fi
+
+    echo "live releases:   branch | format | end-of-life | state (live iff eol in the future)"
+    for b in $branches; do
+        # prefer a local ref (full clone), else fetch the raw manifest.
+        cy="$(git show "origin/$b:chisel.yaml" 2>/dev/null)" \
+            || cy="$(curl -fsSL --max-time 8 "$raw/$b/chisel.yaml" 2>/dev/null)" \
+            || cy=""
+        if [ -z "$cy" ]; then continue; fi
+        # normalise "v3" / "chisel-v1" / "1" -> "v1".."v3" for a tidy column.
+        fmt="$(printf '%s\n' "$cy" | grep -m1 -E '^format:' | grep -oE '[0-9]+' | head -n1 || true)"
+        fmt="${fmt:+v$fmt}"
+        eol="$(printf '%s\n' "$cy" | sed -n 's/^[[:space:]]*end-of-life:[[:space:]]*//p' | head -n1)"
+        if [ -z "$eol" ]; then
+            state="?"
+        elif [[ "$eol" > "$today" ]]; then   # ISO dates sort lexically == chronologically
+            state="live"
+        else
+            state="EOL"
+        fi
+        printf "  %-14s %-7s %-12s %s\n" "$b" "${fmt:-?}" "${eol:-?}" "$state"
+    done
+}
+
+# minimal parse (no pyyaml): top-level format, then the first ubuntu archive.
+if [ -f chisel.yaml ]; then
+    branch="$(git branch --show-current 2>/dev/null || true)"
+    fmt="$(sed -n 's/^format:[[:space:]]*//p' chisel.yaml | head -n1)"
+    ver="$(sed -n 's/^[[:space:]]\{1,\}version:[[:space:]]*//p' chisel.yaml | head -n1)"
+    suites="$(sed -n 's/.*suites:[[:space:]]*//p' chisel.yaml | head -n1)"
+    comps="$(sed -n 's/.*components:[[:space:]]*//p' chisel.yaml | head -n1)"
+    eol="$(sed -n 's/^[[:space:]]*end-of-life:[[:space:]]*//p' chisel.yaml | head -n1)"
+
+    echo "branch:          ${branch:-?}"
+    echo "ubuntu version:  ${ver:-?}"
+    echo "manifest format: ${fmt:-?}   (gates SDF features -- see CHISEL.md schema-versions table)"
+    echo "suites:          ${suites:-?}"
+    echo "components:      ${comps:-?}"
+    echo "end-of-life:     ${eol:-?}"
+    echo "existing slices: $(ls slices/ 2>/dev/null | wc -l | tr -d ' ') in ./slices/"
+
+    if [ "${1:-}" ]; then
+        pkg="$1"
+        echo "target: $pkg  ->  write to ./slices/${pkg}.yaml"
+        [ -f "slices/${pkg}.yaml" ] && echo "  note: ./slices/${pkg}.yaml already exists"
+    fi
+else
+    echo "release: UNKNOWN -- no ./chisel.yaml here; cd into a chisel-releases checkout first"
+fi
+
+# the live release landscape -- best-effort, independent of the local checkout.
+discover_releases || true

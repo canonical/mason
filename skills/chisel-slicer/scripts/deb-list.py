@@ -41,7 +41,7 @@ from pathlib import Path
 
 # Only install-time scripts matter for slice authoring; remove scripts are irrelevant.
 MAINTAINER_SCRIPTS = [
-    ("preinst",  "before install"),
+    ("preinst", "before install"),
     ("postinst", "after install"),
 ]
 
@@ -52,11 +52,20 @@ def perms_to_octal(perms):
     Keeps setuid/setgid/sticky (s/S/t/T in the exec positions) -- exactly the
     mode information that matters for security-sensitive binaries like sudo.
     """
+
     def triplet(t):
-        return (4 if t[0] == "r" else 0) + (2 if t[1] == "w" else 0) \
+        return (
+            (4 if t[0] == "r" else 0)
+            + (2 if t[1] == "w" else 0)
             + (1 if t[2] in "xst" else 0)
+        )
+
     p = perms[1:10]  # skip type char, take 9 permission chars
-    special = (4 if p[2] in "sS" else 0) + (2 if p[5] in "sS" else 0) + (1 if p[8] in "tT" else 0)
+    special = (
+        (4 if p[2] in "sS" else 0)
+        + (2 if p[5] in "sS" else 0)
+        + (1 if p[8] in "tT" else 0)
+    )
     return f"{special}{triplet(p[0:3])}{triplet(p[3:6])}{triplet(p[6:9])}"
 
 
@@ -94,7 +103,7 @@ def read_suite():
         text = Path("chisel.yaml").read_text()
     except OSError:
         return None
-    m = re.search(r"suites:\s*\[\s*([A-Za-z0-9.-]+)", text)         # inline list
+    m = re.search(r"suites:\s*\[\s*([A-Za-z0-9.-]+)", text)  # inline list
     if not m:
         m = re.search(r"suites:\s*\n\s*-\s*([A-Za-z0-9.-]+)", text)  # block list
     if not m:
@@ -180,7 +189,9 @@ def deb_contents(deb_path):
         # and '/' chars, corrupting targets like ../lib/foo or /etc/foo.
         if entry_type == "l" and len(parts) >= 3 and parts[-2] == "->":
             path = parts[-3].removeprefix("./")
-            symlink_target = parts[-1]  # verbatim: absolute, ../-relative, bare all meaningful
+            symlink_target = parts[
+                -1
+            ]  # verbatim: absolute, ../-relative, bare all meaningful
             tag = "l"
         else:
             path = parts[-1].removeprefix("./")
@@ -216,12 +227,27 @@ def deb_maintainer_scripts(deb_path, workdir):
 # --- draft SDF generation (--sdf) --------------------------------------------
 
 BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
-_CLUTTER = ("/usr/share/man/", "/usr/man/", "/usr/share/bash-completion/",
-            "/usr/share/fish/", "/usr/share/zsh/", "/etc/bash_completion.d/",
-            "/usr/share/doc-base/", "/usr/share/lintian/")
+_CLUTTER = (
+    "/usr/share/man/",
+    "/usr/man/",
+    "/usr/share/bash-completion/",
+    "/usr/share/fish/",
+    "/usr/share/zsh/",
+    "/etc/bash_completion.d/",
+    "/usr/share/doc-base/",
+    "/usr/share/lintian/",
+)
 # keep in sync with check-slice.py's LEGAL_DOC
-_LEGAL = {"copyright", "notice", "license", "licence", "copying", "authors",
-          "thirdpartynotices", "third-party-notices"}
+_LEGAL = {
+    "copyright",
+    "notice",
+    "license",
+    "licence",
+    "copying",
+    "authors",
+    "thirdpartynotices",
+    "third-party-notices",
+}
 # a multiarch lib dir, e.g. /usr/lib/x86_64-linux-gnu/ -> globbed to *-linux-*.
 _TRIPLE = re.compile(r"^(/usr)?/lib(32|64|x32)?/[a-z0-9_]+-linux-[a-z0-9]+/")
 
@@ -239,14 +265,16 @@ def classify(path, tag):
     if any(path.startswith(c) for c in _CLUTTER):
         return None
     if path.startswith("/usr/share/doc/"):
-        rest = path[len("/usr/share/doc/"):].rstrip("/")
+        rest = path[len("/usr/share/doc/") :].rstrip("/")
         if "/" not in rest:  # the doc dir itself -- shared-copyright symlink target
             return "copyright"
         return "copyright" if _is_legal_doc(rest.rsplit("/", 1)[-1]) else None
     if tag == "x" and any(path.startswith(d) for d in BIN_DIRS):
         return "bins"
     base = path.rsplit("/", 1)[-1]
-    if (".so." in base or base.endswith(".so")) and (path.startswith("/usr/lib") or path.startswith("/lib")):
+    if (".so." in base or base.endswith(".so")) and (
+        path.startswith("/usr/lib") or path.startswith("/lib")
+    ):
         return "libs"
     if path.startswith("/etc/"):
         return "config"
@@ -279,7 +307,15 @@ def build_sdf(pkg, depends, entries, fmt=None):
 
     fmt: chisel.yaml format version. on v3+ essential: must be a map (list is a
     chisel parse error), so the draft emits the map form there."""
-    buckets = {"bins": [], "libs": [], "config": [], "headers": [], "var": [], "copyright": [], "unplaced": []}
+    buckets = {
+        "bins": [],
+        "libs": [],
+        "config": [],
+        "headers": [],
+        "var": [],
+        "copyright": [],
+        "unplaced": [],
+    }
     for path, tag, _perms, _owner, _sym in entries:
         b = classify(path, tag)
         if b is None:
@@ -299,7 +335,11 @@ def build_sdf(pkg, depends, entries, fmt=None):
         "#   then run check-slice.py on the result.",
         "",
         "essential:",
-        (f"  {pkg}_copyright:" if fmt is not None and fmt >= 3 else f"  - {pkg}_copyright"),
+        (
+            f"  {pkg}_copyright:"
+            if fmt is not None and fmt >= 3
+            else f"  - {pkg}_copyright"
+        ),
         "",
         "slices:",
     ]
@@ -310,7 +350,9 @@ def build_sdf(pkg, depends, entries, fmt=None):
         out.append(f"  {name}:")
         # dep hint as a comment, not an empty `essential:` key -- a null essential
         # is a chisel parse error, and the draft must stay chisel-valid.
-        out.append("    # essential: add this slice's cross-package deps (see Depends above)")
+        out.append(
+            "    # essential: add this slice's cross-package deps (see Depends above)"
+        )
         out.append("    contents:")
         out += [f"      {p}:" for p in paths]
         out.append("")
@@ -320,7 +362,9 @@ def build_sdf(pkg, depends, entries, fmt=None):
     out.append("")
     unplaced = sorted(set(buckets["unplaced"]))
     if unplaced:
-        out.append("# unplaced -- slot each into a slice (data/scripts/var/...) or drop as clutter:")
+        out.append(
+            "# unplaced -- slot each into a slice (data/scripts/var/...) or drop as clutter:"
+        )
         out += [f"#   {p}" for p in unplaced]
     return "\n".join(out)
 
@@ -332,7 +376,9 @@ def main():
     args = [a for a in args if a not in ("--scripts", "--sdf")]
 
     if not args:
-        print("usage: deb-list.py <package> [arch] [--scripts] [--sdf]", file=sys.stderr)
+        print(
+            "usage: deb-list.py <package> [arch] [--scripts] [--sdf]", file=sys.stderr
+        )
         sys.exit(1)
 
     pkg = args[0]
@@ -340,19 +386,28 @@ def main():
 
     suite = read_suite()
     if not suite:
-        print("error: could not read the release suite from ./chisel.yaml", file=sys.stderr)
+        print(
+            "error: could not read the release suite from ./chisel.yaml",
+            file=sys.stderr,
+        )
         print("hint:  run deb-list.py from a chisel-releases checkout", file=sys.stderr)
         sys.exit(1)
 
     with tempfile.TemporaryDirectory() as workdir:
         deb = download_deb(pkg, arch, suite, workdir)
         if not deb:
-            print(f"error: {pkg} (arch {arch}) not found on the mirror for suite {suite}", file=sys.stderr)
-            print("hint:  check the package name + arch; the mirror must be reachable", file=sys.stderr)
+            print(
+                f"error: {pkg} (arch {arch}) not found on the mirror for suite {suite}",
+                file=sys.stderr,
+            )
+            print(
+                "hint:  check the package name + arch; the mirror must be reachable",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         version = deb_field(deb, "Version")
-        depends  = deb_field(deb, "Depends")
+        depends = deb_field(deb, "Depends")
 
         if emit_sdf:
             print(build_sdf(pkg, depends, deb_contents(deb), fmt=read_format()))
@@ -373,7 +428,9 @@ def main():
         scripts = deb_maintainer_scripts(deb, workdir)
         if scripts:
             present = [name for name, _ in MAINTAINER_SCRIPTS if name in scripts]
-            print(f"\nmaintainer scripts present: {', '.join(present)}  (re-run with --scripts to view)")
+            print(
+                f"\nmaintainer scripts present: {', '.join(present)}  (re-run with --scripts to view)"
+            )
 
             if show_scripts:
                 for name, label in MAINTAINER_SCRIPTS:
