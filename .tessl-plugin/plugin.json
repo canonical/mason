@@ -2,5 +2,9 @@
   "name": "rockcrafters/mason",
   "version": "0.1.0",
   "description": "Agent kit for working on canonical/chisel-releases. Cross-agent skills + scripts for authoring and reviewing chisel slice definition files.",
-  "private": false
+  "private": false,
+  "skills": "./skills",
+  "repository": "https://github.com/rockcrafters/mason",
+  "homepage": "https://github.com/rockcrafters/mason",
+  "license": "Apache-2.0"
 }

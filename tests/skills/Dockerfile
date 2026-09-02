@@ -1,6 +1,6 @@
 # mason test sandbox: ubuntu + agent clis + chisel + deb tooling.
 # modelled on ~/git/pats images/Dockerfile.sandbox-26.04, plus what the
-# chisel-releases skill needs at runtime: python3 + dpkg-deb (deb-list) and
+# chisel-slicer skill needs at runtime: python3 + dpkg-deb (deb-list) and
 # the chisel binary (try-cut).
 #
 # clis installed globally (npm -g) so they're on PATH for any uid -- pats runs
