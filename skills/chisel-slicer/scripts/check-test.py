@@ -28,6 +28,7 @@ Output: one finding per line, `SEVERITY  where: message`.
          to check (the SDF declares no explicit binaries).
 Exit code is always 0 (advisory); grep for `warn` to gate. Stdlib + pyyaml.
 """
+
 from __future__ import annotations
 
 import re
@@ -51,7 +52,9 @@ def declared_binaries(doc: Any) -> dict[str, str]:
         if not isinstance(contents, dict):
             continue
         for path in contents:
-            if not isinstance(path, str) or not any(path.startswith(d) for d in BIN_DIRS):
+            if not isinstance(path, str) or not any(
+                path.startswith(d) for d in BIN_DIRS
+            ):
                 continue
             if path.endswith("/") or "*" in path or "?" in path:
                 continue
@@ -90,22 +93,44 @@ def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
         rows.append(("info", str(sdf), "no explicit binaries to exercise"))
         return rows
     if task is None:
-        rows.append(("warn", str(sdf), "no spread test found -- add one that exercises the binaries"))
+        rows.append(
+            (
+                "warn",
+                str(sdf),
+                "no spread test found -- add one that exercises the binaries",
+            )
+        )
         return rows
 
     # lookarounds, not \b: \b needs a word char adjacent, so names ending in
     # non-word chars (c++, g++, [) never match. exclude name-continuation
     # chars but allow a leading / so path-prefixed invocations still count.
-    exercised = {n for n in bins if re.search(rf"(?<![\w.+-]){re.escape(n)}(?![\w.+-])", text)}
+    exercised = {
+        n for n in bins if re.search(rf"(?<![\w.+-]){re.escape(n)}(?![\w.+-])", text)
+    }
     untested = sorted(set(bins) - exercised)
     if not exercised:
         # the real red flag: a test exists but touches none of the binaries.
-        rows.append(("warn", str(task), f"spread test exercises none of the {len(bins)} declared binaries"))
+        rows.append(
+            (
+                "warn",
+                str(task),
+                f"spread test exercises none of the {len(bins)} declared binaries",
+            )
+        )
     elif untested:
         # partial coverage is normal for big suites and alternatives symlinks;
         # surface the gap as info so the author can judge, don't alarm.
-        shown = ", ".join(untested[:12]) + (f", +{len(untested) - 12} more" if len(untested) > 12 else "")
-        rows.append(("info", str(task), f"{len(exercised)}/{len(bins)} binaries exercised; untested: {shown}"))
+        shown = ", ".join(untested[:12]) + (
+            f", +{len(untested) - 12} more" if len(untested) > 12 else ""
+        )
+        rows.append(
+            (
+                "info",
+                str(task),
+                f"{len(exercised)}/{len(bins)} binaries exercised; untested: {shown}",
+            )
+        )
     return rows
 
 

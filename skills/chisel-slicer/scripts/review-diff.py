@@ -22,6 +22,7 @@ Run from the chisel-releases checkout root (the checkers read chisel.yaml for
 the format version). pyyaml is declared so the checkers, invoked via this same
 interpreter, can import it.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -41,14 +42,22 @@ def git(args: list[str]) -> str | None:
 
 
 def run_check(script: str, *args: str) -> list[str]:
-    r = subprocess.run([sys.executable, str(HERE / script), *args], capture_output=True, text=True)
+    r = subprocess.run(
+        [sys.executable, str(HERE / script), *args], capture_output=True, text=True
+    )
     lines = (r.stdout + r.stderr).splitlines()
     findings = [ln for ln in lines if ln.split() and ln.split()[0] in SEVERITIES]
     # a checker crash must not read as "no findings" -- exit 1 with zero
     # parseable findings, or a traceback, means the check never ran.
     if (r.returncode != 0 and not findings) or "Traceback" in r.stderr:
-        tail = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else f"exit {r.returncode}"
-        findings.append(f"warn   {script} {' '.join(args)}: checker crashed, findings unknown ({tail})")
+        tail = (
+            r.stderr.strip().splitlines()[-1]
+            if r.stderr.strip()
+            else f"exit {r.returncode}"
+        )
+        findings.append(
+            f"warn   {script} {' '.join(args)}: checker crashed, findings unknown ({tail})"
+        )
     return findings
 
 
@@ -60,7 +69,11 @@ def changed_slices(base: str) -> list[str] | None:
     for line in status.splitlines():
         parts = line.split("\t")
         # added or modified (skip deletions -- check-diff reports those).
-        if len(parts) >= 2 and parts[0][:1] in ("A", "M", "R") and Path(parts[-1]).exists():
+        if (
+            len(parts) >= 2
+            and parts[0][:1] in ("A", "M", "R")
+            and Path(parts[-1]).exists()
+        ):
             out.append(parts[-1])
     return out
 
@@ -76,7 +89,10 @@ def main(argv: list[str]) -> int:
 
     changed = changed_slices(base)
     if changed is None:
-        print(f"error: git diff against '{base}' failed -- is this a checkout, and is the ref present?", file=sys.stderr)
+        print(
+            f"error: git diff against '{base}' failed -- is this a checkout, and is the ref present?",
+            file=sys.stderr,
+        )
         return 2
 
     findings: list[str] = []
@@ -91,7 +107,9 @@ def main(argv: list[str]) -> int:
     blocks = sum(ln.startswith("block") for ln in findings)
     warns = sum(ln.startswith("warn") for ln in findings)
 
-    print(f"reviewed {len(changed)} changed SDF(s) against {base}: {blocks} block, {warns} warn, {len(findings) - blocks - warns} info")
+    print(
+        f"reviewed {len(changed)} changed SDF(s) against {base}: {blocks} block, {warns} warn, {len(findings) - blocks - warns} info"
+    )
     for ln in findings:
         print(ln)
     verdict = "request-changes" if blocks else ("comment" if warns else "approve")

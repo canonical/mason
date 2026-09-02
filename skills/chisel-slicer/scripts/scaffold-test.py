@@ -19,6 +19,7 @@ Prints to stdout. It does not overwrite anything. Binaries hidden behind globs
 (e.g. /usr/libexec/foo/*) can't be enumerated statically, so they're left as a
 marker comment to fill in. Stdlib + pyyaml.
 """
+
 from __future__ import annotations
 
 import sys
@@ -42,7 +43,9 @@ def slice_execs(doc: Any) -> dict[str, tuple[list[str], list[str]]]:
             continue
         bins, globs = [], []
         for path in contents:
-            if not isinstance(path, str) or not any(path.startswith(d) for d in BIN_DIRS):
+            if not isinstance(path, str) or not any(
+                path.startswith(d) for d in BIN_DIRS
+            ):
                 continue
             if path.endswith("/"):
                 continue
@@ -61,7 +64,9 @@ def scaffold(doc: Any, pkg: str) -> str:
     lines += [
         "# Scaffold from scaffold-test.py -- a STARTING point, not a finished test.",
         "# Replace each --version placeholder with a real functional check and make",
-        "# `spread lxd:tests/spread/integration/" + pkg + "` pass. Every declared binary",
+        "# `spread lxd:tests/spread/integration/"
+        + pkg
+        + "` pass. Every declared binary",
         "# is listed so check-test.py reports full coverage once these are real.",
         "",
     ]
@@ -69,7 +74,9 @@ def scaffold(doc: Any, pkg: str) -> str:
         # no binaries != no test: emit one rootfs per real slice with the
         # consumer pattern spelled out, so the scaffold is runnable as-is.
         slices = doc.get("slices") if isinstance(doc, dict) else None
-        names = [n for n in slices if n != "copyright"] if isinstance(slices, dict) else []
+        names = (
+            [n for n in slices if n != "copyright"] if isinstance(slices, dict) else []
+        )
         names = names or ["<slice>"]
         lines.append("execute: |")
         first = True
@@ -78,9 +85,15 @@ def scaffold(doc: Any, pkg: str) -> str:
                 lines.append("")
             first = False
             lines.append(f'  rootfs="$(install-slices {pkg}_{sname})"')
-            lines.append(f"  # TODO(author): {pkg}_{sname} declares no binaries. install it together")
-            lines.append("  # with a consumer slice (a runtime or tool that uses this data) and")
-            lines.append("  # assert the consumer works -- file-existence checks alone are weak.")
+            lines.append(
+                f"  # TODO(author): {pkg}_{sname} declares no binaries. install it together"
+            )
+            lines.append(
+                "  # with a consumer slice (a runtime or tool that uses this data) and"
+            )
+            lines.append(
+                "  # assert the consumer works -- file-existence checks alone are weak."
+            )
         lines.append("")
         return "\n".join(lines)
 
@@ -90,10 +103,14 @@ def scaffold(doc: Any, pkg: str) -> str:
         if not first:
             lines.append("")
         first = False
-        lines.append(f"  # {pkg}_{sname}: fresh rootfs so a missing dep can't hide behind another test.")
+        lines.append(
+            f"  # {pkg}_{sname}: fresh rootfs so a missing dep can't hide behind another test."
+        )
         lines.append(f'  rootfs="$(install-slices {pkg}_{sname})"')
         for b in bins:
-            lines.append(f'  chroot "$rootfs" {b} --version  # TODO(author): real functional check')
+            lines.append(
+                f'  chroot "$rootfs" {b} --version  # TODO(author): real functional check'
+            )
         for g in globs:
             lines.append(f"  # TODO(author): exercise the binaries matching {g}")
     lines.append("")
@@ -114,7 +131,11 @@ def main(argv: list[str]) -> int:
     except (OSError, yaml.YAMLError) as e:
         print(f"error: cannot read {sdf}: {e}", file=sys.stderr)
         return 2
-    pkg = doc.get("package") if isinstance(doc, dict) and isinstance(doc.get("package"), str) else sdf.stem
+    pkg = (
+        doc.get("package")
+        if isinstance(doc, dict) and isinstance(doc.get("package"), str)
+        else sdf.stem
+    )
     print(scaffold(doc, pkg), end="")
     return 0
 

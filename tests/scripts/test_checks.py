@@ -7,6 +7,7 @@ interpreter. Run:
 
     uv run --with pyyaml --with pytest pytest tests/scripts/
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -20,7 +21,8 @@ SCRIPTS = Path(__file__).resolve().parents[2] / "skills/chisel-slicer/scripts"
 def run(script: str, *args: str) -> str:
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / script), *args],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     return r.stdout + r.stderr
 
@@ -110,12 +112,27 @@ def test_check_slice() -> None:
 
         # hint validation (v3): a good hint is clean; length/style are checked.
         def hint_sdf(h):
-            return f'package: foo\nessential:\n  foo_copyright:\nslices:\n  bins:\n    hint: {h}\n    contents:\n      /usr/bin/foo:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n'
-        out = run("check-slice.py", write(d, "foo.yaml", hint_sdf("System log viewer")), "--format", "3")
+            return f"package: foo\nessential:\n  foo_copyright:\nslices:\n  bins:\n    hint: {h}\n    contents:\n      /usr/bin/foo:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
+
+        out = run(
+            "check-slice.py",
+            write(d, "foo.yaml", hint_sdf("System log viewer")),
+            "--format",
+            "3",
+        )
         assert "hint" not in out, out  # valid hint, no findings
-        out = run("check-slice.py", write(d, "foo.yaml", hint_sdf("The tool that manages absolutely everything here.")), "--format", "3")
-        assert "caps it at 40" in out, out            # length is a parse-error block
-        assert "start with an article" in out, out    # style warn
+        out = run(
+            "check-slice.py",
+            write(
+                d,
+                "foo.yaml",
+                hint_sdf("The tool that manages absolutely everything here."),
+            ),
+            "--format",
+            "3",
+        )
+        assert "caps it at 40" in out, out  # length is a parse-error block
+        assert "start with an article" in out, out  # style warn
 
         # v3-essential is a v1/v2 backport; a chisel parse error on v3.
         v3e = "package: foo\nslices:\n  bins:\n    v3-essential:\n      libc6_libs: {arch: [amd64]}\n    contents:\n      /usr/bin/foo:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
@@ -131,7 +148,12 @@ def test_branch_format_from_git() -> None:
     # object store (no hardcoded table, no network). Build a throwaway repo whose
     # committed chisel.yaml is v3, then lint a list-form SDF against --branch.
     import os
-    env = {**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
+
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+    }
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         (d / "chisel.yaml").write_text("format: v3\n", encoding="utf-8")
@@ -139,9 +161,23 @@ def test_branch_format_from_git() -> None:
 
         def git(*a: str) -> None:
             subprocess.run(
-                ["git", "-C", str(d), "-c", "user.name=t", "-c", "user.email=t@t",
-                 "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", *a],
-                check=True, capture_output=True, env=env,
+                [
+                    "git",
+                    "-C",
+                    str(d),
+                    "-c",
+                    "user.name=t",
+                    "-c",
+                    "user.email=t@t",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "commit.gpgsign=false",
+                    *a,
+                ],
+                check=True,
+                capture_output=True,
+                env=env,
             )
 
         git("init", "-q", "-b", "ubuntu-99.10")
@@ -150,13 +186,24 @@ def test_branch_format_from_git() -> None:
 
         def lint(branch: str) -> str:
             r = subprocess.run(
-                [sys.executable, str(SCRIPTS / "check-slice.py"), "foo.yaml", "--branch", branch],
-                cwd=str(d), capture_output=True, text=True, env=env,
+                [
+                    sys.executable,
+                    str(SCRIPTS / "check-slice.py"),
+                    "foo.yaml",
+                    "--branch",
+                    branch,
+                ],
+                cwd=str(d),
+                capture_output=True,
+                text=True,
+                env=env,
             )
             return r.stdout + r.stderr
 
         # v3 resolved from the committed chisel.yaml -> list-form essential blocks.
-        assert "essential must be a map on v3" in lint("ubuntu-99.10"), lint("ubuntu-99.10")
+        assert "essential must be a map on v3" in lint("ubuntu-99.10"), lint(
+            "ubuntu-99.10"
+        )
         # an unknown ref resolves to no format -> gated checks skipped, no crash.
         out = lint("ubuntu-00.00")
         assert "essential must be a map on v3" not in out, out
@@ -167,13 +214,32 @@ def test_branch_format_origin_fallback() -> None:
     # the real cross-branch case: the target release is only a remote-tracking
     # ref (no local branch), so format_of_branch must fall back to origin/<branch>.
     import os
-    env = {**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
+
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+    }
 
     def git(cwd: Path, *a: str) -> None:
         subprocess.run(
-            ["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@t",
-             "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", *a],
-            check=True, capture_output=True, env=env,
+            [
+                "git",
+                "-C",
+                str(cwd),
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "commit.gpgsign=false",
+                *a,
+            ],
+            check=True,
+            capture_output=True,
+            env=env,
         )
 
     with tempfile.TemporaryDirectory() as td:
@@ -189,19 +255,38 @@ def test_branch_format_origin_fallback() -> None:
         (origin / "chisel.yaml").write_text("format: v3\n", encoding="utf-8")
         git(origin, "add", "-A")
         git(origin, "commit", "-qm", "v3 branch")
-        git(origin, "checkout", "-q", "main")  # leave HEAD on main so the clone omits ubuntu-88.04
-        subprocess.run(["git", "clone", "-q", str(origin), str(clone)],
-                       check=True, capture_output=True, env=env)
+        git(
+            origin, "checkout", "-q", "main"
+        )  # leave HEAD on main so the clone omits ubuntu-88.04
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(clone)],
+            check=True,
+            capture_output=True,
+            env=env,
+        )
         (clone / "foo.yaml").write_text(CLEAN, encoding="utf-8")  # list-form essential
 
         # precondition: no LOCAL ubuntu-88.04 -> only origin/ubuntu-88.04 can resolve it.
-        rb = subprocess.run(["git", "-C", str(clone), "rev-parse", "--verify", "-q", "ubuntu-88.04"],
-                            capture_output=True, text=True, env=env)
+        rb = subprocess.run(
+            ["git", "-C", str(clone), "rev-parse", "--verify", "-q", "ubuntu-88.04"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
         assert rb.returncode != 0, "expected ubuntu-88.04 to be remote-only"
 
         r = subprocess.run(
-            [sys.executable, str(SCRIPTS / "check-slice.py"), "foo.yaml", "--branch", "ubuntu-88.04"],
-            cwd=str(clone), capture_output=True, text=True, env=env,
+            [
+                sys.executable,
+                str(SCRIPTS / "check-slice.py"),
+                "foo.yaml",
+                "--branch",
+                "ubuntu-88.04",
+            ],
+            cwd=str(clone),
+            capture_output=True,
+            text=True,
+            env=env,
         )
         out = r.stdout + r.stderr
         # v3 resolved via origin/ubuntu-88.04 -> list-form essential blocks.
@@ -215,38 +300,72 @@ def test_orientation_release_discovery() -> None:
     # end-of-life line prints. exercises the set -e paths under a real invocation.
     import os
     import re as _re
+
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         origin, clone = d / "origin", d / "clone"
-        env = {**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
-               "MASON_CHISEL_RELEASES_URL": str(origin)}
+        env = {
+            **os.environ,
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_SYSTEM": "/dev/null",
+            "MASON_CHISEL_RELEASES_URL": str(origin),
+        }
 
         def git(cwd: Path, *a: str) -> None:
             subprocess.run(
-                ["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@t",
-                 "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", *a],
-                check=True, capture_output=True, env=env,
+                [
+                    "git",
+                    "-C",
+                    str(cwd),
+                    "-c",
+                    "user.name=t",
+                    "-c",
+                    "user.email=t@t",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "commit.gpgsign=false",
+                    *a,
+                ],
+                check=True,
+                capture_output=True,
+                env=env,
             )
 
         def manifest(fmt: str, ver: str, eol: str) -> str:
-            return (f"format: {fmt}\narchives:\n  ubuntu:\n    version: '{ver}'\n"
-                    f"    suites: [foo]\nmaintenance:\n  end-of-life: {eol}\n")
+            return (
+                f"format: {fmt}\narchives:\n  ubuntu:\n    version: '{ver}'\n"
+                f"    suites: [foo]\nmaintenance:\n  end-of-life: {eol}\n"
+            )
 
         origin.mkdir()
         git(origin, "init", "-q", "-b", "ubuntu-40.04")
-        (origin / "chisel.yaml").write_text(manifest("v3", "40.04", "2999-01-01"), encoding="utf-8")
+        (origin / "chisel.yaml").write_text(
+            manifest("v3", "40.04", "2999-01-01"), encoding="utf-8"
+        )
         git(origin, "add", "-A")
         git(origin, "commit", "-qm", "live lts")
         git(origin, "checkout", "-q", "-b", "ubuntu-30.10")
-        (origin / "chisel.yaml").write_text(manifest("v2", "30.10", "2000-01-01"), encoding="utf-8")
+        (origin / "chisel.yaml").write_text(
+            manifest("v2", "30.10", "2000-01-01"), encoding="utf-8"
+        )
         git(origin, "add", "-A")
         git(origin, "commit", "-qm", "dead interim")
         git(origin, "checkout", "-q", "ubuntu-40.04")  # HEAD -> the future-eol branch
-        subprocess.run(["git", "clone", "-q", str(origin), str(clone)],
-                       check=True, capture_output=True, env=env)
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(clone)],
+            check=True,
+            capture_output=True,
+            env=env,
+        )
 
-        r = subprocess.run(["bash", str(SCRIPTS / "orientation")],
-                           cwd=str(clone), capture_output=True, text=True, env=env)
+        r = subprocess.run(
+            ["bash", str(SCRIPTS / "orientation")],
+            cwd=str(clone),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
         out = r.stdout + r.stderr
         assert r.returncode == 0, out
         # local parse of the checked-out branch: the new end-of-life line.
@@ -261,7 +380,11 @@ def test_check_test() -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         sdf = write(d, "foo.yaml", CLEAN)
-        exercised = write(d, "task.yaml", 'summary: x\nexecute: |\n  rootfs="$(install-slices foo_bins)"\n  chroot "$rootfs" foo --version\n')
+        exercised = write(
+            d,
+            "task.yaml",
+            'summary: x\nexecute: |\n  rootfs="$(install-slices foo_bins)"\n  chroot "$rootfs" foo --version\n',
+        )
         out = run("check-test.py", sdf, exercised)
         assert "ok:" in out, out
 
@@ -273,7 +396,9 @@ def test_check_test() -> None:
         # partial coverage is advisory (info), not a warn: two bins, one tested.
         two = "package: foo\nessential:\n  - foo_copyright\nslices:\n  bins:\n    contents:\n      /usr/bin/foo:\n      /usr/bin/zzz:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
         sdf2 = write(d, "foo2.yaml", two)
-        one = write(d, "one.yaml", 'summary: x\nexecute: |\n  chroot "$r" foo --version\n')
+        one = write(
+            d, "one.yaml", 'summary: x\nexecute: |\n  chroot "$r" foo --version\n'
+        )
         out = run("check-test.py", sdf2, one)
         assert "info" in out and "1/2 binaries exercised" in out and "zzz" in out, out
         assert "warn" not in out, out
@@ -328,10 +453,13 @@ def test_robustness() -> None:
 
 def test_draft_sdf() -> None:
     import importlib.util
+
     # don't write __pycache__ into the installed skill's scripts dir.
     prev, sys.dont_write_bytecode = sys.dont_write_bytecode, True
     try:
-        spec = importlib.util.spec_from_file_location("deblist", str(SCRIPTS / "deb-list.py"))
+        spec = importlib.util.spec_from_file_location(
+            "deblist", str(SCRIPTS / "deb-list.py")
+        )
         m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(m)
     finally:
@@ -339,14 +467,14 @@ def test_draft_sdf() -> None:
     entries = [
         ("/usr/bin/foo", "x", "0755", "root/root", None),
         ("/usr/lib/x86_64-linux-gnu/libfoo.so.1", "f", "0644", "root/root", None),
-        ("/usr/include/foo.h", "f", "0644", "root/root", None),          # headers
-        ("/var/lib/foo/state", "f", "0644", "root/root", None),          # var
-        ("/usr/share/man/man1/foo.1", "f", "0644", "root/root", None),   # clutter
+        ("/usr/include/foo.h", "f", "0644", "root/root", None),  # headers
+        ("/var/lib/foo/state", "f", "0644", "root/root", None),  # var
+        ("/usr/share/man/man1/foo.1", "f", "0644", "root/root", None),  # clutter
         ("/usr/share/doc/foo/copyright", "f", "0644", "root/root", None),
     ]
     sdf = m.build_sdf("foo", "libc6", entries)
     assert "/usr/lib/*-linux-*/libfoo.so.1:" in sdf, sdf  # multiarch triple globbed
-    assert "/usr/share/man" not in sdf, sdf               # clutter dropped
+    assert "/usr/share/man" not in sdf, sdf  # clutter dropped
     assert "headers:" in sdf and "/usr/include/foo.h:" in sdf, sdf
     assert "var:" in sdf and "/var/lib/foo/state:" in sdf, sdf
     # the draft is conformant by construction: check-slice passes on it, on the
@@ -365,9 +493,13 @@ def test_draft_sdf() -> None:
     # shared-copyright package: ships /usr/share/doc/<pkg> as a symlink, no
     # copyright file. the doc dir must go in copyright, not be dropped, and no
     # bogus /usr/share/doc/<pkg>/copyright path should be invented.
-    shared = m.build_sdf("libgcc-s1", "gcc-base", [
-        ("/usr/lib/x86_64-linux-gnu/libgcc_s.so.1", "f", "0644", "root/root", None),
-        ("/usr/share/doc/libgcc-s1", "l", "0777", "root/root", "gcc-base"),
-    ])
+    shared = m.build_sdf(
+        "libgcc-s1",
+        "gcc-base",
+        [
+            ("/usr/lib/x86_64-linux-gnu/libgcc_s.so.1", "f", "0644", "root/root", None),
+            ("/usr/share/doc/libgcc-s1", "l", "0777", "root/root", "gcc-base"),
+        ],
+    )
     assert "/usr/share/doc/libgcc-s1:" in shared, shared
     assert "/usr/share/doc/libgcc-s1/copyright" not in shared, shared
