@@ -11,7 +11,7 @@ labels: bug
 
 ## repro
 
-<!-- exact command, e.g. `npx tessl i rockcrafters/mason --skill chisel-slicer` -->
+<!-- exact command, e.g. `npx tessl i canonical/mason --skill chisel-slicer` -->
 
 ```
 

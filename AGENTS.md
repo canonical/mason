@@ -29,6 +29,6 @@ the deterministic scripts are the backbone, so the commands don't rely on the ag
 
 ## install
 
-`mason` is a tessl plugin (`.tessl-plugin/plugin.json`; skills discovered from `skills/`): `npx tessl i rockcrafters/mason --skill chisel-slicer`. the same tree installs via `npx skills add`, `gh skill install`, and the claude code marketplace (`.claude-plugin/`) -- see README. there is no installer of our own any more; a skill has to be self-contained (hence `_shared/` + `sync-shared`). adding a capability = a new skill dir under `skills/`, name equal to the dir, `SKILL.md` frontmatter per agentskills.io.
+`mason` is a tessl plugin (`.tessl-plugin/plugin.json`; skills discovered from `skills/`): `npx tessl i canonical/mason --skill chisel-slicer`. the same tree installs via `npx skills add`, `gh skill install`, and the claude code marketplace (`.claude-plugin/`) -- see README. there is no installer of our own any more; a skill has to be self-contained (hence `_shared/` + `sync-shared`). adding a capability = a new skill dir under `skills/`, name equal to the dir, `SKILL.md` frontmatter per agentskills.io.
 
 the version is `.tessl-plugin/plugin.json`'s (mirror in `.claude-plugin/plugin.json`); releasing = bump, tag, `npx tessl plugin publish .` (README "releasing").

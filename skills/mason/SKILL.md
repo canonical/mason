@@ -36,5 +36,5 @@ usage:
   /chisel-slicer review-slice slices/<pkg>.yaml
   or plain language: "write a slice for <pkg>", "review slices/foo.yaml"
 
-docs: https://github.com/rockcrafters/mason
+docs: https://github.com/canonical/mason
 ```

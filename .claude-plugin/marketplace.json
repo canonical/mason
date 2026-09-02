@@ -3,8 +3,8 @@
   "name": "mason",
   "description": "Agent kit for canonical/chisel-releases work -- a cross-agent skill and scripts for authoring and reviewing chisel slice definition files.",
   "owner": {
-    "name": "rockcrafters",
-    "url": "https://github.com/rockcrafters"
+    "name": "canonical",
+    "url": "https://github.com/canonical"
   },
   "plugins": [
     {

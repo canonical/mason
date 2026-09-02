@@ -6,15 +6,15 @@
 
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)](#)
 [![rocks](https://img.shields.io/badge/%F0%9F%AA%A8-rocks-E95420)](https://ubuntu.com/server/docs/explanation/virtualisation/about-rock-images/)
-[![test](https://github.com/rockcrafters/mason/actions/workflows/test.yml/badge.svg)](https://github.com/rockcrafters/mason/actions/workflows/test.yml)
-[![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Frockcrafters%2Fmason)](https://tessl.io/registry/rockcrafters/mason)
+[![test](https://github.com/canonical/mason/actions/workflows/test.yml/badge.svg)](https://github.com/canonical/mason/actions/workflows/test.yml)
+[![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fcanonical%2Fmason)](https://tessl.io/registry/canonical/mason)
 
 Tribal knowledge about [`rocks`](https://documentation.ubuntu.com/rockcraft/stable/explanation/rocks/), [`rockcraft`](https://documentation.ubuntu.com/rockcraft/latest/), [`chisel`](https://github.com/canonical/chisel), [`chisel-releases`](https://github.com/canonical/chisel-releases), and slice definition files (SDFs).
 
 Install with:
 
 ```
-npx tessl i rockcrafters/mason --skill chisel-slicer
+npx tessl i canonical/mason --skill chisel-slicer
 ```
 
 _(see below for detailed instructions)_
@@ -31,14 +31,14 @@ git checkout ubuntu-26.04 && git checkout -b feat/my-new-slice
 ## install
 
 `mason` is a [tessl](https://tessl.io) plugin: one registry entry
-([`rockcrafters/mason`](https://tessl.io/registry/rockcrafters/mason)), several skills, pick the
+([`canonical/mason`](https://tessl.io/registry/canonical/mason)), several skills, pick the
 ones you want. No clone, no npm publish:
 
 ```
-npx tessl i rockcrafters/mason --skill chisel-slicer             # into the current repo
-npx tessl i rockcrafters/mason --skill chisel-slicer --global    # into ~/.tessl, for every repo
-npx tessl i rockcrafters/mason@0.1.0 --skill chisel-slicer       # pinned
-npx tessl i rockcrafters/mason                                   # no --skill: pick interactively
+npx tessl i canonical/mason --skill chisel-slicer             # into the current repo
+npx tessl i canonical/mason --skill chisel-slicer --global    # into ~/.tessl, for every repo
+npx tessl i canonical/mason@0.2.0 --skill chisel-slicer       # pinned
+npx tessl i canonical/mason                                   # no --skill: pick interactively
 ```
 
 tessl keeps one copy of the plugin (`.tessl/plugins/`, or `~/.tessl/` with `--global`) and
@@ -51,9 +51,9 @@ yours to commit to (a `chisel-releases` clone, say).
 The layout is a plain `skills/<name>/SKILL.md` tree, so the other installers work too:
 
 ```
-npx skills add rockcrafters/mason --skill chisel-slicer    # skills.sh (vercel), 70+ agents incl. pi
-gh skill install rockcrafters/mason chisel-slicer          # github cli >= 2.90
-/plugin marketplace add rockcrafters/mason                 # claude code plugin: every skill, as /mason:<skill>
+npx skills add canonical/mason --skill chisel-slicer    # skills.sh (vercel), 70+ agents incl. pi
+gh skill install canonical/mason chisel-slicer          # github cli >= 2.90
+/plugin marketplace add canonical/mason                 # claude code plugin: every skill, as /mason:<skill>
 ```
 
 ## what's in here
@@ -114,7 +114,7 @@ npx tessl plugin pack . --output /tmp/mason.tgz && tar tzf /tmp/mason.tgz   # ey
 npx tessl plugin publish .
 ```
 
-Installs from github (`npx tessl i github:rockcrafters/mason`, `npx skills add`, `gh skill`) pin
+Installs from github (`npx tessl i github:canonical/mason`, `npx skills add`, `gh skill`) pin
 the commit and need no publish.
 
 ## sources of truth

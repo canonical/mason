@@ -22,7 +22,7 @@ _MARKERS = (
     "write-slice <pkg>",
     "review-slice",
     "slices/<pkg>.yaml",
-    "github.com/rockcrafters/mason",
+    "github.com/canonical/mason",
 )
 
 

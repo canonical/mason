@@ -3,9 +3,9 @@
   "version": "0.2.0",
   "description": "Agent kit for working on canonical/chisel-releases. Cross-agent skills + scripts for authoring and reviewing chisel slice definition files.",
   "author": {
-    "name": "rockcrafters",
-    "url": "https://github.com/rockcrafters"
+    "name": "canonical",
+    "url": "https://github.com/canonical"
   },
-  "repository": "https://github.com/rockcrafters/mason",
+  "repository": "https://github.com/canonical/mason",
   "license": "Apache-2.0"
 }
