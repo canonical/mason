@@ -23,7 +23,10 @@ exactly as written.
 
 Paths below (`commands/`, `shared/`, `scripts/`, `schemas/`) are relative to this
 skill's own directory instead -- the one holding this `SKILL.md`. They are
-read-only.
+read-only. Some installers drop the executable bit, so if a
+`scripts/` file will not run by path, run it through its interpreter instead:
+`bash scripts/orientation`, `uv run --script scripts/check-slice.py` (or `python3`
+with pyyaml available).
 
 ## Layout
 
