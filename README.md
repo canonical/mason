@@ -14,7 +14,7 @@ Tribal knowledge about [`rocks`](https://documentation.ubuntu.com/rockcraft/stab
 Install with:
 
 ```
-npx github:rockcrafters/mason install ...
+npx tessl i rockcrafters/mason --skill chisel-slicer
 ```
 
 _(see below for detailed instructions)_
@@ -30,97 +30,92 @@ git checkout ubuntu-26.04 && git checkout -b feat/my-new-slice
 
 ## install
 
-Install the skills into another repo for your agent with `npx`, no clone or npm publish needed:
+`mason` is a [tessl](https://tessl.io) plugin: one registry entry
+([`rockcrafters/mason`](https://tessl.io/registry/rockcrafters/mason)), several skills, pick the
+ones you want. No clone, no npm publish:
 
 ```
-npx github:rockcrafters/mason install claude
+npx tessl i rockcrafters/mason --skill chisel-slicer             # into the current repo
+npx tessl i rockcrafters/mason --skill chisel-slicer --global    # into ~/.tessl, for every repo
+npx tessl i rockcrafters/mason@0.1.0 --skill chisel-slicer       # pinned
+npx tessl i rockcrafters/mason                                   # no --skill: pick interactively
 ```
 
-```
-<agents>          required. comma-separated: claude, pi, copilot-cli, opencode, codex;
-                  also: auto (detect agents in target), all (every agent).
-                  duplicates are fine; all wins over everything else.
-                  extra target: copilot-instructions (see below; never
-                  implied by all/auto).
---target <dir>    install into <dir> (default: git root, else cwd)
---dry-run         show what would change, write nothing
---force           clean reinstall: drop each skill dir, then write it anew
---update          alias for --force
---quiet, -q       suppress per-file logs (warnings still print)
---help, -h        show this help
-```
+tessl keeps one copy of the plugin (`.tessl/plugins/`, or `~/.tessl/` with `--global`) and
+symlinks each chosen skill into the discovery directory of every agent it detects -- claude
+code, codex, copilot, cursor, gemini, ... (`--agent <id>` to choose). opencode and pi read
+`.agents/skills/` and `.claude/skills/` natively, so `--agent agents` covers them. A
+project-level install also writes `tessl.json`; use `--global` when the target checkout is not
+yours to commit to (a `chisel-releases` clone, say).
 
-The installer copies each skill tree, plus the shared reference `mason/_shared/` as `<skill>/shared/`, into the agent's skill-discovery directory
-(`.claude/skills/<skill>`, `.pi/skills/<skill>`, `.github/skills/<skill>`, `.opencode/skills/<skill>`, `.codex/skills/<skill>`);
-opencode additionally gets a generated `.opencode/command/<skill>.md`. Re-running skips up-to-date
-files and leaves locally-modified ones alone; `--force` drops each known skill dir and writes it
-fresh (scoped per skill -- foreign skills under the same base survive).
-
-Claude code users can alternatively add it as a plugin via the marketplace (`.claude-plugin/`).
-
-### copilot code review
-
-GitHub Copilot code review (the automatic PR reviewer) never reads `.github/skills/` -- it only
-picks up `.github/copilot-instructions.md` and `.github/instructions/*.instructions.md`. The
-`copilot-instructions` target covers it:
+The layout is a plain `skills/<name>/SKILL.md` tree, so the other installers work too:
 
 ```
-npx github:rockcrafters/mason install copilot-instructions
+npx skills add rockcrafters/mason --skill chisel-slicer    # skills.sh (vercel), 70+ agents incl. pi
+gh skill install rockcrafters/mason chisel-slicer          # github cli >= 2.90
+/plugin marketplace add rockcrafters/mason                 # claude code plugin: every skill, as /mason:<skill>
 ```
-
-This writes `.github/copilot-instructions.md` (review conventions and known anti-patterns) and
-materialises every `mason/_shared/*.md` as `.github/instructions/mason-<name>.instructions.md`
-(with an `applyTo` frontmatter), so the reviewer sees the shared reference too. The `mason-`
-prefix namespaces the files; `--force` drops and rewrites only `mason-*.instructions.md`,
-leaving foreign instructions files alone. The target is explicit opt-in -- `all` and `auto`
-never write it.
 
 ## what's in here
 
-`mason` is an umbrella kit for chisel / rocks work. each capability area is one self-contained skill
-under `mason/skills/`; the installer copies each per agent (no committed per-agent adapters). today
-there are two: `chisel-releases` (the substance) and `mason` (the `/mason` entry point -- routes a request to the right skill, or prints help).
+`mason` is an umbrella kit for chisel / rocks work. Each capability area is one self-contained skill
+under `skills/`, copied verbatim by whichever installer. Today there are two: `chisel-slicer` (the
+substance) and `mason` (the `/mason` entry point -- routes a request to the right skill, or prints help).
 
 ```
-mason/
-  skills/
-    chisel-releases/               # a skill -- self-contained, copied verbatim on install
-      SKILL.md                     # skill entry + command dispatch
-      commands/
-        write-slice.md             # author + scaffold tests + self-check + commit
-        review-slice.md            # review: deterministic first pass (scripts) + judgement
-      shared/CHISEL.md             # not committed -- materialised from mason/_shared/ on install
-      scripts/
-        orientation                # deterministic orientation: cwd, skill dir, target release + format
-        deb-list.py                # inspect .deb contents (files, deps, maintainer scripts); --sdf emits a draft SDF
-        try-cut                    # test slices with chisel cut against the current checkout
-        scaffold-test.py           # emit a spread task.yaml skeleton (a rootfs per slice, every binary listed)
-        check-slice.py             # lint an SDF: sorting, naming, copyright, clutter, arch, version-gated fields
-        check-test.py              # report binary test coverage for a slice
-        check-diff.py              # append-only regressions (removed SDF / slice / path) vs a base ref
-        review-diff.py             # run the three checks over a PR diff -> report + verdict + exit code
-      schemas/commands.manifest.yaml  # command index (command -> file)
-    mason/                         # umbrella /mason skill -- routes to a skill, or prints usage
-      SKILL.md
-  _shared/                         # shared reference, source of truth (format, branch model, schema versions)
-    CHISEL.md
-  copilot-instructions/            # entry file for the copilot-instructions install target
-    copilot-instructions.md        # -> .github/copilot-instructions.md (copilot code review)
-  .claude-plugin/                  # claude code plugin manifest
-scripts/cli.js                     # the npx installer (installs every skill under mason/skills/)
-tests/scripts/                     # pytest (script checks) + node --test (installer) -- see makefile
-package.json                       # bin: mason -> scripts/cli.js
+skills/
+  chisel-slicer/                   # a skill -- self-contained, copied verbatim on install
+    SKILL.md                       # skill entry + command dispatch
+    commands/
+      write-slice.md               # author + scaffold tests + self-check + commit
+      review-slice.md              # review: deterministic first pass (scripts) + judgement
+    shared/CHISEL.md               # generated copy of _shared/CHISEL.md (make sync-shared)
+    shared.list                    # which _shared/ files this skill ships
+    scripts/
+      orientation                  # deterministic orientation: cwd, skill dir, target release + format
+      deb-list.py                  # inspect .deb contents (files, deps, maintainer scripts); --sdf emits a draft SDF
+      try-cut                      # test slices with chisel cut against the current checkout
+      scaffold-test.py             # emit a spread task.yaml skeleton (a rootfs per slice, every binary listed)
+      check-slice.py               # lint an SDF: sorting, naming, copyright, clutter, arch, version-gated fields
+      check-test.py                # report binary test coverage for a slice
+      check-diff.py                # append-only regressions (removed SDF / slice / path) vs a base ref
+      review-diff.py               # run the three checks over a PR diff -> report + verdict + exit code
+    schemas/commands.manifest.yaml # command index (command -> file)
+  mason/                           # umbrella /mason skill -- routes to a skill, or prints usage
+    SKILL.md
+_shared/                           # material used by more than one skill -- the source of truth
+  CHISEL.md                        # chisel reference: format, branch model, schema versions, naming
+scripts/sync-shared.py             # copies _shared/ files into each skill's shared/ per its shared.list
+.tessl-plugin/plugin.json          # tessl plugin manifest (name, version); skills/ discovered by default
+.claude-plugin/                    # claude code marketplace + plugin manifests
+tests/scripts/                     # pytest for the skill scripts -- see makefile
+tests/skills/                      # pats eval of the skills themselves
 ```
 
-Adding a capability = a new skill directory under `mason/skills/`; the installer picks it up automatically.
-Skills share reference material via `mason/_shared/` -- the single source of truth. The installer
-materialises it into every skill as `<skill>/shared/`, so installed skills are self-contained; the
-copies are never committed (gitignored).
+Adding a capability = a new skill directory under `skills/`; every installer picks it up. A skill
+that needs something from `_shared/` lists it in its `shared.list`; `make sync-shared` copies it
+into `<skill>/shared/` (with a "generated" banner) and the copy is committed, so installed skills
+are self-contained. `make check-shared` (run in ci) fails when a copy drifts from its source.
 
 ## testing
 
-Scripts and the installer are covered by pytest and `node --test` (see makefile). The skills
-themselves (prompt-level behaviour) are tested with [pats](https://github.com/lczyk/pats).
+The scripts are covered by pytest (`make test`); `make verify` runs everything ci runs. The skills
+themselves (prompt-level behaviour) are tested with [pats](https://github.com/lczyk/pats), see
+`tests/skills/`.
+
+## releasing
+
+The version lives in `.tessl-plugin/plugin.json` (mirror it in `.claude-plugin/plugin.json`).
+Bump it, tag `vX.Y.Z`, then publish to the registry:
+
+```
+npx tessl plugin lint .
+npx tessl plugin pack . --output /tmp/mason.tgz && tar tzf /tmp/mason.tgz   # eyeball what ships
+npx tessl plugin publish .
+```
+
+Installs from github (`npx tessl i github:rockcrafters/mason`, `npx skills add`, `gh skill`) pin
+the commit and need no publish.
 
 ## sources of truth
 
