@@ -7,14 +7,14 @@
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)](#)
 [![rocks](https://img.shields.io/badge/%F0%9F%AA%A8-rocks-E95420)](https://ubuntu.com/server/docs/explanation/virtualisation/about-rock-images/)
 [![test](https://github.com/canonical/mason/actions/workflows/test.yml/badge.svg)](https://github.com/canonical/mason/actions/workflows/test.yml)
-[![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fcanonical%2Fmason)](https://tessl.io/registry/canonical/mason)
+[![skills.sh](https://skills.sh/b/canonical/mason)](https://skills.sh/canonical/mason)
 
 Tribal knowledge about [`rocks`](https://documentation.ubuntu.com/rockcraft/stable/explanation/rocks/), [`rockcraft`](https://documentation.ubuntu.com/rockcraft/latest/), [`chisel`](https://github.com/canonical/chisel), [`chisel-releases`](https://github.com/canonical/chisel-releases), and slice definition files (SDFs).
 
 Install with:
 
 ```
-npx tessl i canonical/mason --skill chisel-slicer
+npx skills add canonical/mason --skill chisel-slicer
 ```
 
 _(see below for detailed instructions)_
@@ -30,31 +30,17 @@ git checkout ubuntu-26.04 && git checkout -b feat/my-new-slice
 
 ## install
 
-`mason` is a [tessl](https://tessl.io) plugin: one registry entry
-([`canonical/mason`](https://tessl.io/registry/canonical/mason)), several skills, pick the
-ones you want. No clone, no npm publish:
-
-```
-npx tessl i canonical/mason --skill chisel-slicer             # into the current repo
-npx tessl i canonical/mason --skill chisel-slicer --global    # into ~/.tessl, for every repo
-npx tessl i canonical/mason@0.2.0 --skill chisel-slicer       # pinned
-npx tessl i canonical/mason                                   # no --skill: pick interactively
-```
-
-tessl keeps one copy of the plugin (`.tessl/plugins/`, or `~/.tessl/` with `--global`) and
-symlinks each chosen skill into the discovery directory of every agent it detects -- claude
-code, codex, copilot, cursor, gemini, ... (`--agent <id>` to choose). opencode and pi read
-`.agents/skills/` and `.claude/skills/` natively, so `--agent agents` covers them. A
-project-level install also writes `tessl.json`; use `--global` when the target checkout is not
-yours to commit to (a `chisel-releases` clone, say).
-
-The layout is a plain `skills/<name>/SKILL.md` tree, so the other installers work too:
+`mason` is an agent skills kit published from github. Each capability is a separate skill, so
+pick the ones you want:
 
 ```
 npx skills add canonical/mason --skill chisel-slicer    # skills.sh (vercel), 70+ agents incl. pi
 gh skill install canonical/mason chisel-slicer          # github cli >= 2.90
 /plugin marketplace add canonical/mason                 # claude code plugin: every skill, as /mason:<skill>
 ```
+
+The layout is a plain `skills/<name>/SKILL.md` tree, so these installers all work directly from
+github.
 
 ## what's in here
 
@@ -86,7 +72,7 @@ skills/
 _shared/                           # material used by more than one skill -- the source of truth
   CHISEL.md                        # chisel reference: format, branch model, schema versions, naming
 scripts/sync-shared.py             # copies _shared/ files into each skill's shared/ per its shared.list
-.tessl-plugin/plugin.json          # tessl plugin manifest (name, version); skills/ discovered by default
+.tessl-plugin/plugin.json          # tessl plugin manifest retained for registry packaging
 .claude-plugin/                    # claude code marketplace + plugin manifests
 tests/scripts/                     # pytest for the skill scripts -- see makefile
 tests/skills/                      # pats eval of the skills themselves
@@ -114,12 +100,10 @@ npx tessl plugin pack . --output /tmp/mason.tgz && tar tzf /tmp/mason.tgz   # ey
 npx tessl plugin publish .
 ```
 
-Installs from github (`npx tessl i github:canonical/mason`, `npx skills add`, `gh skill`) pin
-the commit and need no publish.
+Installs from github (`npx skills add`, `gh skill`) pin the commit and need no registry publish.
 
 ## sources of truth
 
 The skill defers to three upstream projects. When in doubt:
 
 **tool behaviour** ([canonical/chisel](https://github.com/canonical/chisel)) > **docs** ([canonical/chisel-docs](https://github.com/canonical/chisel-docs)) > **conventions** ([canonical/chisel-releases](https://github.com/canonical/chisel-releases)) > **this repo**
-
