@@ -35,7 +35,7 @@ SEVERITIES = ("block", "warn", "info")
 
 def git(args: list[str]) -> str | None:
     try:
-        r = subprocess.run(["git", *args], capture_output=True, text=True)
+        r = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
     except OSError:
         return None
     return r.stdout if r.returncode == 0 else None
@@ -43,7 +43,10 @@ def git(args: list[str]) -> str | None:
 
 def run_check(script: str, *args: str) -> list[str]:
     r = subprocess.run(
-        [sys.executable, str(HERE / script), *args], capture_output=True, text=True
+        [sys.executable, str(HERE / script), *args],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     lines = (r.stdout + r.stderr).splitlines()
     findings = [ln for ln in lines if ln.split() and ln.split()[0] in SEVERITIES]

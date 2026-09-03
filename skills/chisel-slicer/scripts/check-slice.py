@@ -145,9 +145,8 @@ def check_essential_sorted(doc: Any, f: Findings) -> None:
     # per-slice essential + contents sorting is the CI lint gate (LC_COLLATE=C,
     # sort -C). the top-level essential is not CI-gated, but keep it sorted for
     # consistency -- so warn, don't block.
-    if isinstance(doc.get("essential"), list):
-        if not is_sorted(doc["essential"]):
-            f.warn("essential:", "global essential entries not sorted")
+    if isinstance(doc.get("essential"), list) and not is_sorted(doc["essential"]):
+        f.warn("essential:", "global essential entries not sorted")
     for name, body in slices_of(doc).items():
         ess = body.get("essential") if isinstance(body, dict) else None
         if isinstance(ess, list) and not is_sorted(ess):
@@ -350,11 +349,12 @@ def format_of_branch(branch: str) -> int | None:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
         except (OSError, subprocess.SubprocessError):
             return None
         if r.returncode == 0:
-            m = re.search(r"^format:\s*\"?v?(\d+)", r.stdout, re.M)
+            m = re.search(r"^format:\s*\"?v?(\d+)", r.stdout, re.MULTILINE)
             return int(m.group(1)) if m else None
     return None
 

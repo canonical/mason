@@ -91,7 +91,7 @@ def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, st
 
 def git(args: list[str]) -> str | None:
     try:
-        r = subprocess.run(["git", *args], capture_output=True, text=True)
+        r = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
     except OSError:
         return None
     return r.stdout if r.returncode == 0 else None

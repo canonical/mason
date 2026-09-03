@@ -23,6 +23,7 @@ def run(script: str, *args: str) -> str:
         [sys.executable, str(SCRIPTS / script), *args],
         capture_output=True,
         text=True,
+        check=False,
     )
     return r.stdout + r.stderr
 
@@ -197,6 +198,7 @@ def test_branch_format_from_git() -> None:
                 capture_output=True,
                 text=True,
                 env=env,
+                check=False,
             )
             return r.stdout + r.stderr
 
@@ -272,6 +274,7 @@ def test_branch_format_origin_fallback() -> None:
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
         assert rb.returncode != 0, "expected ubuntu-88.04 to be remote-only"
 
@@ -287,6 +290,7 @@ def test_branch_format_origin_fallback() -> None:
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
         out = r.stdout + r.stderr
         # v3 resolved via origin/ubuntu-88.04 -> list-form essential blocks.
@@ -365,6 +369,7 @@ def test_orientation_release_discovery() -> None:
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
         out = r.stdout + r.stderr
         assert r.returncode == 0, out

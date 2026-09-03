@@ -38,7 +38,6 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
-
 # Only install-time scripts matter for slice authoring; remove scripts are irrelevant.
 MAINTAINER_SCRIPTS = [
     ("preinst", "before install"),
@@ -76,7 +75,7 @@ def run(cmd, cwd=None, check=True, capture=False):
 def host_arch():
     try:
         return run(["dpkg", "--print-architecture"], capture=True).stdout.strip()
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         return "amd64"
 
 
@@ -116,7 +115,7 @@ def _fetch(url):
         req = urllib.request.Request(url, headers={"User-Agent": _UA})
         with urllib.request.urlopen(req, timeout=60) as resp:
             return resp.read()
-    except Exception:
+    except OSError:
         return None
 
 
@@ -124,7 +123,7 @@ def _filename_from_packages(data, pkg):
     """Find pkg's `Filename:` (pool path) in a gzipped Packages index blob."""
     try:
         text = gzip.GzipFile(fileobj=io.BytesIO(data)).read().decode("utf-8", "replace")
-    except Exception:
+    except (OSError, EOFError):
         return None
     cur = {}
     for line in text.splitlines():
@@ -273,7 +272,7 @@ def classify(path, tag):
         return "bins"
     base = path.rsplit("/", 1)[-1]
     if (".so." in base or base.endswith(".so")) and (
-        path.startswith("/usr/lib") or path.startswith("/lib")
+        path.startswith(("/usr/lib", "/lib"))
     ):
         return "libs"
     if path.startswith("/etc/"):
@@ -297,7 +296,7 @@ def read_format():
         text = Path("chisel.yaml").read_text()
     except OSError:
         return None
-    m = re.search(r"^format:\s*\"?v?(\d+)", text, re.M)
+    m = re.search(r"^format:\s*\"?v?(\d+)", text, re.MULTILINE)
     return int(m.group(1)) if m else None
 
 
