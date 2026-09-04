@@ -56,7 +56,7 @@ Conventions on how a `contents:` path is written. Chisel accepts either form; re
 
 ## Exclude by Default
 
-A `.deb` ships files a minimal rootfs never needs. Do **not** slice these unless a concrete runtime need is proven -- reviewers reject them, and `check-slice.py` (and the eval) flag them:
+A `.deb` ships files a minimal rootfs never needs. Do **not** slice these unless a concrete runtime need is proven -- reviewers reject them, and `check-slice.py` flags them:
 
 | Excluded | Paths | Notes |
 |----------|-------|-------|

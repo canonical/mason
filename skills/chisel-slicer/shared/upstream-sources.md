@@ -1,6 +1,6 @@
 # Sources of Truth
 
-The knowledge in the mason reference files and the associated skills is derived from three upstream projects. When in doubt, **always defer to these sources** over anything written here.
+The knowledge in these reference files is derived from three upstream projects. When in doubt, **always defer to these sources** over anything written here.
 
 ## 1. `canonical/chisel` (tool behaviour)
 
@@ -37,6 +37,6 @@ Also: chisel-releases navigator <https://canonical.github.io/chisel-releases-nav
 
 ## Precedence
 
-When sources conflict: **tool behaviour > chisel-docs > chisel-releases conventions > the mason reference files**.
+When sources conflict: **tool behaviour > chisel-docs > chisel-releases conventions > these reference files**.
 
 When a reference file disagrees with the repo, trust the repo. When in doubt, read `slices/bash.yaml` or `slices/base-files.yaml` on the target release branch.

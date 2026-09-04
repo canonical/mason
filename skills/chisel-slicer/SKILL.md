@@ -2,7 +2,7 @@
 name: chisel-slicer
 description: >-
   Author or review chisel slice definition files (SDFs) against canonical/chisel-releases.
-  Command-per-file architecture, portable across claude code, pi, opencode, copilot, and codex.
+  Command-per-file architecture.
   Commands: write-slice (author + test + commit), review-slice (read-only review).
   Use when user says "add slice", "write a chisel slice", "review slices/<pkg>.yaml",
   or works inside a canonical/chisel-releases checkout.
@@ -11,8 +11,7 @@ argument-hint: "[write-slice|review-slice] <pkg-or-sdf>"
 
 # chisel-slicer
 
-Cross-agent skill for working on [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
-Self-contained: the same skill directory drives claude code, pi, opencode, copilot, and codex.
+Skill for working on [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
 
 ## Where things live
 
@@ -23,8 +22,7 @@ exactly as written.
 
 Paths below (`commands/`, `shared/`, `scripts/`) are relative to this
 skill's own directory instead -- the one holding this `SKILL.md`. They are
-read-only. Some installers drop the executable bit, so if a `scripts/` file will
-not run by path, run it through its interpreter -- **the extension tells you
+read-only. If a `scripts/` file will not run by path, run it through its interpreter -- **the extension tells you
 which**: `orientation` and `try-cut` have none and are bash (`bash scripts/orientation`);
 everything ending `.py` is python (`uv run --script scripts/check-slice.py`, or
 `python3` with pyyaml available). Running a bash script under `python3` fails
@@ -33,7 +31,7 @@ with a `SyntaxError`.
 ## Layout
 
 - `commands/` -- command workflows: markdown to read and follow, not executable scripts
-- `shared/` -- reference material, one file per subject. Each stands alone; read the ones a step calls for. NOTE: copies of the mason source repo's `_shared/` -- edit the sources there, not these.
+- `shared/` -- reference material, one file per subject. Each stands alone; read the ones a step calls for.
   - `slice-definition-format.md` -- SDF format: top-level and per-slice keys, content entry options, wildcards, `mutate:`, arch-gated essentials, `hint:` style, arch names
   - `chisel-releases.md` -- branch model, per-branch layout, `chisel.yaml` schema versions
   - `slice-conventions.md` -- canonical slice names, path entry style, file layout, what to exclude by default
