@@ -1,7 +1,7 @@
 {
   "name": "canonical/mason",
   "version": "0.2.0",
-  "description": "Agent kit for working on canonical/chisel-releases. Cross-agent skills + scripts for authoring and reviewing chisel slice definition files.",
+  "description": "Collection of plugins for working with Canonical rocks, rockcraft, chisel and chisel-releases.",
   "private": false,
   "skills": "./skills",
   "repository": "https://github.com/canonical/mason",
