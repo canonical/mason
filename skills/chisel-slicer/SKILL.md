@@ -21,7 +21,7 @@ directory. Every repo path you read or write -- `slices/<pkg>.yaml`,
 `tests/spread/...`, `chisel.yaml`, sibling SDFs -- is relative to this checkout,
 exactly as written.
 
-Paths below (`commands/`, `shared/`, `scripts/`, `schemas/`) are relative to this
+Paths below (`commands/`, `shared/`, `scripts/`) are relative to this
 skill's own directory instead -- the one holding this `SKILL.md`. They are
 read-only. Some installers drop the executable bit, so if a
 `scripts/` file will not run by path, run it through its interpreter instead:
@@ -40,7 +40,6 @@ with pyyaml available).
   - `chisel-cli.md` -- `chisel` CLI, `--release` semantics, inspecting the repo without a checkout
   - `upstream-sources.md` -- upstream repos, doc page index, precedence when sources conflict
 - `scripts/` -- runnable helpers: `orientation`, `deb-list.py` (inspect a .deb; `--sdf` emits a draft SDF), `try-cut`, `scaffold-test.py` (emit a spread test skeleton), `check-slice.py` (deterministic SDF linter), `check-test.py` (binary test-coverage check), `check-diff.py` (append-only regression check), `review-diff.py` (runs all three over a PR diff)
-- `schemas/commands.manifest.yaml` -- command index (name -> file)
 
 ## Orient first
 
