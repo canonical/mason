@@ -8,11 +8,11 @@
 # usage: orientation [<package>]
 set -euo pipefail
 
-mason_root="$(cd "$(dirname "$0")/.." && pwd)"
+skill_root="$(cd "$(dirname "$0")/.." && pwd)"
 echo "working dir (chisel-releases checkout): $(pwd)"
-echo "skill dir (read-only):                  $mason_root"
-echo "  reference: $mason_root/shared/ -- one file per subject, start with slice-definition-format.md"
-echo "  helpers:   $mason_root/scripts/ -- deb-list.py (--sdf drafts an SDF), scaffold-test.py,"
+echo "skill dir (read-only):                  $skill_root"
+echo "  reference: $skill_root/shared/ -- one file per subject, start with slice-definition-format.md"
+echo "  helpers:   $skill_root/scripts/ -- deb-list.py (--sdf drafts an SDF), scaffold-test.py,"
 echo "             check-slice.py, check-test.py, check-diff.py, review-diff.py, try-cut"
 
 # what can you actually run here? the scripts degrade, but knowing upfront saves
@@ -40,7 +40,7 @@ done
 # degrades to a one-line note when there is no network.
 discover_releases() {
     # url overridable for a mirror / fork / air-gapped clone (and hermetic tests).
-    local url="${MASON_CHISEL_RELEASES_URL:-https://github.com/canonical/chisel-releases.git}"
+    local url="${CHISEL_RELEASES_URL:-https://github.com/canonical/chisel-releases.git}"
     local raw="https://raw.githubusercontent.com/canonical/chisel-releases"
     local today branches b cy fmt eol state
     today="$(date +%F)"

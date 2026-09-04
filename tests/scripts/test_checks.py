@@ -362,7 +362,7 @@ def test_orientation_release_discovery() -> None:
             **os.environ,
             "GIT_CONFIG_GLOBAL": "/dev/null",
             "GIT_CONFIG_SYSTEM": "/dev/null",
-            "MASON_CHISEL_RELEASES_URL": str(origin),
+            "CHISEL_RELEASES_URL": str(origin),
         }
 
         def git(cwd: Path, *a: str) -> None:
