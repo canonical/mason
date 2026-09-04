@@ -11,12 +11,14 @@ to its result:
   0.5  ran it but no invocation succeeded (every cut errored)
   1.0  ran it and at least one cut exited cleanly
 
-three transcript formats, tried in order:
+four transcript formats, tried in order:
   - claude (stdout.log, ndjson stream-json): tool_use/tool_result correlation
     (claude lines carry "message"/"session_id" keys).
   - opencode (stdout.log, `--format json` events): each tool_use event carries
     both the command and its result (part.state), no correlation needed
     (opencode lines carry a "part" object + camel-case "sessionID").
+  - codex (stdout.log, jsonl): item.completed events whose item is a
+    command_execution -- command, aggregated_output and exit_code on one object.
   - plain text (stderr.log/stdout.log, ANSI): `$ <command>` blocks scanned for
     failure markers. fallback for old opencode runs predating --format json.
 """
@@ -117,6 +119,35 @@ def _score_opencode() -> float | None:
     return 0.5
 
 
+def _score_codex() -> float | None:
+    """codex jsonl: item.completed events carrying a command_execution item,
+    which is self-contained -- command, aggregated_output and exit_code all on
+    the one object. None if stdout.log has no codex-shaped events."""
+    saw_codex = False
+    cuts: list[tuple[bool, str]] = []
+
+    for ev in _jsonl(OUT / "stdout.log"):
+        item = ev.get("item")
+        if not isinstance(item, dict) or not str(ev.get("type", "")).startswith("item."):
+            continue
+        saw_codex = True
+        if ev.get("type") != "item.completed" or item.get("type") != "command_execution":
+            continue
+        if not _is_cut_cmd(str(item.get("command", ""))):
+            continue
+        # exit_code is None on the in_progress twin; completed always has one.
+        cuts.append((item.get("exit_code") not in (0, None), str(item.get("aggregated_output") or "")))
+
+    if not saw_codex:
+        return None
+    if not cuts:
+        return 0.0
+    for is_err, text in cuts:
+        if not is_err and not any(m in text.lower() for m in _FAIL):
+            return 1.0
+    return 0.5
+
+
 def _score_text() -> float:
     """plain-text transcript (e.g. opencode): scan `$ <command>` blocks for
     chisel-cut/try-cut invocations and check their output for failure markers."""
@@ -158,7 +189,7 @@ def _score_text() -> float:
 
 
 def score() -> float:
-    for s in (_score_claude(), _score_opencode()):
+    for s in (_score_claude(), _score_opencode(), _score_codex()):
         if s is not None:
             return s
     return _score_text()

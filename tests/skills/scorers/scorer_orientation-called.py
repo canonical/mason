@@ -7,8 +7,8 @@
 
 reads the run transcript and checks for orientation's own success marker
 ("working dir (chisel-releases checkout):"), the same way scorer_chisel-cut.py
-does. three transcript formats, tried in order (see that scorer's docstring):
-claude stream-json, opencode --format json, plain text (old opencode runs).
+does. four transcript formats, tried in order (see that scorer's docstring):
+claude stream-json, opencode --format json, codex jsonl, plain text.
   0.0  orientation never ran (no invocation attempt found)
   0.5  invocation attempted but failed (e.g. wrong path -- no success marker)
   1.0  ran successfully, before the first write to a slice file
@@ -18,7 +18,17 @@ import json
 import re
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
-_SUCCESS_MARKER = "working dir (chisel-releases checkout):"
+# orientation's own output lines. several, spread through the output, because
+# harnesses truncate: codex keeps only the tail of a long aggregated_output, so
+# a marker pinned to the first line (as this scorer once used) reads as failure
+# on a run that succeeded. any one of these hitting means it ran.
+_SUCCESS_MARKERS = (
+    "working dir (chisel-releases checkout):",
+    "skill dir (read-only):",
+    "existing slices:",
+    "(gates SDF features",
+    "->  write to",
+)
 _ATTEMPT_MARKERS = ("orientation",)
 
 
@@ -77,11 +87,32 @@ def _opencode_events():
     return events if saw_oc else None
 
 
+def _codex_events():
+    """yield commands, their output, and assistant text from codex's jsonl
+    (item.started/item.completed wrapping an "item"). None if not codex."""
+    events = []
+    saw_codex = False
+    for ev in _jsonl(OUT / "stdout.log"):
+        item = ev.get("item")
+        if not isinstance(item, dict) or not str(ev.get("type", "")).startswith("item."):
+            continue
+        saw_codex = True
+        if ev.get("type") != "item.completed":
+            continue
+        kind = item.get("type")
+        if kind == "command_execution":
+            events.append(str(item.get("command", "")))
+            events.append(str(item.get("aggregated_output") or ""))
+        elif kind == "agent_message":
+            events.append(str(item.get("text", "")))
+    return events if saw_codex else None
+
+
 def _score_events(events) -> float:
     joined = "\n".join(events)
     if not any(m in joined for m in _ATTEMPT_MARKERS):
         return 0.0
-    return 1.0 if _SUCCESS_MARKER in joined else 0.5
+    return 1.0 if any(m in joined for m in _SUCCESS_MARKERS) else 0.5
 
 
 def _score_text() -> float:
@@ -93,11 +124,11 @@ def _score_text() -> float:
     text = "\n".join(chunks)
     if not any(m in text for m in _ATTEMPT_MARKERS):
         return 0.0
-    return 1.0 if _SUCCESS_MARKER in text else 0.5
+    return 1.0 if any(m in text for m in _SUCCESS_MARKERS) else 0.5
 
 
 def score() -> float:
-    for events in (_claude_events(), _opencode_events()):
+    for events in (_claude_events(), _opencode_events(), _codex_events()):
         if events is not None:
             return _score_events(events)
     return _score_text()

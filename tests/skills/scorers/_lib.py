@@ -92,9 +92,14 @@ def fmt() -> int | None:
     return int(m.group()) if m else None
 
 
+# vocabulary for the slice-names-canonical scorer -- matched exactly, or as the
+# first/last part of a compound name (modprobe-config, udev-rules). deliberately
+# permissive: it screens for real vocabulary, not for the single best name.
+# `license`/`notice` are absent on purpose -- no SDF in chisel-releases has one;
+# upstream legal files ship inside the `copyright` slice.
 CANONICAL = {
-    "bins", "libs", "config", "configs", "data", "scripts", "copyright",
-    "core", "standard", "var", "headers", "jars", "license", "notice",
+    "bins", "libs", "config", "data", "scripts", "copyright", "fonts",
+    "core", "standard", "minimal", "runtime", "var", "headers", "jars",
     "locales", "services", "modules", "tables", "chisel", "rules", "dev",
 }
 BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
@@ -216,14 +221,32 @@ def transcript() -> dict:
         raw       ansi-stripped stdout+stderr, all formats
 
     formats tried in order: claude stream-json (lines carry "message" /
-    "session_id"), opencode --format json (lines carry a "part" object).
+    "session_id"), opencode --format json (lines carry a "part" object), codex
+    (lines are item.started/item.completed carrying an "item" object).
     """
     texts: list[str] = []
     commands: list[str] = []
     writes: list[str] = []
-    saw_claude = saw_oc = False
+    saw_claude = saw_oc = saw_codex = False
 
     for ev in _jsonl(OUT / "stdout.log"):
+        # codex: {"type": "item.completed", "item": {"type": ..., ...}}. only
+        # the completed events carry a result; item.started would double-count.
+        item = ev.get("item")
+        if isinstance(item, dict) and str(ev.get("type", "")).startswith("item."):
+            saw_codex = True
+            if ev.get("type") == "item.completed":
+                kind = item.get("type")
+                if kind == "agent_message":
+                    texts.append(str(item.get("text", "")))
+                elif kind == "command_execution":
+                    commands.append(str(item.get("command", "")))
+                elif kind == "file_change":
+                    for ch in item.get("changes") or []:
+                        if isinstance(ch, dict) and ch.get("path"):
+                            writes.append(str(ch["path"]))
+            continue
+
         if "message" in ev or "session_id" in ev:
             saw_claude = True
         msg = ev.get("message") or {}
@@ -266,7 +289,7 @@ def transcript() -> dict:
         "texts": texts,
         "commands": commands,
         "writes": writes,
-        "parsed": saw_claude or saw_oc,
+        "parsed": saw_claude or saw_oc or saw_codex,
         "raw": "\n".join(chunks),
     }
 
