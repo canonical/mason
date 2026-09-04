@@ -2,13 +2,32 @@ version: 1
 skill: chisel-slicer
 summary: Cross-agent skill for authoring and reviewing chisel slice definition files (SDFs).
 
-# shared reference loaded before any command. paths are relative to this
+# shared reference material, one module per subject. each stands alone; a
+# command reads the ones its steps call for. paths are relative to this
 # skill's directory (the one holding SKILL.md) so the skill stays
 # self-contained wherever it is installed.
 shared:
-  reference:
-    module: shared/CHISEL.md
-    description: chisel/SDF format, branch model, schema versions, naming, sources of truth.
+  slice-definition-format:
+    module: shared/slice-definition-format.md
+    description: SDF format -- keys, content entry options, wildcards, mutate, arch-gated essentials, hint style, arch names.
+  chisel-releases:
+    module: shared/chisel-releases.md
+    description: Branch model, per-branch layout, chisel.yaml schema versions.
+  slice-conventions:
+    module: shared/slice-conventions.md
+    description: Canonical slice names and paths to exclude by default.
+  cross-release-porting:
+    module: shared/cross-release-porting.md
+    description: Cross-release differences and multiarch quirks when forward-porting.
+  spread-tests:
+    module: shared/spread-tests.md
+    description: Spread layout, install-slices, two-layer testing model, chroot patterns, backends.
+  chisel-cli:
+    module: shared/chisel-cli.md
+    description: chisel CLI, --release semantics, inspecting the repo without a checkout.
+  upstream-sources:
+    module: shared/upstream-sources.md
+    description: Upstream repos, doc page index, precedence when sources conflict.
 
 commands:
   - name: write-slice

@@ -9,7 +9,7 @@ description: >-
 
 You review slices in [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
 
-**Prerequisites**: read `shared/CHISEL.md` first for chisel/SDF format reference, branch model, schema versions, and canonical naming conventions. This agent focuses on _what to check_ when reviewing.
+**Prerequisites**: read `shared/slice-definition-format.md` (SDF format) and `shared/chisel-releases.md` (branch model, schema versions) first, plus `shared/slice-conventions.md` for canonical naming. Pull in `shared/cross-release-porting.md` when the review touches a forward-port. This agent focuses on _what to check_ when reviewing.
 
 You are read-only: inspect the diff / SDFs and return a review report. Do not edit files.
 
@@ -29,7 +29,7 @@ It finds the changed SDFs and runs the three checkers over them, then prints fin
 - `scripts/check-test.py slices/<pkg>.yaml` -- test coverage: `warn` if there's no test or it exercises none of the binaries; `info` listing untested binaries under partial coverage (normal for suites and alternatives symlinks -- judge whether the gaps matter).
 - `scripts/check-diff.py --base <target-branch>` -- append-only regressions: a removed SDF or slice fails the `removed-slices` CI gate (unless the package left the archive); a content path dropped from a kept slice has no CI gate but is a regression reviewers reject.
 
-Fold the output straight into your report: map `block` -> blocking, `warn` -> should-fix, `info` -> judge. Then spend your own judgement on what they can't check: dependency accuracy, test *depth*, design, forward-porting, and hint phrasing (noun phrase, no finite verbs -- see `shared/CHISEL.md`).
+Fold the output straight into your report: map `block` -> blocking, `warn` -> should-fix, `info` -> judge. Then spend your own judgement on what they can't check: dependency accuracy, test *depth*, design, forward-porting, and hint phrasing (noun phrase, no finite verbs -- see `shared/slice-definition-format.md`).
 
 None cut a rootfs or run tests -- `chisel cut` (the `install-slices` CI check) and spread cover those.
 
@@ -69,7 +69,7 @@ Published slices are **append-only in spirit**. Removing files from an existing 
 
 ## Naming Conventions
 
-Verify against the Canonical Slice Names table in `shared/CHISEL.md`:
+Verify against the Canonical Slice Names table in `shared/slice-conventions.md`:
 
 - `bins` not `bin` for executables (the singular `bin` is only right in `base-files`, which builds the `/bin` directory tree)
 - `libs` not `lib` for shared libraries (same `base-files` exception for the `/lib` tree)
@@ -106,7 +106,7 @@ These are hard gates. Reject if violated:
 
 ## Schema Version Compliance
 
-`check-slice.py` gates these deterministically (hint/prefer/essential-shape/v3-essential vs `format:`) -- fold its output in; the CHISEL.md schema-versions table is the reference. The one gate the script can't see: `pro:` under `archives:` is v2+; v1 uses a separate `v2-archives:` block.
+`check-slice.py` gates these deterministically (hint/prefer/essential-shape/v3-essential vs `format:`) -- fold its output in; the `shared/chisel-releases.md` schema-versions table is the reference. The one gate the script can't see: `pro:` under `archives:` is v2+; v1 uses a separate `v2-archives:` block.
 
 ## Testing Requirements
 

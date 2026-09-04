@@ -15,7 +15,7 @@ You author slices against [`canonical/chisel-releases`](https://github.com/canon
 
 **Existing slices are append-only.** Only modify a published slice if strictly necessary (e.g. fixing a bug, adding a missing dependency, or accommodating an upstream packaging change). Never reorganise, rename, or remove paths from existing slices without a concrete reason -- downstream consumers depend on the current layout. When in doubt, create a new slice rather than changing an existing one. If you do change an existing SDF, run `scripts/check-diff.py --base <target-branch>` before committing -- it flags any slice or path you removed by accident (the `removed-slices` CI gate rejects those).
 
-**Prerequisites**: run `scripts/orientation <package>` first -- it reports your working dir, the skill dir, and the target release + manifest format (from `chisel.yaml`) deterministically. Then read `shared/CHISEL.md` for chisel/SDF format reference, branch model, schema versions, and canonical naming conventions. This command focuses on the _workflow_ of writing slices.
+**Prerequisites**: run `scripts/orientation <package>` first -- it reports your working dir, the skill dir, and the target release + manifest format (from `chisel.yaml`) deterministically. Then read `shared/slice-definition-format.md` (SDF format) and `shared/chisel-releases.md` (branch model, schema versions); pull in `shared/slice-conventions.md`, `shared/cross-release-porting.md` and `shared/spread-tests.md` at the steps that call for them. This command focuses on the _workflow_ of writing slices.
 
 When this prompt and the repo disagree, trust the repo. Read `slices/bash.yaml` or `slices/base-files.yaml` on the target branch as canonical reference.
 
@@ -30,7 +30,7 @@ Follow these steps in order. Do NOT skip steps.
 1. **Confirm it is an Ubuntu package.** Chisel only supports packages from Ubuntu (and Ubuntu Pro) archives. Verify against the archive -- `scripts/deb-list.py <pkg>` (or `apt-cache show <pkg>` where apt is available); do not assume existence from the name. If the package is not found, stop and report it -- do not author anything.
 2. **Identify the target Ubuntu release** (e.g. `ubuntu-24.04`). This determines which chisel-releases branch to target.
 3. **Check the branch is not EOL.** Read `chisel.yaml` on the target branch: `maintenance.end-of-life` must be in the future.
-4. **Check `format:` version** in `chisel.yaml`. This gates available features (see `shared/CHISEL.md` schema versions table). Do not use v2+/v3+ features on older formats.
+4. **Check `format:` version** in `chisel.yaml`. This gates available features (see the schema versions table in `shared/chisel-releases.md`). Do not use v2+/v3+ features on older formats.
 5. **Avoid duplicates.** Check `slices/<pkg>.yaml` does not already exist on the target branch. If it does, stop and report it.
 
 ### Step 2: Check Cross-Release Consistency
@@ -60,7 +60,7 @@ Before designing anything, check whether the package already has slices on **oth
 
    Note the structural decisions: slice names, grouping approach (by-type vs by-function), dependency choices, `mutate:` patterns. Carry these forward unless there is a concrete reason to diverge.
 
-4. **Compare `.deb` contents across releases.** Run `scripts/deb-list.py` for the target release and for each release that already has an SDF. Look for cross-release differences (see `shared/CHISEL.md` Cross-Release Differences table):
+4. **Compare `.deb` contents across releases.** Run `scripts/deb-list.py` for the target release and for each release that already has an SDF. Look for cross-release differences (see the Cross-Release Differences table in `shared/cross-release-porting.md`):
    - Path changes (usrmerge: `/bin/` -> `/usr/bin/`)
    - Library renames (t64 transition: `libssl3` -> `libssl3t64`)
    - New or removed files
@@ -113,7 +113,7 @@ Reading the output:
 - Add `mode:` to a slice entry only when the permission is non-standard (not `0644`/`0755`/`0777`). Never on a glob path -- wildcard entries accept only `until:`/`arch:` (anything else is a parse error); name the file explicitly instead.
 - If `--scripts` shows `postinst` calling `update-alternatives`, `ldconfig`, or `update-mime-database`, those side-effects don't run in a chisel rootfs -- either drop the dep or write a `mutate:` equivalent.
 - Run once per target arch when multiarch differences are expected (`deb-list.py libfoo amd64`, then `deb-list.py libfoo arm64`).
-- **Ignore the clutter.** deb-list prints everything the deb ships, including man pages, shell completions, `/usr/share/doc/**`, changelogs, examples. Those are excluded by convention (see "Exclude by Default" in `shared/CHISEL.md`) -- under `/usr/share/doc/` ship only legal files (`copyright`, and `NOTICE`/`LICENSE`-type notices where present).
+- **Ignore the clutter.** deb-list prints everything the deb ships, including man pages, shell completions, `/usr/share/doc/**`, changelogs, examples. Those are excluded by convention (see "Exclude by Default" in `shared/slice-conventions.md`) -- under `/usr/share/doc/` ship only legal files (`copyright`, and `NOTICE`/`LICENSE`-type notices where present).
 
 Requires `dpkg-deb` + network to the mirror (archive.ubuntu.com / ports.ubuntu.com). No sudo or apt cache needed.
 
@@ -148,7 +148,7 @@ Use the source to:
 Before designing new slices, study existing SDFs on the target branch.
 
 1. **Read representative SDFs** for similar packages. Use `slices/bash.yaml`, `slices/base-files.yaml`, `slices/openssl.yaml`, `slices/dpkg.yaml` as references.
-2. **Follow naming conventions** from `shared/CHISEL.md` (Canonical Slice Names table). Use `libs` not `lib`, `bins` not `bin` (the table notes the rare `base-files`-style exceptions).
+2. **Follow naming conventions** from `shared/slice-conventions.md` (Canonical Slice Names table). Use `libs` not `lib`, `bins` not `bin` (the table notes the rare `base-files`-style exceptions).
 3. **Check shared dependencies.** If the target package depends on packages with multiple slices (e.g. `libc6_libs`, `libc6_config`), determine which _specific_ slice is needed. Do not over-depend.
 4. **Verify no path conflicts.** Multiple slices from different packages can declare the same path ONLY if:
    - Both slices are in the same package, OR
@@ -163,7 +163,7 @@ Choose the approach that fits the package best.
 
 #### Approach A: Group by Type of Content
 
-Best for most packages. Group files by their type. See the Canonical Slice Names table in `shared/CHISEL.md`.
+Best for most packages. Group files by their type. See the Canonical Slice Names table in `shared/slice-conventions.md`.
 
 Typical structure:
 - `copyright` slice (mandatory, always present)
@@ -319,7 +319,7 @@ execute: |
 - **One rootfs per test.** Call `install-slices` afresh for each test rather than reusing one rootfs -- leftover slices from an earlier test mask a missing dependency in a later one. This is a standard reviewer request.
 - **Every binary in a `bins` slice must be exercised.** Reviewers reject untested binaries. A binary you can't drive fully still gets a skeleton test proving the dynamic linker resolves it -- run it and grep for its own usage/error text, e.g. `chroot "$rootfs" /usr/lib/foo/helper 2>&1 | grep -Fiq "usage"`.
 - **Untestable means unshippable.** Reviewers push to drop rather than ship untested slices. (For data-only slices, the consumer pattern above is the test -- "no binaries" never means "no test".)
-- **Set up the chroot before weakening a test.** If a chroot command fails on missing `/dev/null`, `/bin/sh`, or DNS, fix the environment per the "Chroot environment patterns" table in `shared/CHISEL.md` -- do not retreat to file-existence checks.
+- **Set up the chroot before weakening a test.** If a chroot command fails on missing `/dev/null`, `/bin/sh`, or DNS, fix the environment per the "Chroot environment patterns" table in `shared/spread-tests.md` -- do not retreat to file-existence checks.
 - **Hermetic by default.** Generate inputs (secrets, digests, fixtures) inline; never apt-install extras into the test env. Exception: when the package's function IS the network path (CA bundles, TLS/http clients), hitting one stable well-known endpoint (e.g. `https://example.com`) is accepted upstream -- copy `resolv.conf` in per the chroot patterns table.
 
 **Test hygiene** (recurring review nits):
@@ -350,7 +350,7 @@ curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/ref
 curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/reference/chisel-releases/chisel.yaml.md
 ```
 
-(rendered at `https://documentation.ubuntu.com/chisel/latest/<path>/` if you prefer. If these fetches fail -- offline / egress-restricted environment -- skip this step, rely on `shared/CHISEL.md` + `check-slice.py`, and note the skipped verification in your final report.)
+(rendered at `https://documentation.ubuntu.com/chisel/latest/<path>/` if you prefer. If these fetches fail -- offline / egress-restricted environment -- skip this step, rely on the `shared/` reference files + `check-slice.py`, and note the skipped verification in your final report.)
 
 Check: does the SDF use any undocumented fields or patterns? Does the design match documented recommendations? Is the `format:` version compatible with all features used? Fix any discrepancy before committing; note deliberate divergence in your final report.
 

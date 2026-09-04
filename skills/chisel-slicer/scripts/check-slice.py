@@ -61,7 +61,7 @@ SNAME_RE = re.compile(r"^[a-z](?:-?[a-z0-9]){2,}$")
 # basename fails the whole release parse; a non-.yaml file is silently ignored.
 FNAME_RE = re.compile(r"^[a-z0-9](?:-?[.a-z0-9+]){1,}\.yaml$")
 
-# paths a minimal rootfs never needs -- see shared/CHISEL.md "Exclude by Default".
+# paths a minimal rootfs never needs -- see shared/slice-conventions.md "Exclude by Default".
 CLUTTER = {
     "man pages": ("/usr/share/man/", "/usr/man/"),
     "shell completions": (
@@ -203,7 +203,7 @@ def check_slices(doc: Any, fmt: int | None, f: Findings) -> None:
 
 
 # validate-hints allows only these chars; chisel core caps length at 40 and
-# rejects non-printable. see shared/CHISEL.md "hint: style".
+# rejects non-printable. see shared/slice-definition-format.md "hint: style".
 _HINT_ALLOWED = set(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,;()"
 )

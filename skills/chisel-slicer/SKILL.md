@@ -31,7 +31,14 @@ with pyyaml available).
 ## Layout
 
 - `commands/` -- command workflows: markdown to read and follow, not executable scripts
-- `shared/CHISEL.md` -- reference (format, branch model, schema versions, naming, sources of truth). NOTE: a generated copy of `_shared/CHISEL.md` in the mason source repo -- edit the source there.
+- `shared/` -- reference material, one file per subject. Each stands alone; read the ones a step calls for. NOTE: generated copies of the mason source repo's `_shared/` -- edit the sources there.
+  - `slice-definition-format.md` -- SDF format: top-level and per-slice keys, content entry options, wildcards, `mutate:`, arch-gated essentials, `hint:` style, arch names
+  - `chisel-releases.md` -- branch model, per-branch layout, `chisel.yaml` schema versions
+  - `slice-conventions.md` -- canonical slice names, what to exclude by default
+  - `cross-release-porting.md` -- cross-release differences, multiarch quirks
+  - `spread-tests.md` -- spread layout, `install-slices`, chroot patterns, backends
+  - `chisel-cli.md` -- `chisel` CLI, `--release` semantics, inspecting the repo without a checkout
+  - `upstream-sources.md` -- upstream repos, doc page index, precedence when sources conflict
 - `scripts/` -- runnable helpers: `orientation`, `deb-list.py` (inspect a .deb; `--sdf` emits a draft SDF), `try-cut`, `scaffold-test.py` (emit a spread test skeleton), `check-slice.py` (deterministic SDF linter), `check-test.py` (binary test-coverage check), `check-diff.py` (append-only regression check), `review-diff.py` (runs all three over a PR diff)
 - `schemas/commands.manifest.yaml` -- command index (name -> file)
 
@@ -42,7 +49,8 @@ deterministically -- your working dir, this skill's own dir, the target release
 + manifest format parsed from `chisel.yaml`, and which tools are available here
 (`chisel`, `dpkg-deb`, `spread`, `uv`, ...) so you know upfront what you can run.
 Treat its output as ground truth; don't infer any of it. Then read
-`shared/CHISEL.md` for format and conventions.
+`shared/slice-definition-format.md` and `shared/chisel-releases.md` before
+touching an SDF; pull the other `shared/` files in as a step calls for them.
 
 ## Commands
 
