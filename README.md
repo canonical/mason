@@ -21,7 +21,7 @@ npx skills add canonical/mason --skill chisel-slicer
 # or
 npx tessl i canonical/mason --skill chisel-slicer
 # or
-gh skill ...
+gh skill install canonical/mason chisel-slicer
 ```
 
 _(see below for detailed instructions)_
@@ -34,5 +34,5 @@ and then, for example, write a new slice file:
 
 ## what's in here
 
-- `chisel-slicer` - ...
-- `mason` - ...
+- `chisel-slicer` - writes, tests, and reviews chisel slice definition files
+- `mason` - routes `/mason` requests to the right skill or prints usage
