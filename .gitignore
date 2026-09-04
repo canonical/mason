@@ -11,5 +11,9 @@ tessl.json
 .DS_Store
 __pycache__/
 
+# tool caches (ruff, pytest)
+.ruff_cache/
+.pytest_cache/
+
 # pats run artifacts
 /tests/skills/.pats/

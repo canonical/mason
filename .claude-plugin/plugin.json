@@ -1,6 +1,6 @@
 {
   "name": "mason",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent kit for working on canonical/chisel-releases. Cross-agent skills + scripts for authoring and reviewing chisel slice definition files.",
   "author": {
     "name": "canonical",
