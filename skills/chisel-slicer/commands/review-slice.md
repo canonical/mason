@@ -25,7 +25,7 @@ scripts/review-diff.py --base <target-branch>
 
 It finds the changed SDFs and runs the three checkers over them, then prints findings grouped by severity plus a verdict, and exits non-zero if anything `block`s (the same command a CI PR-review job would call). The three it drives, also runnable on their own:
 
-- `scripts/check-slice.py slices/<pkg>.yaml` -- static conventions: sorting, naming, absolute paths, duplicate contents keys, copyright presence, clutter exclusion, arch names, version-gated fields (`hint`/`prefer`/`v3-essential`/essential-as-map/essential-as-list), and `hint:` length + mechanical style (the noun-phrase rule needs NLP -- `validate-hints` CI covers that, not this script). Reads `format:` from `./chisel.yaml` (or pass `--branch ubuntu-XX.XX`).
+- `scripts/check-slice.py slices/<pkg>.yaml` -- static conventions: sorting, naming, absolute paths, duplicate contents keys, copyright presence, clutter exclusion, arch names, the format-gated `essential:` shape and `v3-essential:`, the path-shape parse errors (glob with content options, `make:` without a trailing `/`, `generate:` rules, `prefer:` naming its own package), and `hint:` length + mechanical style (the noun-phrase rule needs NLP -- `validate-hints` CI covers that, not this script). Reads `format:` from `./chisel.yaml` (or pass `--branch ubuntu-XX.XX`).
 - `scripts/check-test.py slices/<pkg>.yaml` -- test coverage: `warn` if there's no test or it exercises none of the binaries; `info` listing untested binaries under partial coverage (normal for suites and alternatives symlinks -- judge whether the gaps matter).
 - `scripts/check-diff.py --base <target-branch>` -- append-only regressions: a removed SDF or slice fails the `removed-slices` CI gate (unless the package left the archive); a content path dropped from a kept slice has no CI gate but is a regression reviewers reject.
 
@@ -41,12 +41,12 @@ These automated checks run on every PR. Understand what each one validates:
 
 | Check | Failure means |
 |-------|---------------|
-| `lint` | YAML syntax/formatting issue in SDF |
+| `lint` | yamllint failure, or `contents:`/`essential:` entries not sorted (bytewise, `LC_COLLATE=C`) |
 | `install-slices` | Slice can't `chisel cut`, or package not in archive for some arch |
 | `removed-slices` | SDF deleted -- breaking unless package is gone from the archive |
 | `forward-port-missing` | New slice in branch but not in newer live releases |
 | `pkg-deps` | Informational diff of declared deps vs `apt depends`; non-blocking but reviewer signal |
-| `validate-hints` | `hint:` text fails NLP style check (v3+ only) |
+| `validate-hints` | `hint:` text fails the spaCy style check. Runs on every `ubuntu-*` PR that touches `slices/`, whatever the branch's format |
 | `spread` | Integration test failed inside LXD test container |
 | `cla-check` | CLA unsigned |
 
@@ -75,38 +75,28 @@ Verify against the Canonical Slice Names table in `shared/slice-conventions.md`:
 - `libs` not `lib` for shared libraries (same `base-files` exception for the `/lib` tree)
 - `config` for configuration files; break large configs into `<purpose>-config`
 - `scripts` for non-binary executables (not in `bins`)
-- `copyright` for deb copyright (mandatory)
-- `license` / `notice` for upstream licence/notice (separate from `copyright`)
-- `core` for minimum-functional subset; avoid `all` except a rare umbrella aggregate (e.g. `fonts-ubuntu`)
+- `copyright` for the deb copyright **and** any upstream `NOTICE` / `LICENSE` / `ThirdPartyNotices` (mandatory). There is no separate `license` or `notice` slice -- flag one as wrong
+- `core` for minimum-functional subset; avoid `all` -- `fonts-ubuntu` is the only SDF that legitimately uses it
+- `fonts` for font files (not `data`); `udev-rules`, not bare `rules`
 - When deb already names `<pkg>-core`, keep verbatim
 
-Slice names must: be lowercase, >= 3 characters, only `a-z 0-9 -`, start with a letter.
+Slice names must start with `a-z`, be >= 3 characters, and use only `a-z`, `0-9` and `-`. Chisel rejects anything else at parse time, so this is a hard gate rather than a convention.
 
-## Formatting Rules
+## Formatting and Path Style
 
-These are hard gates. Reject if violated:
+Hard gates, all of them mechanical -- `check-slice.py` reports every one, so fold its output in rather than re-deriving them:
 
-1. **Contents paths sorted** in bytewise ASCII (lexicographic) order within each slice.
-2. **Global `essential:`** placed at top of file, right after `package:`.
-3. **`copyright` slice** placed last in the `slices:` block.
-4. **`package:` matches filename stem.** `slices/foo.yaml` -> `package: foo`.
-5. **One SDF per package.** Never two packages in one YAML.
+1. **Contents paths and `essential:` entries sorted** bytewise (`LC_COLLATE=C`) within each slice. Both are CI `lint` gates.
+2. **Arch names**: lowercase Debian names only (`amd64`, `arm64`, `armhf`, `i386`, `ppc64el`, `riscv64`, `s390x`) -- never `x86_64`/`aarch64`.
+3. **File layout**: global `essential:` right after `package:`, `copyright` slice last, `package:` matching the filename stem, one package per file.
 
-## Path Entry Style
-
-- **Multiarch lib glob**: `*-linux-*`, not explicit triples. E.g. `/usr/lib/*-linux-*/libnghttp2.so.14*:`.
-- **Drop trailing `*` for single-version sonames**: `libfoo.so.1:` not `libfoo.so.1*:`.
-- **Version globs pin major.minor only**, never the patch: `/usr/src/rustc-1.93.*/**`, `/usr/lib/perl5/*/`. Reject patch-level pins.
-- **Narrow globs.** A broad `**` or bare `*.pm` collides across packages. Push for another path level; a path more than one package could own is a red flag.
-- **No explicit `symlink:` if deb ships it.** Chisel preserves deb symlinks. Manual `symlink:` only for paths the deb doesn't ship (e.g. created by maintainer scripts).
-- **Annotate explicit symlinks**: `/usr/bin/dotnet:  # Symlink to ../lib/dotnet/dotnet`.
-- **Inline-style for short options**: `/path: {arch: [amd64, arm64]}`.
-- **Arch names**: valid lowercase Debian names only (`amd64`, `arm64`, `armhf`, `i386`, `ppc64el`, `riscv64`, `s390x`) -- never `x86_64`/`aarch64`. This is a hard gate.
-- **Arch list order**: a nit, not a gate. Alphabetical reads tidily, but real SDFs (e.g. `systemd`) use a priority order; don't block on it.
+The style rules the script can't judge -- multiarch globs, soname trailing `*`, version-glob pinning, glob narrowness, when a `symlink:` is redundant, symlink comments, inline option style -- are in the Path Entry Style section of `shared/slice-conventions.md`. Review against that, and treat arch-list *order* as a nit rather than a gate.
 
 ## Schema Version Compliance
 
-`check-slice.py` gates these deterministically (hint/prefer/essential-shape/v3-essential vs `format:`) -- fold its output in; the `shared/chisel-releases.md` schema-versions table is the reference. The one gate the script can't see: `pro:` under `archives:` is v2+; v1 uses a separate `v2-archives:` block.
+Only one SDF field is genuinely decided by `chisel.yaml`'s `format:` -- the shape of `essential:` (list on v1/v2, map on v3+) and, with it, whether `v3-essential:` is allowed. `check-slice.py` blocks on that deterministically; fold its output in. `shared/chisel-releases.md` is the reference.
+
+`hint:` and `prefer:` are **not** format-gated -- chisel validates them under every format. Writing one on a v1/v2 branch is a convention violation worth a should-fix, not a parse error; do not report it as CI-breaking. The gate the script cannot see: `pro:` under `archives:` is v2+, and v1 uses a separate `v2-archives:` block.
 
 ## Testing Requirements
 
@@ -116,7 +106,7 @@ These are hard gates. Reject if violated:
 - **Functional slices need functional tests.** `--version` alone is insufficient for applications. Test actual functionality.
 - **One rootfs per test.** Reusing a rootfs across tests lets leftover slices mask a missing dependency -- push to split into a fresh `install-slices` per test.
 - **Hermetic by default.** Inputs generated inline, no apt-installing extras, bounded waits (no naked `sleep`/infinite retry), `grep -Fiq` for assertions. Exception: packages whose function IS the network path (CA bundles, TLS/http clients) may hit one stable well-known endpoint (e.g. `https://example.com`) -- upstream does.
-- Tests live at `tests/spread/integration/<pkg>/task.yaml`.
+- Tests live at `tests/spread/integration/<pkg>/task.yaml`. `shared/spread-tests.md` has the `install-slices` contract and the chroot setup patterns a test is expected to use.
 
 ## Forward-Port Requirements
 

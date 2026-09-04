@@ -23,7 +23,7 @@ Accepts:
 
 - `ubuntu-XX.XX` -- an online release branch.
 - a directory path -- anything containing a `/`, e.g. `./` for the current checkout.
-- omitted -- inferred from the host's `/etc/os-release`.
+- omitted -- inferred from the host's `/etc/lsb-release` (`DISTRIB_ID` / `DISTRIB_RELEASE`). Not `/etc/os-release`.
 
 On a devel (unstable) or EOL (unmaintained) branch, add `--ignore=unstable` / `--ignore=unmaintained` or `cut` errors out.
 

@@ -23,18 +23,20 @@ exactly as written.
 
 Paths below (`commands/`, `shared/`, `scripts/`) are relative to this
 skill's own directory instead -- the one holding this `SKILL.md`. They are
-read-only. Some installers drop the executable bit, so if a
-`scripts/` file will not run by path, run it through its interpreter instead:
-`bash scripts/orientation`, `uv run --script scripts/check-slice.py` (or `python3`
-with pyyaml available).
+read-only. Some installers drop the executable bit, so if a `scripts/` file will
+not run by path, run it through its interpreter -- **the extension tells you
+which**: `orientation` and `try-cut` have none and are bash (`bash scripts/orientation`);
+everything ending `.py` is python (`uv run --script scripts/check-slice.py`, or
+`python3` with pyyaml available). Running a bash script under `python3` fails
+with a `SyntaxError`.
 
 ## Layout
 
 - `commands/` -- command workflows: markdown to read and follow, not executable scripts
-- `shared/` -- reference material, one file per subject. Each stands alone; read the ones a step calls for. NOTE: generated copies of the mason source repo's `_shared/` -- edit the sources there.
+- `shared/` -- reference material, one file per subject. Each stands alone; read the ones a step calls for. NOTE: copies of the mason source repo's `_shared/` -- edit the sources there, not these.
   - `slice-definition-format.md` -- SDF format: top-level and per-slice keys, content entry options, wildcards, `mutate:`, arch-gated essentials, `hint:` style, arch names
   - `chisel-releases.md` -- branch model, per-branch layout, `chisel.yaml` schema versions
-  - `slice-conventions.md` -- canonical slice names, what to exclude by default
+  - `slice-conventions.md` -- canonical slice names, path entry style, file layout, what to exclude by default
   - `cross-release-porting.md` -- cross-release differences, multiarch quirks
   - `spread-tests.md` -- spread layout, `install-slices`, chroot patterns, backends
   - `chisel-cli.md` -- `chisel` CLI, `--release` semantics, inspecting the repo without a checkout
@@ -58,7 +60,7 @@ touching an SDF; pull the other `shared/` files in as a step calls for them.
 - `/chisel-slicer write-slice <pkg>` (the first arg names the command), or
 - plain language: "write a slice for `<pkg>`", "review `slices/foo.yaml`".
 
-dispatch: take the first token of the args as the command name; if it matches a command below, read that file and follow its steps, treating the rest of the args as its input. on no match, or no args at all, print the numbered list below and wait for the user's reply before loading anything -- never guess.
+dispatch: if the first token of the args names a command below, read that file and follow its steps, treating the rest of the args as its input. otherwise read the args as plain language and match on intent -- authoring / adding / writing / forward-porting a slice or SDF goes to `write-slice`, reviewing an existing one goes to `review-slice`. on no args at all, or intent that matches neither, print the numbered list below and wait for the user's reply before loading anything -- never guess.
 
 1. `write-slice` -> `commands/write-slice.md` -- author + test + commit SDFs. does not open PRs.
 2. `review-slice` -> `commands/review-slice.md` -- read-only review of SDFs.

@@ -11,7 +11,7 @@ SDFs for the same package differ across Ubuntu release branches. Forward-porting
 | **usrmerge** | `/bin/bash` -> `/usr/bin/bash` | Ubuntu 24.04+ moved binaries from `/bin/` to `/usr/bin/`. Update `contents` paths per release |
 | **t64 transition** | `libssl3` -> `libssl3t64` | Ubuntu 24.04+ renamed libraries for 64-bit `time_t`. Update `essential` deps and copyright refs |
 | **Package splits/renames** | Transitional packages, new soname packages | May need entirely different SDF structure or filename |
-| **Soname bumps** | `librocksdb9.11` -> `librocksdb10` | Old SDF deleted (archive no longer carries it); new SDF with new filename |
+| **Soname bumps** | `librocksdb8.9` (24.04) -> `librocksdb9.10` (25.10) -> `librocksdb9.11` (26.04) | Old SDF deleted (archive no longer carries it); new SDF with new filename |
 | **Essential syntax** | List (`- foo_bar`) vs map (`foo_bar:`) | Gated by the branch's `chisel.yaml` `format:`. v3 branches **must** use map syntax in `essential:` (the list form is a parse error, and `v3-essential:` is rejected -- fold its entries into `essential:`); v1/v2 use the list, with `v3-essential:` alongside it for arch gating |
 | **Slice granularity** | `bashbug` inline in `bins` (24.04) vs separate `bashbug` slice (26.04) | Newer releases may demand finer-grained decomposition |
 | **New/removed files** | New config files, removed scripts | `.deb` contents change between releases. Some paths exist in one release but not another |

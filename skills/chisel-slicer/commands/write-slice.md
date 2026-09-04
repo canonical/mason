@@ -15,7 +15,7 @@ You author slices against [`canonical/chisel-releases`](https://github.com/canon
 
 **Existing slices are append-only.** Only modify a published slice if strictly necessary (e.g. fixing a bug, adding a missing dependency, or accommodating an upstream packaging change). Never reorganise, rename, or remove paths from existing slices without a concrete reason -- downstream consumers depend on the current layout. When in doubt, create a new slice rather than changing an existing one. If you do change an existing SDF, run `scripts/check-diff.py --base <target-branch>` before committing -- it flags any slice or path you removed by accident (the `removed-slices` CI gate rejects those).
 
-**Prerequisites**: run `scripts/orientation <package>` first -- it reports your working dir, the skill dir, and the target release + manifest format (from `chisel.yaml`) deterministically. Then read `shared/slice-definition-format.md` (SDF format) and `shared/chisel-releases.md` (branch model, schema versions); pull in `shared/slice-conventions.md`, `shared/cross-release-porting.md` and `shared/spread-tests.md` at the steps that call for them. This command focuses on the _workflow_ of writing slices.
+**Prerequisites**: run `scripts/orientation <package>` first -- it reports your working dir, the skill dir, and the target release + manifest format (from `chisel.yaml`) deterministically. Then read `shared/slice-definition-format.md` (SDF format) and `shared/chisel-releases.md` (branch model, schema versions); pull in `shared/slice-conventions.md` (naming, path style, exclusions) at steps 6-8, `shared/cross-release-porting.md` at step 2, `shared/chisel-cli.md` at step 9 for `chisel cut`'s flags and `--release` handling, and `shared/spread-tests.md` at step 9 for the test contract. This command focuses on the _workflow_ of writing slices.
 
 When this prompt and the repo disagree, trust the repo. Read `slices/bash.yaml` or `slices/base-files.yaml` on the target branch as canonical reference.
 
@@ -30,7 +30,7 @@ Follow these steps in order. Do NOT skip steps.
 1. **Confirm it is an Ubuntu package.** Chisel only supports packages from Ubuntu (and Ubuntu Pro) archives. Verify against the archive -- `scripts/deb-list.py <pkg>` (or `apt-cache show <pkg>` where apt is available); do not assume existence from the name. If the package is not found, stop and report it -- do not author anything.
 2. **Identify the target Ubuntu release** (e.g. `ubuntu-24.04`). This determines which chisel-releases branch to target.
 3. **Check the branch is not EOL.** Read `chisel.yaml` on the target branch: `maintenance.end-of-life` must be in the future.
-4. **Check `format:` version** in `chisel.yaml`. This gates available features (see the schema versions table in `shared/chisel-releases.md`). Do not use v2+/v3+ features on older formats.
+4. **Check `format:` version** in `chisel.yaml`. It decides the shape of `essential:` -- list on v1/v2, map on v3+ -- which is a parse error to get wrong. It does not decide `hint:`/`prefer:`, which are chisel-version gated; those still follow branch convention (v3+ / v2+ in practice). See the schema versions table in `shared/chisel-releases.md`.
 5. **Avoid duplicates.** Check `slices/<pkg>.yaml` does not already exist on the target branch. If it does, stop and report it.
 
 ### Step 2: Check Cross-Release Consistency
@@ -216,7 +216,7 @@ slices:
       /usr/share/doc/<package-name>/copyright:
 ```
 
-**On a v3 branch (e.g. `ubuntu-26.04`) every `essential:` must be a map, not a list** -- `chisel cut` rejects the list form with _"essential expects a map"_. Same shape, map keys:
+**On a v3 branch (e.g. `ubuntu-26.04`, `ubuntu-26.10`) every `essential:` must be a map, not a list** -- `chisel cut` rejects the list form with _"essential expects a map"_. This one really is decided by `chisel.yaml`'s `format:`, unlike `hint:`/`prefer:` (see `shared/chisel-releases.md`). Same shape, map keys:
 
 ```yaml
 essential:
@@ -235,9 +235,9 @@ Key rules:
 - `copyright` slice placed **last** by convention
 - One SDF per package. Never put two packages in one YAML file
 
-#### `license` / `notice` slices
+#### Upstream legal files
 
-Upstream `LICENSE.txt`, `NOTICE`, `ThirdPartyNotices.txt` are **not** the deb copyright. They get separate `license:` / `notice:` slices that depend on `<pkg>_copyright`.
+Upstream `LICENSE.txt`, `NOTICE`, `ThirdPartyNotices.txt` are not the deb copyright, but they do not get their own slice -- no SDF in chisel-releases has a `license` or `notice` slice. Ship them **inside** the `copyright` slice, alongside `/usr/share/doc/<pkg>/copyright` (see `apache2-bin`, `dotnet-host-10.0`, `aspnetcore-runtime-10.0`).
 
 ### Step 8: Apply Formatting Rules and Self-Check
 
@@ -253,17 +253,15 @@ It reads `format:` from `./chisel.yaml` automatically (or pass `--format N` / `-
 
 The script mechanically owns: sorting (contents paths and `essential` entries, bytewise ASCII -- CI checks with `LC_COLLATE=C sort -C`), slice-name validity, absolute paths, duplicate contents keys, arch names (list *order* there is a nit, not a gate), clutter exclusions, copyright presence, the version-gated fields (`hint`/`prefer`/`v3-essential`/essential-as-map/essential-as-list), and `hint:` length + style. Don't restate its work -- run it.
 
-The rules it can't judge -- these are on you:
+The rules it can't judge are the Path Entry Style and File Layout sections of `shared/slice-conventions.md` -- read them and apply them by hand:
 
-1. **Place `essential` (global)** at the top of the file, right after `package:`.
-2. **Place the `copyright` slice** at the bottom of the `slices:` block.
-3. **Multiarch lib glob**: use `*-linux-*`, not explicit triples. E.g. `/usr/lib/*-linux-*/libfoo.so.1:`.
-4. **Drop trailing `*`** for single-version sonames: `libfoo.so.1:` not `libfoo.so.1*:`.
-5. **Pin only major.minor in version globs**, never the patch: `/usr/src/rustc-1.93.*/**`, `/usr/lib/perl5/*/`. Patch-level pins break on the next package update.
-6. **Keep globs narrow.** A broad `**` or a bare `*.pm` can collide with hundreds of other packages' paths. Add another path level to scope it (`.../perl5/*/auto/DBI/DBI.so:`), and `grep -r "/shared/path" slices/` before declaring a path more than one package could own.
-7. **Inline-style** for short options: `/path: {arch: [amd64, arm64]}`.
-8. **Annotate explicit symlinks** with comments: `/usr/bin/foo:  # Symlink to ../lib/foo/foo`.
-9. **yamllint gates** (`.github/yamllint.yaml`): 2-space indent, lines <= 100 chars, at most one consecutive blank line, comments aligned to content, at most one space inside `{ }`/`[ ]`.
+1. **File layout** -- global `essential:` right after `package:`, `copyright` slice last in `slices:`.
+2. **Path style** -- multiarch `*-linux-*` globs, no trailing `*` on single-version sonames, major.minor-only version globs, narrow globs, inline option maps, comments on explicit symlinks.
+
+For the glob-narrowness rule specifically, `grep -r "/shared/path" slices/` before declaring a path more than one package could own.
+3. **yamllint gates** (`.github/yamllint.yaml`, which lives on `main`): 2-space indent, lines <= 100 chars, at most one consecutive blank line, comments aligned to content, at most one space inside `{ }`/`[ ]`.
+
+Both sorted lists -- `contents:` paths and each slice's `essential:` entries -- are CI gates, not chisel parse errors; `check-slice.py` blocks on them anyway because the `lint` job will. `shared/slice-definition-format.md` has the detail.
 
 ### Step 9: Test
 
@@ -350,7 +348,7 @@ curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/ref
 curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/reference/chisel-releases/chisel.yaml.md
 ```
 
-(rendered at `https://documentation.ubuntu.com/chisel/latest/<path>/` if you prefer. If these fetches fail -- offline / egress-restricted environment -- skip this step, rely on the `shared/` reference files + `check-slice.py`, and note the skipped verification in your final report.)
+`shared/upstream-sources.md` lists the rest of the pages and the raw-URL pattern; it also carries the precedence rule for when they disagree with each other (tool behaviour wins). Rendered at `https://documentation.ubuntu.com/chisel/latest/<path>/` if you prefer. If these fetches fail -- offline / egress-restricted environment -- skip this step, rely on the `shared/` reference files + `check-slice.py`, and note the skipped verification in your final report.
 
 Check: does the SDF use any undocumented fields or patterns? Does the design match documented recommendations? Is the `format:` version compatible with all features used? Fix any discrepancy before committing; note deliberate divergence in your final report.
 

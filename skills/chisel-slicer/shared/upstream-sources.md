@@ -32,9 +32,8 @@ The documentation source renders to <https://documentation.ubuntu.com/chisel/en/
 The collection of published SDFs is the ground truth for conventions, naming patterns, and reviewer expectations. Studying real SDFs is more reliable than any written convention doc.
 
 - Repo: <https://github.com/canonical/chisel-releases>
-- Key files on each release branch: `chisel.yaml`, `slices/bash.yaml`, `slices/base-files.yaml`, `CONTRIBUTING.md`
-- `README.md` on `main` carries the live release-branch list
-- CI workflows in `.github/` define the automated checks
+- Key files on each release branch: `chisel.yaml`, `slices/bash.yaml`, `slices/base-files.yaml`
+- `main` carries what the release branches do not: `CONTRIBUTING.md`, `README.md` with the live release-branch list, `.github/yamllint.yaml`, and the reusable CI workflows plus the scripts they drive (`.github/scripts/validate-hints/`, `install-slices/`, `removed-slices/`, `forward-port-missing/`, `pkg-deps/`). A release branch's own `.github/workflows/ci.yaml` only calls into them, so read the definitions on `main`
 
 Also: chisel-releases navigator <https://canonical.github.io/chisel-releases-navigator/>; Ubuntu release schedule <https://wiki.ubuntu.com/Releases>.
 
