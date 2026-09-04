@@ -17,7 +17,7 @@ from _lib import *  # noqa: F403
 # one phrase per load-bearing line of the usage block in
 # skills/mason/SKILL.md; drift there should fail here.
 _MARKERS = (
-    "agent kit for chisel / rocks work",
+    "agent kit for chisel / chisel-releases work",
     "/chisel-slicer",
     "write-slice <pkg>",
     "review-slice",

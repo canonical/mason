@@ -13,7 +13,7 @@
 [![skills.sh](https://skills.sh/b/canonical/mason)](https://skills.sh/canonical/mason)
 [![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fcanonical%2Fmason)](https://tessl.io/registry/canonical/mason)
 
-Collection of plugins for working with Canonical [`rocks`](https://documentation.ubuntu.com/rockcraft/stable/explanation/rocks/), [`rockcraft`](https://documentation.ubuntu.com/rockcraft/latest/), [`chisel`](https://github.com/canonical/chisel) and [`chisel-releases`](https://github.com/canonical/chisel-releases).
+Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chisel) and [`chisel-releases`](https://github.com/canonical/chisel-releases) -- cross-agent skills and scripts for authoring and reviewing slice definition files.
 
 ## install
 
@@ -35,3 +35,16 @@ and then, for example, write a new slice file:
 
 - `chisel-slicer` - writes, tests, and reviews chisel slice definition files
 - `mason` - routes `/mason` requests to the right skill or prints usage
+
+## releasing
+
+The version lives in `.tessl-plugin/plugin.json`; mirror it in `.claude-plugin/plugin.json`.
+Bump both, add a `CHANGELOG.md` entry, tag `vX.Y.Z`, then publish to the registry:
+
+```shell
+npx tessl plugin lint .
+npx tessl plugin pack . --output mason.tgz && tar tzf mason.tgz   # eyeball what ships
+npx tessl plugin publish .
+```
+
+Installs from github (`npx skills add`, `gh skill`) pin the commit and need no registry publish.

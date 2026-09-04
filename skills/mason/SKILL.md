@@ -9,8 +9,8 @@ argument-hint: "[request]  (no args -- prints usage)"
 
 # mason
 
-Agent kit for chisel / rocks work -- a cross-agent skill bundle, portable across
-claude code, pi, opencode, copilot, and codex.
+Agent kit for chisel / chisel-releases work -- a cross-agent skill bundle, portable
+across claude code, pi, opencode, copilot, and codex.
 
 `/mason` has no actions of its own -- it either routes or prints usage:
 
@@ -23,7 +23,7 @@ claude code, pi, opencode, copilot, and codex.
   usage block below verbatim, then stop. Do not load or run anything else -- never guess.
 
 ```
-mason -- agent kit for chisel / rocks work
+mason -- agent kit for chisel / chisel-releases work
 
 skills:
   /chisel-slicer           author + review chisel slice definition files (SDFs)
