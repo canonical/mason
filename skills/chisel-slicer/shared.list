@@ -1,8 +1,0 @@
-# _shared/ files this skill ships under shared/ (see scripts/sync-shared.py)
-chisel-cli.md
-chisel-releases.md
-slice-definition-format.md
-slice-conventions.md
-cross-release-porting.md
-spread-tests.md
-upstream-sources.md

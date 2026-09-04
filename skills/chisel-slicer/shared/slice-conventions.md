@@ -1,5 +1,3 @@
-<!-- generated from _shared/slice-conventions.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # Slice Naming and Content Conventions
 
 Conventions the chisel-releases reviewers enforce on Slice Definition Files (SDFs). These are not parse errors -- chisel accepts any well-formed slice name -- but a PR that ignores them is rejected.

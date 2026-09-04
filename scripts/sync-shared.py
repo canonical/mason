@@ -1,14 +1,39 @@
-#!/usr/bin/env python3
-"""sync-shared: copy files from _shared/ into the skills that list them.
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pyyaml"]
+# ///
+"""sync-shared: copy files from _shared/ into the skills that ask for them.
 
 Installers copy a skill directory verbatim and know nothing about siblings, so
 anything a skill needs has to live inside it. _shared/ is the single source of
 truth for material used by more than one skill; this script materialises it.
 
-Each skill opts in with a shared.list next to its SKILL.md -- one _shared/-relative
-path per line (blank lines and # comments ignored). Copies land in <skill>/shared/
-with the source's mode, prefixed by a "generated" banner where the file type has
-a comment syntax. Copies not listed any more are removed.
+Everything is declared in .shared.yaml at the repo root: a `shared:` map keyed
+by skill, then by _shared/-relative source, each entry naming where the copy
+goes. The destination is a path, not a directory convention -- a skill decides
+where its copies live and what they are called:
+
+    shared:
+      chisel-slicer:
+        chisel-cli.md:
+          path: shared/chisel-cli.md      # under shared/
+        slice-conventions.md:
+          path: reference/style.md        # anywhere else, renamed
+        spread-tests.md:                  # no entry body -- same relative path
+
+Nothing about this lives in the skill directories: a copy is a byte-for-byte
+duplicate of its source carrying its mode, and no listing file sits beside it.
+A skill dir holds only what ships.
+
+Being an exact duplicate is also how a copy is recognised, so no record of past
+writes is kept: a file inside a skill whose bytes match some _shared/ file but
+which nothing declares is a leftover, and is removed. Drop an entry or point it
+somewhere else and the file at the old path goes away rather than lingering.
+
+The one leftover this cannot see is one whose source was edited in the same
+change that moved it -- its content no longer matches anything in _shared/.
+Running sync after a retarget alone always catches it.
 
 Usage:
   sync-shared.py            write the copies (make sync-shared)
@@ -21,65 +46,92 @@ import stat
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = ROOT / "_shared"
 SKILLS = ROOT / "skills"
-LIST = "shared.list"
-DEST = "shared"
+MANIFEST = ROOT / ".shared.yaml"
 
-HASH_COMMENT = {".sh", ".bash", ".py", ".yaml", ".yml", ".toml", ".cfg", ".ini"}
-
-
-def banner(rel: str, src: bytes, suffix: str) -> bytes:
-    note = f"generated from _shared/{rel} by scripts/sync-shared.py -- edit the source, then make sync-shared"
-    if suffix == ".md":
-        return f"<!-- {note} -->\n\n".encode() + src
-    if suffix in HASH_COMMENT or src.startswith(b"#!"):
-        line = f"# {note}\n".encode()
-        if src.startswith(b"#!"):
-            head, _, tail = src.partition(b"\n")
-            return head + b"\n" + line + tail
-        return line + src
-    return src
+ENTRY_KEYS = {"path"}
 
 
-def read_list(path: Path) -> list[str]:
-    out = []
-    for raw in path.read_text().splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if line:
-            out.append(line)
-    return out
+def fail(msg: str) -> None:
+    sys.exit(f"error: {MANIFEST.name}: {msg}")
 
 
-def expected() -> dict[Path, tuple[bytes, bool]]:
-    """dest path -> (content, executable) for every listed file of every skill."""
-    want: dict[Path, tuple[bytes, bool]] = {}
-    for skill in sorted(p for p in SKILLS.iterdir() if (p / "SKILL.md").is_file()):
-        lst = skill / LIST
-        if not lst.is_file():
+def read_manifest() -> dict[Path, Path]:
+    """Parse .shared.yaml into {destination: source}."""
+    if not MANIFEST.is_file():
+        sys.exit(f"error: {MANIFEST.name} not found at the repo root")
+    doc = yaml.safe_load(MANIFEST.read_text()) or {}
+    if not isinstance(doc, dict):
+        fail("must be a mapping with a 'shared:' key")
+    extra = set(doc) - {"shared"}
+    if extra:
+        fail(f"unknown top-level key(s) {sorted(extra)}")
+
+    by_skill = doc.get("shared") or {}
+    if not isinstance(by_skill, dict):
+        fail("'shared' must be a map keyed by skill name")
+
+    want: dict[Path, Path] = {}
+    for name, entries in by_skill.items():
+        skill = SKILLS / str(name)
+        if not (skill / "SKILL.md").is_file():
+            fail(f"'{name}' is not a skill (no skills/{name}/SKILL.md)")
+        if entries is None:
             continue
-        for rel in read_list(lst):
-            src = SHARED / rel
-            if not src.is_file():
-                sys.exit(
-                    f"error: {lst.relative_to(ROOT)} lists {rel}, but _shared/{rel} does not exist"
-                )
-            content = banner(rel, src.read_bytes(), src.suffix)
-            executable = bool(src.stat().st_mode & stat.S_IXUSR)
-            want[skill / DEST / rel] = (content, executable)
+        if not isinstance(entries, dict):
+            fail(f"{name}: must be a map keyed by _shared/ source path")
+        for src, entry in entries.items():
+            if not isinstance(src, str):
+                fail(f"{name}: source {src!r} is not a string")
+            if not (SHARED / src).is_file():
+                fail(f"{name} lists {src}, but _shared/{src} does not exist")
+            if entry is None:
+                entry = {}
+            if not isinstance(entry, dict):
+                fail(f"{name}: entry for {src} must be a map (e.g. 'path: ...')")
+            bad = set(entry) - ENTRY_KEYS
+            if bad:
+                fail(f"{name}: {src} has unknown key(s) {sorted(bad)}")
+            dest = entry.get("path") or src
+            if not isinstance(dest, str):
+                fail(f"{name}: path for {src} is not a string")
+            if Path(dest).is_absolute() or ".." in Path(dest).parts:
+                fail(f"{name}: path {dest!r} must stay inside the skill")
+            target = skill / dest
+            if target in want:
+                fail(f"two sources both target {target.relative_to(ROOT)}")
+            want[target] = SHARED / src
+
     return want
 
 
-def actual() -> dict[Path, tuple[bytes, bool]]:
-    have: dict[Path, tuple[bytes, bool]] = {}
+def expected() -> dict[Path, tuple[bytes, bool]]:
+    """dest path -> (content, executable) for every file every skill asks for."""
+    return {
+        dest: (src.read_bytes(), bool(src.stat().st_mode & stat.S_IXUSR))
+        for dest, src in read_manifest().items()
+    }
+
+
+def _stat(p: Path) -> tuple[bytes, bool]:
+    return p.read_bytes(), bool(p.stat().st_mode & stat.S_IXUSR)
+
+
+def actual(want: dict[Path, tuple[bytes, bool]]) -> dict[Path, tuple[bytes, bool]]:
+    """Copies on disk: the declared ones that exist, plus any undeclared file in
+    a skill that duplicates a _shared/ source -- those are leftovers to sweep."""
+    have = {p: _stat(p) for p in want if p.is_file()}
+    sources = {f.read_bytes() for f in SHARED.rglob("*") if f.is_file()}
     for skill in SKILLS.iterdir():
-        dest = skill / DEST
-        if not dest.is_dir():
+        if not skill.is_dir():
             continue
-        for p in dest.rglob("*"):
-            if p.is_file():
-                have[p] = (p.read_bytes(), bool(p.stat().st_mode & stat.S_IXUSR))
+        for p in skill.rglob("*"):
+            if p.is_file() and p not in want and p.read_bytes() in sources:
+                have[p] = _stat(p)
     return have
 
 
@@ -96,6 +148,15 @@ def diff(want: dict, have: dict) -> list[tuple[str, Path]]:
     return sorted(out, key=lambda t: t[1])
 
 
+def prune_empty_dirs() -> None:
+    for skill in SKILLS.iterdir():
+        if not skill.is_dir():
+            continue
+        for p in sorted(skill.rglob("*"), key=lambda q: -len(q.parts)):
+            if p.is_dir() and not any(p.iterdir()):
+                p.rmdir()
+
+
 def apply(want: dict, have: dict) -> None:
     for kind, p in diff(want, have):
         if kind == "stale":
@@ -109,15 +170,13 @@ def apply(want: dict, have: dict) -> None:
         mode = mode | 0o111 if executable else mode & ~0o111
         p.chmod(mode)
         print(f"wrote    {p.relative_to(ROOT)}")
-    for skill in SKILLS.iterdir():
-        dest = skill / DEST
-        if dest.is_dir() and not any(dest.rglob("*")):
-            dest.rmdir()
+    prune_empty_dirs()
 
 
 def main(argv: list[str]) -> int:
     check = "--check" in argv
-    want, have = expected(), actual()
+    want = expected()
+    have = actual(want)
     if not check:
         apply(want, have)
         return 0

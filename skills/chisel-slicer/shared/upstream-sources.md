@@ -1,5 +1,3 @@
-<!-- generated from _shared/upstream-sources.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # Sources of Truth
 
 The knowledge in the mason reference files and the associated skills is derived from three upstream projects. When in doubt, **always defer to these sources** over anything written here.

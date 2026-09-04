@@ -21,9 +21,9 @@ format:  ## Format python in place (ruff, version pinned by RUFF)
 	uvx $(RUFF) format scripts/ skills/ tests/scripts/
 
 .PHONY: sync-shared
-sync-shared:  ## Copy _shared/ files into the skills that list them in shared.list
-	python3 scripts/sync-shared.py
+sync-shared:  ## Copy _shared/ files into the skills that ask for them in .shared.yaml
+	uv run --script scripts/sync-shared.py
 
 .PHONY: check-shared
-check-shared:  ## Fail if any skill's shared/ copy is out of sync with _shared/
-	python3 scripts/sync-shared.py --check
+check-shared:  ## Fail if any skill's generated copy is out of sync with _shared/
+	uv run --script scripts/sync-shared.py --check

@@ -1,5 +1,3 @@
-<!-- generated from _shared/chisel-releases.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # chisel-releases: Branch Model and `chisel.yaml`
 
 The [chisel-releases](https://github.com/canonical/chisel-releases) repository holds the _chisel releases_ that `chisel` consumes: one Git branch per Ubuntu release, `ubuntu-XX.XX` (e.g. `ubuntu-22.04`, `ubuntu-24.04`, `ubuntu-26.04`).

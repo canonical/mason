@@ -1,5 +1,3 @@
-<!-- generated from _shared/chisel-cli.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # Chisel: the Tool and its CLI
 
 [Chisel](https://github.com/canonical/chisel) builds minimal Ubuntu root filesystems by extracting named _slices_ of `.deb` packages instead of whole packages. It is a Go tool that consumes a _chisel release_ (a branch of [chisel-releases](https://github.com/canonical/chisel-releases)) as its source of truth.

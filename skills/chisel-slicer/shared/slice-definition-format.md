@@ -1,5 +1,3 @@
-<!-- generated from _shared/slice-definition-format.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # Slice Definition File (SDF) Format
 
 A _slice_ is a named subset of files from a single `.deb` package. Slices are defined in **Slice Definition Files (SDFs)** -- YAML files named `<package>.yaml` stored in the `slices/` directory of a chisel-releases branch.

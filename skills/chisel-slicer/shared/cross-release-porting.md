@@ -1,5 +1,3 @@
-<!-- generated from _shared/cross-release-porting.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # Porting Slices Across Ubuntu Releases
 
 SDFs for the same package differ across Ubuntu release branches. Forward-porting is **adaptation, not copy-paste**. Always run `deb-list.py` against each target release and verify actual `.deb` contents.

@@ -1,5 +1,3 @@
-<!-- generated from _shared/spread-tests.md by scripts/sync-shared.py -- edit the source, then make sync-shared -->
-
 # Spread Test Infrastructure
 
 Integration tests in [chisel-releases](https://github.com/canonical/chisel-releases) use [spread](https://github.com/canonical/spread) to validate slices inside ephemeral containers.

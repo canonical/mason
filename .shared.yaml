@@ -1,0 +1,18 @@
+# what each skill takes from _shared/, and where the copy lands inside it.
+# `make sync-shared` writes the copies; `make check-shared` (ci) catches drift.
+shared:
+  chisel-slicer:
+    chisel-cli.md:
+      path: shared/chisel-cli.md
+    chisel-releases.md:
+      path: shared/chisel-releases.md
+    cross-release-porting.md:
+      path: shared/cross-release-porting.md
+    slice-conventions.md:
+      path: shared/slice-conventions.md
+    slice-definition-format.md:
+      path: shared/slice-definition-format.md
+    spread-tests.md:
+      path: shared/spread-tests.md
+    upstream-sources.md:
+      path: shared/upstream-sources.md
