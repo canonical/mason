@@ -15,7 +15,7 @@
 
 Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chisel) and [`chisel-releases`](https://github.com/canonical/chisel-releases) -- cross-agent skills and scripts for authoring and reviewing slice definition files.
 
-## install
+Install with:
 
 ```shell
 npx skills add canonical/mason --skill chisel-slicer
