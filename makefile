@@ -9,16 +9,16 @@ help:  ## Show this help
 verify: lint check-shared test  ## Run every check ci runs
 
 .PHONY: test
-test:  ## Test the skill scripts (uvx pytest, pyyaml pulled in on the fly)
-	uvx --with pyyaml --with pytest pytest tests/scripts/
+test:  ## Test the scripts and repo metadata (uvx pytest, pyyaml pulled in on the fly)
+	uvx --with pyyaml --with pytest pytest tests/scripts/ tests/meta/
 
 .PHONY: lint
 lint:  ## Lint python (ruff, version pinned by RUFF)
-	uvx $(RUFF) check scripts/ skills/ tests/scripts/
+	uvx $(RUFF) check scripts/ skills/ tests/scripts/ tests/meta/
 
 .PHONY: format
 format:  ## Format python in place (ruff, version pinned by RUFF)
-	uvx $(RUFF) format scripts/ skills/ tests/scripts/
+	uvx $(RUFF) format scripts/ skills/ tests/scripts/ tests/meta/
 
 .PHONY: sync-shared
 sync-shared:  ## Copy _shared/ files into the skills that ask for them in .shared.yaml
