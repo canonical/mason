@@ -281,7 +281,7 @@ When you need to poke around the resulting rootfs (chroot in, inspect files), cu
 
 ```bash
 mkdir rootfs/
-chisel cut --release ./ --root rootfs/ <package>_<slice>
+chisel cut --ignore=unstable --ignore=unmaintained --release ./ --root rootfs/ <package>_<slice>
 ```
 
 #### Write the test suite
