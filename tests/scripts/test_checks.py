@@ -104,8 +104,58 @@ def test_check_slice() -> None:
         out = run("check-slice.py", write(d, "foo.yaml", DIRTY), "--format", "1")
         assert "contents paths not sorted" in out, out
         assert "essential entries not sorted" in out, out
-        assert "hint: is v3+ only" in out, out
         assert "man pages" in out, out
+        # chisel does not gate hint: on format -- it is branch convention, so a
+        # v1 branch gets a warning, never a block.
+        assert "hint: is a v3+ branch convention" in out, out
+        assert "block" not in out.split("bins.hint")[1].split("\n")[0], out
+
+        # COVER: the path-shape rules chisel enforces at parse time. each is a
+        # block on its own, and none of them fire on a well-formed path.
+        def path_sdf(entry: str) -> str:
+            return (
+                "package: foo\nessential:\n  foo_copyright:\nslices:\n  bins:\n"
+                f"    contents:\n      {entry}\n"
+                "  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
+            )
+
+        for entry, expected in [
+            ("/usr/bin/*: {mode: 0755}", "wildcard path cannot set"),
+            ("/usr/lib/foo: {make: true}", "make: true requires the path to end in /"),
+            (
+                "/var/lib/chisel/**: {generate: manifest, until: mutate}",
+                "only arch: is allowed",
+            ),
+            (
+                "/var/lib/chisel/*/**: {generate: manifest}",
+                "must end in /** and hold no other wildcard",
+            ),
+            ("/x: {prefer: foo}", "names its own package"),
+        ]:
+            out = run(
+                "check-slice.py", write(d, "foo.yaml", path_sdf(entry)), "--format", "3"
+            )
+            assert expected in out, (entry, out)
+
+        for entry in [
+            "/usr/bin/*: {arch: [amd64]}",
+            "/usr/lib/foo/: {make: true}",
+            "/var/lib/chisel/**: {generate: manifest}",
+            "/x: {prefer: otherpkg}",
+        ]:
+            out = run(
+                "check-slice.py", write(d, "foo.yaml", path_sdf(entry)), "--format", "3"
+            )
+            assert "block" not in out, (entry, out)
+
+        # base-files really does own bin/ and lib/ -- exempt from the name warning.
+        bf = (
+            "package: base-files\nessential:\n  base-files_copyright:\nslices:\n"
+            "  bin:\n    contents:\n      /bin:\n"
+            "  copyright:\n    contents:\n      /usr/share/doc/base-files/copyright:\n"
+        )
+        out = run("check-slice.py", write(d, "base-files.yaml", bf), "--format", "3")
+        assert "use 'bins'" not in out, out
 
         # filename must match package.
         out = run("check-slice.py", write(d, "bar.yaml", CLEAN), "--format", "3")

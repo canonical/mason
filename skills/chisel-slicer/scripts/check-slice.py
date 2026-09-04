@@ -47,7 +47,19 @@ import yaml
 # known-bad slice names reviewers reject, mapped to the right one. by-function
 # and per-binary names (e.g. printing-text, ls-bin, journal) are legitimate, so
 # only these exact mistakes are flagged -- not "anything off a fixed vocabulary".
-BAD_SLICE_NAMES = {"bin": "bins", "lib": "libs", "all": "core"}
+BAD_SLICE_NAMES = {
+    "bin": "bins",
+    "lib": "libs",
+    "all": "core",
+    "configs": "config",
+    "rules": "udev-rules",
+    "license": "copyright",
+    "notice": "copyright",
+}
+
+# base-files really does own bin/lib (they build the /bin and /lib trees, not
+# executables), and fonts-ubuntu is the one legitimate umbrella `all`.
+BAD_NAME_EXEMPT = {"base-files": {"bin", "lib"}, "fonts-ubuntu": {"all"}}
 
 # Debian arch names -- always lowercase, never x86_64/aarch64. (arch-list order
 # is not enforced: real SDFs use a priority order, not alphabetical.)
@@ -225,8 +237,11 @@ def check_hint(name: str, hint: Any, f: Findings) -> None:
         f.warn(where, "hint should be sentence case (capitalise the first letter)")
     if re.match(r"(?i)^(a|an|the)\b", hint):
         f.warn(where, "hint should not start with an article (a/an/the)")
-    if hint[-1:] in {".", ",", ";", ":", "!"}:
-        f.warn(where, "hint should not end with punctuation")
+    if hint[-1:] in {".", ",", ";", ":", "!", "?", " "}:
+        f.warn(
+            where,
+            "hint should not end with punctuation or a space (a closing ')' is fine)",
+        )
     if "  " in hint or hint != hint.strip():
         f.warn(where, "hint should have no double, leading, or trailing spaces")
     stray = sorted(set(hint) - _HINT_ALLOWED - {"\n"})
@@ -240,14 +255,19 @@ def check_hint(name: str, hint: Any, f: Findings) -> None:
 def check_slice_body(
     name: str, body: dict, pkg: str, fmt: int | None, f: Findings
 ) -> None:
-    if name in BAD_SLICE_NAMES:
+    if name in BAD_SLICE_NAMES and name not in BAD_NAME_EXEMPT.get(pkg, ()):
         f.warn(f"slices.{name}", f"use '{BAD_SLICE_NAMES[name]}' not '{name}'")
 
     if "hint" in body:
+        # chisel validates hint under every format -- the v3+ rule is branch
+        # convention, not a parse error, so warn rather than block.
         if fmt is not None and fmt < 3:
-            f.block(f"{name}.hint", f"hint: is v3+ only (format is v{fmt})")
-        else:
-            check_hint(name, body["hint"], f)
+            f.warn(
+                f"{name}.hint",
+                f"hint: is a v3+ branch convention (format is v{fmt}); "
+                "chisel parses it but no v1/v2 branch uses it",
+            )
+        check_hint(name, body["hint"], f)
 
     contents = body.get("contents")
     if not isinstance(contents, dict):
@@ -257,6 +277,48 @@ def check_slice_body(
         f.block(f"{name}.contents", "contents paths not sorted (bytewise/ASCII)")
     for path, entry in contents.items():
         check_path(name, path, entry, pkg, fmt, f)
+
+
+# options chisel rejects on a glob path: everything that defines content, plus
+# prefer. only until: and arch: survive. (internal/setup: "invalid wildcard options")
+GLOB_INCOMPATIBLE = ("copy", "make", "text", "symlink", "mode", "mutable", "prefer")
+
+# a generate: path is stricter still -- arch: is the only companion it takes.
+GENERATE_INCOMPATIBLE = GLOB_INCOMPATIBLE + ("until",)
+
+
+def check_path_kind(sname: str, path: str, entry: dict, f: Findings) -> None:
+    """The three path-shape rules chisel enforces at parse time."""
+    where = f"{sname}: {path}"
+    if entry.get("generate") is not None:
+        if entry.get("generate") != "manifest":
+            f.block(
+                where, "generate: only takes the value 'manifest' (chisel parse error)"
+            )
+        if not path.endswith("/**") or "*" in path[:-3] or "?" in path:
+            f.block(
+                where,
+                "generate: path must end in /** and hold no other wildcard (chisel parse error)",
+            )
+        bad = [k for k in GENERATE_INCOMPATIBLE if k in entry]
+        if bad:
+            f.block(
+                where,
+                f"generate: path cannot also set {bad} -- only arch: is allowed (chisel parse error)",
+            )
+        return
+
+    if "*" in path or "?" in path:
+        bad = [k for k in GLOB_INCOMPATIBLE if k in entry]
+        if bad:
+            f.block(
+                where,
+                f"wildcard path cannot set {bad} -- globs take only until: and arch: "
+                "(chisel parse error). Name the path explicitly instead",
+            )
+
+    if entry.get("make") and not path.endswith("/"):
+        f.block(where, "make: true requires the path to end in / (chisel parse error)")
 
 
 def check_path(
@@ -280,8 +342,23 @@ def check_path(
 
     if not isinstance(entry, dict):
         return
-    if "prefer" in entry and (fmt is not None and fmt < 2):
-        f.block(f"{sname}: {path}", f"prefer: is v2+ only (format is v{fmt})")
+
+    check_path_kind(sname, path, entry, f)
+
+    prefer = entry.get("prefer")
+    if prefer is not None:
+        # not format-gated in chisel; naming your own package is a parse error.
+        if prefer == pkg:
+            f.block(
+                f"{sname}: {path}",
+                f"prefer: names its own package '{pkg}' -- must name another (chisel parse error)",
+            )
+        if fmt is not None and fmt < 2:
+            f.warn(
+                f"{sname}: {path}",
+                f"prefer: is a v2+ branch convention (format is v{fmt}); "
+                "a chisel older than 1.2.0 ignores it silently",
+            )
     arch = entry.get("arch")
     archs = (
         [arch] if isinstance(arch, str) else arch if isinstance(arch, list) else None
