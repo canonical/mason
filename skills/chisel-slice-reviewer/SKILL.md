@@ -9,6 +9,7 @@ argument-hint: "<sdf-path|branch|pr>"
 ---
 
 # chisel-slice-reviewer
+
 You review slices in [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
 
 **Input**: an SDF path (`slices/<pkg>.yaml`), a branch, or a PR to review. When
@@ -16,12 +17,12 @@ given a branch or PR, the diff against the branch it targets is what you review;
 when given a single SDF, review the file as it stands. If which is meant is
 unclear, review what you were handed and say in the report what you assumed.
 
-**First**: run `scripts/orientation` -- it reports your working dir, this skill's
+**First**: run `scripts/_orientation` -- it reports your working dir, this skill's
 own dir, and the target release + manifest format from `chisel.yaml`. Then read
-`kb/slice-definition-format.md` (SDF format) and `kb/chisel-formats.md` (what
-`format:` decides), plus `kb/slice-conventions.md` for canonical naming and path
-style. Pull in `kb/chisel-branches.md` for the branch model and
-`kb/spread-tests.md` when judging tests.
+`kb/_slice-definition-format.md` (SDF format) and `kb/_chisel-formats.md` (what
+`format:` decides), plus `kb/_slice-conventions.md` for canonical naming and path
+style. Pull in `kb/_chisel-branches.md` for the branch model and
+`kb/_spread-tests.md` when judging tests.
 
 ## Where things live
 
@@ -32,14 +33,14 @@ exactly as written.
 
 `kb/` and `scripts/` are **not**. They are relative to this skill's own
 directory -- the one holding this `SKILL.md` -- which is somewhere else entirely,
-and they are read-only. Running `scripts/orientation` from the checkout finds
-nothing; run it by its real path. `scripts/orientation` prints that path as
+and they are read-only. Running `scripts/_orientation` from the checkout finds
+nothing; run it by its real path. `scripts/_orientation` prints that path as
 "skill dir" for you, so run it first and use what it prints.
 
 If a `scripts/` file will not run by path, run it through its interpreter --
-**the extension tells you which**: `orientation` and `try-cut` have none and are
-bash (`bash <skill dir>/scripts/orientation`); everything ending `.py` is python
-(`uv run --script <skill dir>/scripts/check-slice.py`, or `python3` with pyyaml
+**the extension tells you which**: `_orientation` and `_try-cut` have no
+extension and are bash (`bash <skill dir>/scripts/_orientation`); everything ending `.py` is python
+(`uv run --script <skill dir>/scripts/_check-slice.py`, or `python3` with pyyaml
 available). Running a bash script under `python3` fails with a `SyntaxError`.
 
 You are read-only: inspect the diff / SDFs and return a review report. Do not edit files.
@@ -56,11 +57,11 @@ scripts/review-diff.py --base <target-branch>
 
 It finds the changed SDFs and runs the three checkers over them, then prints findings grouped by severity plus a verdict, and exits non-zero if anything `block`s (the same command a CI PR-review job would call). The three it drives, also runnable on their own:
 
-- `scripts/check-slice.py slices/<pkg>.yaml` -- static conventions: sorting, naming, absolute paths, duplicate contents keys, copyright presence, clutter exclusion, arch names, the format-gated `essential:` shape and `v3-essential:`, the path-shape parse errors (glob with content options, `make:` without a trailing `/`, `generate:` rules, `prefer:` naming its own package), and `hint:` length + mechanical style (the noun-phrase rule needs NLP -- `validate-hints` CI covers that, not this script). Reads `format:` from `./chisel.yaml` (or pass `--branch ubuntu-XX.XX`).
-- `scripts/check-test.py slices/<pkg>.yaml` -- test coverage: `warn` if there's no test or it exercises none of the binaries; `info` listing untested binaries under partial coverage (normal for suites and alternatives symlinks -- judge whether the gaps matter).
-- `scripts/check-diff.py --base <target-branch>` -- append-only regressions: a removed SDF or slice fails the `removed-slices` CI gate (unless the package left the archive); a content path dropped from a kept slice has no CI gate but is a regression reviewers reject.
+- `scripts/_check-slice.py slices/<pkg>.yaml` -- static conventions: sorting, naming, absolute paths, duplicate contents keys, copyright presence, clutter exclusion, arch names, the format-gated `essential:` shape and `v3-essential:`, the path-shape parse errors (glob with content options, `make:` without a trailing `/`, `generate:` rules, `prefer:` naming its own package), and `hint:` length + mechanical style (the noun-phrase rule needs NLP -- `validate-hints` CI covers that, not this script). Reads `format:` from `./chisel.yaml` (or pass `--branch ubuntu-XX.XX`).
+- `scripts/_check-test.py slices/<pkg>.yaml` -- test coverage: `warn` if there's no test or it exercises none of the binaries; `info` listing untested binaries under partial coverage (normal for suites and alternatives symlinks -- judge whether the gaps matter).
+- `scripts/_check-diff.py --base <target-branch>` -- append-only regressions: a removed SDF or slice fails the `removed-slices` CI gate (unless the package left the archive); a content path dropped from a kept slice has no CI gate but is a regression reviewers reject.
 
-Fold the output straight into your report: map `block` -> blocking, `warn` -> should-fix, `info` -> judge. Then spend your own judgement on what they can't check: dependency accuracy, test *depth*, design, forward-porting, and hint phrasing (noun phrase, no finite verbs -- see `kb/slice-definition-format.md`).
+Fold the output straight into your report: map `block` -> blocking, `warn` -> should-fix, `info` -> judge. Then spend your own judgement on what they can't check: dependency accuracy, test *depth*, design, forward-porting, and hint phrasing (noun phrase, no finite verbs -- see `kb/_slice-definition-format.md`).
 
 None cut a rootfs or run tests -- `chisel cut` (the `install-slices` CI check) and spread cover those.
 
@@ -100,7 +101,7 @@ Published slices are **append-only in spirit**. Removing files from an existing 
 
 ## Naming Conventions
 
-Verify against the Canonical Slice Names table in `kb/slice-conventions.md`:
+Verify against the Canonical Slice Names table in `kb/_slice-conventions.md`:
 
 - `bins` not `bin` for executables (the singular `bin` is only right in `base-files`, which builds the `/bin` directory tree)
 - `libs` not `lib` for shared libraries (same `base-files` exception for the `/lib` tree)
@@ -121,23 +122,23 @@ Hard gates, all of them mechanical -- `check-slice.py` reports every one, so fol
 2. **Arch names**: lowercase Debian names only (`amd64`, `arm64`, `armhf`, `i386`, `ppc64el`, `riscv64`, `s390x`) -- never `x86_64`/`aarch64`.
 3. **File layout**: global `essential:` right after `package:`, `copyright` slice last, `package:` matching the filename stem, one package per file.
 
-The style rules the script can't judge -- multiarch globs, soname trailing `*`, version-glob pinning, glob narrowness, when a `symlink:` is redundant, symlink comments, inline option style -- are in the Path Entry Style section of `kb/slice-conventions.md`. Review against that, and treat arch-list *order* as a nit rather than a gate.
+The style rules the script can't judge -- multiarch globs, soname trailing `*`, version-glob pinning, glob narrowness, when a `symlink:` is redundant, symlink comments, inline option style -- are in the Path Entry Style section of `kb/_slice-conventions.md`. Review against that, and treat arch-list *order* as a nit rather than a gate.
 
 ## Schema Version Compliance
 
-Only one SDF field is genuinely decided by `chisel.yaml`'s `format:` -- the shape of `essential:` (list on v1/v2, map on v3+) and, with it, whether `v3-essential:` is allowed. `check-slice.py` blocks on that deterministically; fold its output in. `kb/chisel-formats.md` is the reference.
+Only one SDF field is genuinely decided by `chisel.yaml`'s `format:` -- the shape of `essential:` (list on v1/v2, map on v3+) and, with it, whether `v3-essential:` is allowed. `check-slice.py` blocks on that deterministically; fold its output in. `kb/_chisel-formats.md` is the reference.
 
 `hint:` and `prefer:` are **not** format-gated -- chisel validates them under every format. Writing one on a v1/v2 branch is a convention violation worth a should-fix, not a parse error; do not report it as CI-breaking. The gate the script cannot see: `pro:` under `archives:` is v2+, and v1 uses a separate `v2-archives:` block.
 
 ## Testing Requirements
 
-- **Binaries in a `bins` slice should be exercised** in spread tests. "Please test every binary being delivered" is a recurring ask, though representative coverage is accepted for suites and alternatives symlinks. `scripts/check-test.py slices/<pkg>.yaml` reports the coverage and lists untested binaries -- flag a test that exercises none of them, and judge whether partial gaps matter.
+- **Binaries in a `bins` slice should be exercised** in spread tests. "Please test every binary being delivered" is a recurring ask, though representative coverage is accepted for suites and alternatives symlinks. `scripts/_check-test.py slices/<pkg>.yaml` reports the coverage and lists untested binaries -- flag a test that exercises none of them, and judge whether partial gaps matter.
 - **Untestable means unshippable.** Push to drop rather than ship untested.
 - **~80% coverage** is a soft target mentioned in PR coverage comments. Not a hard gate but actively watched.
 - **Functional slices need functional tests.** `--version` alone is insufficient for applications. Test actual functionality.
 - **One rootfs per test.** Reusing a rootfs across tests lets leftover slices mask a missing dependency -- push to split into a fresh `install-slices` per test.
 - **Hermetic by default.** Inputs generated inline, no apt-installing extras, bounded waits (no naked `sleep`/infinite retry), `grep -Fiq` for assertions. Exception: packages whose function IS the network path (CA bundles, TLS/http clients) may hit one stable well-known endpoint (e.g. `https://example.com`) -- upstream does.
-- Tests live at `tests/spread/integration/<pkg>/task.yaml`. `kb/spread-tests.md` has the `install-slices` contract and the chroot setup patterns a test is expected to use.
+- Tests live at `tests/spread/integration/<pkg>/task.yaml`. `kb/_spread-tests.md` has the `install-slices` contract and the chroot setup patterns a test is expected to use.
 
 ## Forward-Port Requirements
 
@@ -150,7 +151,7 @@ Only one SDF field is genuinely decided by `chisel.yaml`'s `format:` -- the shap
 
 ## Contribution Process
 
-`kb/conventional-commits.md` has the commit format and the PR rules -- branch off
+`kb/_conventional-commits.md` has the commit format and the PR rules -- branch off
 the target release branch, one cohesive change, two approvals, CLA, green CI, no
 force-push after review. Check the PR against it.
 

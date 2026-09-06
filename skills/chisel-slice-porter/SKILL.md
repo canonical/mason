@@ -28,14 +28,14 @@ exactly as written.
 
 `kb/` and `scripts/` are **not**. They are relative to this skill's own
 directory -- the one holding this `SKILL.md` -- which is somewhere else entirely,
-and they are read-only. Running `scripts/orientation` from the checkout finds
-nothing; run it by its real path. `scripts/orientation` prints that path as
+and they are read-only. Running `scripts/_orientation` from the checkout finds
+nothing; run it by its real path. `scripts/_orientation` prints that path as
 "skill dir" for you, so run it first and use what it prints.
 
 If a `scripts/` file will not run by path, run it through its interpreter --
-**the extension tells you which**: `orientation` and `try-cut` have none and are
-bash (`bash <skill dir>/scripts/orientation`); everything ending `.py` is python
-(`uv run --script <skill dir>/scripts/check-slice.py`, or `python3` with pyyaml
+**the extension tells you which**: `_orientation` and `_try-cut` have no
+extension and are bash (`bash <skill dir>/scripts/_orientation`); everything ending `.py` is python
+(`uv run --script <skill dir>/scripts/_check-slice.py`, or `python3` with pyyaml
 available). Running a bash script under `python3` fails with a `SyntaxError`.
 
 **Scope**: adapt + test + commit on the target branch. Do NOT open PRs -- the
@@ -45,14 +45,14 @@ user opens them.
 for confirmation, make the best-supported decision, proceed, and record it with
 its rationale in your final report.
 
-**Prerequisites**: run `scripts/orientation <package>` first -- it reports your
+**Prerequisites**: run `scripts/_orientation <package>` first -- it reports your
 working dir, this skill's own dir, the target release + manifest format from
 `chisel.yaml`, and the live release set. Then read
-`kb/cross-release-porting.md` (what changes between releases -- this is the
-core reference for this job) and `kb/chisel-formats.md` (what `format:`
-decides). Pull in `kb/slice-definition-format.md` and `kb/slice-conventions.md`
-when writing, `kb/spread-tests.md` when porting the test, and
-`kb/chisel-branches.md` for the branch model.
+`kb/_cross-release-porting.md` (what changes between releases -- this is the
+core reference for this job) and `kb/_chisel-formats.md` (what `format:`
+decides). Pull in `kb/_slice-definition-format.md` and `kb/_slice-conventions.md`
+when writing, `kb/_spread-tests.md` when porting the test, and
+`kb/_chisel-branches.md` for the branch model.
 
 When this prompt and the repo disagree, trust the repo.
 
@@ -71,7 +71,7 @@ When this prompt and the repo disagree, trust the repo.
    user asked for the reconcile.
 4. **Read both `format:` versions.** Source and target formats decide the shape
    of `essential:`, and a mismatch is the single most common porting failure.
-   See `kb/chisel-formats.md`.
+   See `kb/_chisel-formats.md`.
 
 Fetch the source SDF without a full checkout:
 
@@ -88,11 +88,11 @@ git -C <repo> diff <source-branch>:slices/<pkg>.yaml <target-branch>:slices/<pkg
 ### Step 2: Diff the packages, not just the SDFs
 
 The source SDF tells you what *was* true. The target release's `.deb` tells you
-what *is*. Run `scripts/deb-list.py <pkg>` against the target release and
+what *is*. Run `scripts/_deb-list.py <pkg>` against the target release and
 compare against the source SDF's `contents:`.
 
 Work through the Cross-Release Differences table in
-`kb/cross-release-porting.md`. The recurring ones:
+`kb/_cross-release-porting.md`. The recurring ones:
 
 - **usrmerge** -- `/bin/x` becomes `/usr/bin/x` on 24.04+.
 - **t64** -- `libfoo3` becomes `libfoo3t64` on 24.04+; both the SDF filename and
@@ -123,7 +123,7 @@ correcting everything Step 2 turned up.
 Then self-check:
 
 ```bash
-scripts/check-slice.py slices/<pkg>.yaml
+scripts/_check-slice.py slices/<pkg>.yaml
 ```
 
 Fix every `block` and every `warn` you cannot justify.
@@ -135,18 +135,18 @@ The spread test moves with the slice. Copy
 the same way: binary paths may have moved, and the slices it installs may have
 been renamed.
 
-If the source branch has no test, write one -- `scripts/scaffold-test.py
-slices/<pkg>.yaml` emits a skeleton. `kb/spread-tests.md` has the
+If the source branch has no test, write one -- `scripts/_scaffold-test.py
+slices/<pkg>.yaml` emits a skeleton. `kb/_spread-tests.md` has the
 `install-slices` contract and the chroot setup patterns.
 
 ```bash
-scripts/check-test.py slices/<pkg>.yaml
+scripts/_check-test.py slices/<pkg>.yaml
 ```
 
 ### Step 5: Verify on the target
 
 ```bash
-scripts/try-cut <pkg>_<slice>
+scripts/_try-cut <pkg>_<slice>
 ```
 
 A cut that succeeds on the source branch proves nothing about the target. Cut on
@@ -160,12 +160,12 @@ spread lxd:tests/spread/integration/<pkg>
 
 If the port is one link in a chain -- the same change going across several live
 releases -- the other branches need the same treatment. List the live releases
-with `scripts/orientation` and report which still need the port.
+with `scripts/_orientation` and report which still need the port.
 
 If you changed an existing SDF rather than adding one:
 
 ```bash
-scripts/check-diff.py --base <target-branch>
+scripts/_check-diff.py --base <target-branch>
 ```
 
 It flags any slice or path dropped by accident. The `removed-slices` CI gate
@@ -183,7 +183,7 @@ git -C <repo> commit -m "feat(<pkg>): add <slice-list> slices"
 git -C <repo> commit -m "test(<pkg>): add integration tests"
 ```
 
-Commit messages follow `kb/conventional-commits.md`.
+Commit messages follow `kb/_conventional-commits.md`.
 
 **Stop here. The user opens the PR themselves.**
 

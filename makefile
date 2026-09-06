@@ -22,8 +22,12 @@ format:  ## Format python in place (ruff, version pinned by RUFF)
 
 .PHONY: sync-shared
 sync-shared:  ## Copy _shared/ files into the skills that ask for them in .shared.yaml
-	uv run --script scripts/sync-shared.py
+	uv run --script scripts/shared.py sync
 
 .PHONY: check-shared
 check-shared:  ## Fail if any skill's generated copy is out of sync with _shared/
-	uv run --script scripts/sync-shared.py --check
+	uv run --script scripts/shared.py sync --check
+
+.PHONY: list-shared
+list-shared:  ## Print a skill-by-file matrix of what _shared/ goes where
+	@uv run --script scripts/shared.py list

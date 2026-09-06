@@ -3,11 +3,12 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""sync-shared: copy files from _shared/ into the skills that ask for them.
+"""shared: materialise _shared/ into the skills that ask for it.
 
 Installers copy a skill directory verbatim and know nothing about siblings, so
 anything a skill needs has to live inside it. _shared/ is the single source of
-truth for material used by more than one skill; this script materialises it.
+truth for material used by more than one skill -- knowledge-base markdown and
+helper scripts alike -- and this script materialises it.
 
 Everything is declared in .shared.yaml at the repo root: a `shared:` map keyed
 by skill, then by _shared/-relative source, each entry naming where the copy
@@ -17,27 +18,29 @@ where its copies live and what they are called:
     shared:
       chisel-slicer:
         chisel-cli.md:
-          path: shared/chisel-cli.md      # under shared/
-        slice-conventions.md:
-          path: reference/style.md        # anywhere else, renamed
-        spread-tests.md:                  # no entry body -- same relative path
+          path: kb/_chisel-cli.md
+        check-slice.py:
+          path: scripts/_check-slice.py
 
-Nothing about this lives in the skill directories: a copy is a byte-for-byte
-duplicate of its source carrying its mode, and no listing file sits beside it.
-A skill dir holds only what ships.
+Every destination basename must start with an underscore. That is what tells a
+reader, at a glance and inside the skill, which files the skill owns and which
+were synced in -- and underscore sorts before letters, so the synced ones group
+together in a listing. The rule is enforced here rather than left to the author
+of the manifest.
 
-Being an exact duplicate is also how a copy is recognised, so no record of past
-writes is kept: a file inside a skill whose bytes match some _shared/ file but
-which nothing declares is a leftover, and is removed. Drop an entry or point it
-somewhere else and the file at the old path goes away rather than lingering.
+A copy is byte-for-byte its source, carrying its mode. Being an exact duplicate
+is also how a copy is recognised, so no record of past writes is kept: a file
+inside a skill whose bytes match some _shared/ file but which nothing declares
+is a leftover, and is removed. Drop an entry or point it somewhere else and the
+file at the old path goes away rather than lingering.
 
 The one leftover this cannot see is one whose source was edited in the same
 change that moved it -- its content no longer matches anything in _shared/.
-Running sync after a retarget alone always catches it.
 
 Usage:
-  sync-shared.py            write the copies (make sync-shared)
-  sync-shared.py --check    write nothing; list what differs, exit 1 if anything does
+  shared.py sync            write the copies (make sync-shared)
+  shared.py sync --check    write nothing; list what differs, exit 1 if anything does
+  shared.py list            print a skill-by-file matrix of what goes where
 """
 
 from __future__ import annotations
@@ -89,18 +92,22 @@ def read_manifest() -> dict[Path, Path]:
                 fail(f"{name}: source {src!r} is not a string")
             if not (SHARED / src).is_file():
                 fail(f"{name} lists {src}, but _shared/{src} does not exist")
-            if entry is None:
-                entry = {}
             if not isinstance(entry, dict):
                 fail(f"{name}: entry for {src} must be a map (e.g. 'path: ...')")
             bad = set(entry) - ENTRY_KEYS
             if bad:
                 fail(f"{name}: {src} has unknown key(s) {sorted(bad)}")
-            dest = entry.get("path") or src
-            if not isinstance(dest, str):
-                fail(f"{name}: path for {src} is not a string")
+            dest = entry.get("path")
+            if not isinstance(dest, str) or not dest:
+                fail(f"{name}: {src} needs an explicit 'path:'")
             if Path(dest).is_absolute() or ".." in Path(dest).parts:
                 fail(f"{name}: path {dest!r} must stay inside the skill")
+            if not Path(dest).name.startswith("_"):
+                fail(
+                    f"{name}: path {dest!r} must start its filename with '_' -- "
+                    "synced copies are marked so they are told apart from the "
+                    "skill's own files"
+                )
             target = skill / dest
             if target in want:
                 fail(f"two sources both target {target.relative_to(ROOT)}")
@@ -173,8 +180,40 @@ def apply(want: dict, have: dict) -> None:
     prune_empty_dirs()
 
 
+def cmd_list() -> int:
+    """A matrix of what each skill ships. Rows are destination paths, columns
+    skills -- so a row shows at a glance who gets a given file, and where."""
+    declared = read_manifest()
+    names = sorted({d.relative_to(SKILLS).parts[0] for d in declared})
+    rows: dict[str, set[str]] = {}
+    for dest in declared:
+        rel = dest.relative_to(SKILLS)
+        skill, path = rel.parts[0], str(Path(*rel.parts[1:]))
+        rows.setdefault(path, set()).add(skill)
+
+    width = max([len(r) for r in rows] + [4])
+    header = " " * width + "  " + "  ".join(n.center(len(n)) for n in names)
+    print(header)
+    print("-" * len(header))
+    for path in sorted(rows):
+        cells = [
+            "x".center(len(n)) if n in rows[path] else "-".center(len(n)) for n in names
+        ]
+        print(f"{path:<{width}}  " + "  ".join(cells))
+    print()
+    print(f"{len(rows)} files from _shared/, {len(names)} skills")
+    return 0
+
+
 def main(argv: list[str]) -> int:
-    check = "--check" in argv
+    cmd = argv[0] if argv else ""
+    if cmd == "list":
+        return cmd_list()
+    if cmd != "sync":
+        print(__doc__.split("Usage:")[1].rstrip(), file=sys.stderr)
+        return 2
+
+    check = "--check" in argv[1:]
     want = expected()
     have = actual(want)
     if not check:

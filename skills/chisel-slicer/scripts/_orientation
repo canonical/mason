@@ -84,7 +84,7 @@ if [ -f chisel.yaml ]; then
 
     echo "branch:          ${branch:-?}"
     echo "ubuntu version:  ${ver:-?}"
-    echo "manifest format: ${fmt:-?}   (gates SDF features -- see kb/chisel-formats.md)"
+    echo "manifest format: ${fmt:-?}   (gates SDF features -- see kb/_chisel-formats.md)"
     echo "suites:          ${suites:-?}"
     echo "components:      ${comps:-?}"
     echo "end-of-life:     ${eol:-?}"
