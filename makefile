@@ -14,11 +14,11 @@ test:  ## Test the scripts and repo metadata (uvx pytest, pyyaml pulled in on th
 
 .PHONY: lint
 lint:  ## Lint python (ruff, version pinned by RUFF)
-	uvx $(RUFF) check scripts/ skills/ tests/scripts/ tests/meta/
+	uvx $(RUFF) check scripts/ _shared/ skills/ tests/scripts/ tests/meta/
 
 .PHONY: format
 format:  ## Format python in place (ruff, version pinned by RUFF)
-	uvx $(RUFF) format scripts/ skills/ tests/scripts/ tests/meta/
+	uvx $(RUFF) format scripts/ _shared/ skills/ tests/scripts/ tests/meta/
 
 .PHONY: sync-shared
 sync-shared:  ## Copy _shared/ files into the skills that ask for them in .shared.yaml
