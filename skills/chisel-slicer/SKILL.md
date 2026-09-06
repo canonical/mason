@@ -11,6 +11,25 @@ argument-hint: "<package>"
 # chisel-slicer
 You author slices against [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
 
+## Where things live
+
+You work inside a checkout of `canonical/chisel-releases` -- your current working
+directory. Every repo path you read or write -- `slices/<pkg>.yaml`,
+`tests/spread/...`, `chisel.yaml`, sibling SDFs -- is relative to that checkout,
+exactly as written.
+
+`kb/` and `scripts/` are **not**. They are relative to this skill's own
+directory -- the one holding this `SKILL.md` -- which is somewhere else entirely,
+and they are read-only. Running `scripts/orientation` from the checkout finds
+nothing; run it by its real path. `scripts/orientation` prints that path as
+"skill dir" for you, so run it first and use what it prints.
+
+If a `scripts/` file will not run by path, run it through its interpreter --
+**the extension tells you which**: `orientation` and `try-cut` have none and are
+bash (`bash <skill dir>/scripts/orientation`); everything ending `.py` is python
+(`uv run --script <skill dir>/scripts/check-slice.py`, or `python3` with pyyaml
+available). Running a bash script under `python3` fails with a `SyntaxError`.
+
 **Scope**: author + test + commit slices locally. Do NOT open PRs -- the user opens the PR themselves.
 
 **You run autonomously.** There is no human in the loop mid-task. Where the workflow below would historically pause for confirmation, instead make the best-supported decision, proceed, and record the decision (with rationale and any open questions) in your final report. Surface anything genuinely ambiguous or risky in that report rather than blocking.

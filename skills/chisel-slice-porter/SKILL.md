@@ -19,6 +19,25 @@ differently on different releases: paths move, libraries are renamed, sonames
 bump, packages split, and the `essential:` syntax itself changes with the
 branch's `format:`. A verbatim copy usually parses and is usually wrong.
 
+## Where things live
+
+You work inside a checkout of `canonical/chisel-releases` -- your current working
+directory. Every repo path you read or write -- `slices/<pkg>.yaml`,
+`tests/spread/...`, `chisel.yaml`, sibling SDFs -- is relative to that checkout,
+exactly as written.
+
+`kb/` and `scripts/` are **not**. They are relative to this skill's own
+directory -- the one holding this `SKILL.md` -- which is somewhere else entirely,
+and they are read-only. Running `scripts/orientation` from the checkout finds
+nothing; run it by its real path. `scripts/orientation` prints that path as
+"skill dir" for you, so run it first and use what it prints.
+
+If a `scripts/` file will not run by path, run it through its interpreter --
+**the extension tells you which**: `orientation` and `try-cut` have none and are
+bash (`bash <skill dir>/scripts/orientation`); everything ending `.py` is python
+(`uv run --script <skill dir>/scripts/check-slice.py`, or `python3` with pyyaml
+available). Running a bash script under `python3` fails with a `SyntaxError`.
+
 **Scope**: adapt + test + commit on the target branch. Do NOT open PRs -- the
 user opens them.
 
