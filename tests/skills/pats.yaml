@@ -9,10 +9,11 @@ sandboxes:
   # github/githubcopilot for copilot-cli, openrouter/models.dev/npm for
   # opencode), so the allowlist below is task needs only.
   #
-  # github is allowed, but the canonical/chisel-releases repo is not: the
-  # skill's write-slice workflow (Step 2) legitimately wants github (upstream
-  # sources, docs) -- but for several of our knockout cases the sibling-branch
-  # SDF in chisel-releases IS (or is near-identical to) the held-out answer.
+  # github is allowed, but the canonical/chisel-releases repo is not: the skill
+  # legitimately wants github (upstream sources, docs) -- but for our knockout
+  # cases the sibling-branch SDF in chisel-releases IS (or is near-identical to)
+  # the held-out answer. the slicer has no reason to reach for it, so a denial
+  # here is a signal worth reading, not routine noise.
   # mitm-proxy terminates tls for the hosts named in deny-urls and blocks any
   # url mentioning the repo; denied urls land in the run metadata (cheat
   # detector). objects.githubusercontent.com stays unallowed -- its paths are
@@ -51,64 +52,18 @@ agents:
     kind: claude-cli-keyless
     model: claude-haiku-4-5-20251001
     effort: low
+  # same harness, stronger model -- the pair brackets the range the skill has to
+  # work across, and isolates skill quality from model quality.
+  - id: sonnet
+    kind: claude-cli-keyless
+    model: claude-sonnet-5
+    effort: low
   # small, fast, cost-efficient Codex model; uses the host's ChatGPT login via
-  # ~/.codex/auth.json rather than an API key.
+  # ~/.codex/auth.json rather than an API key. a second harness, so a regression
+  # that is really a harness quirk shows up as one.
   - id: codex-mini
     kind: codex-cli-keyless
     model: gpt-5.4-mini
-    effort: low
-  # same underlying model as the gpt-5-mini opencode agent below but through
-  # the copilot cli -- isolates harness effect on a shared model, and it's a
-  # 0x-multiplier model on copilot (burns no premium requests). needs
-  # COPILOT_GITHUB_TOKEN in the env at run time:
-  #   env COPILOT_GITHUB_TOKEN=(security find-generic-password -s copilot-cli -w) pats run
-  - id: copilot-mini
-    kind: copilot-cli-keyless
-    model: gpt-5-mini
-    effort: low
-  # gemini-2.5-flash-lite benched too weak for this skill: broke tool-call
-  # namespacing (`default_api.skill`), dumped pseudocode as plain text instead
-  # of calling tools, and fabricated done-state (claimed files written/committed
-  # that don't exist in output). see .pats/runs/20260630-012.
-  # - id: gemini
-  #   kind: opencode-openrouter
-  #   model: google/gemini-2.5-flash-lite
-  # deliberately-bad-model canary: gpt-4o-mini fabricates done-state and skips
-  # derivation (see .pats/runs/20260630-014). kept on purpose as the floor --
-  # it measures whether the skill degrades gracefully, not skill quality.
-  - id: gpt-mini
-    kind: opencode-openrouter
-    model: openai/gpt-4o-mini
-    effort: low
-  # cheap-but-stronger rung, all via openrouter+opencode, from a live openrouter
-  # pricing pull (2026-07-02). deepseek-chat-v3.1 (redundant with the strong
-  # slot) and glm-4.6 (pricey: $0.43/M in) dropped 2026-07-02; deepseek-v3.2
-  # holds the strong-opencode slot at $0.229/M in with in-eval family evidence.
-  - id: qwen3-coder-flash
-    kind: opencode-openrouter
-    model: qwen/${id}
-    effort: low
-  - id: gpt-5-mini
-    kind: opencode-openrouter
-    model: openai/${id}
-    effort: low
-  # benched 0.76 on 20260702-004 but the losses are 10m-timeout deaths, not bad
-  # output: it slices deps bottom-up so methodically it runs out of clock
-  # (python3-minimal never reached the target file; ipmitool wrote 2/3). where
-  # it finished it scored 0.90-0.98. too slow for the 10m task timeout --
-  # re-enable if timeouts are ever raised.
-  # - id: deepseek-v3.2
-  #   kind: opencode-openrouter
-  #   model: deepseek/deepseek-v3.2
-  # benched fine (0.93 on 20260702-003) but pricey ($0.43/M in vs v3.2's
-  # $0.229) -- re-enable to cross-check the strong slot.
-  # - id: glm-4.6
-  #   kind: opencode-openrouter
-  #   model: z-ai/glm-4.6
-  # cheapest kimi on openrouter ($0.375/M in, $2.025/M out)
-  - id: kimi-k2.5
-    kind: opencode-openrouter
-    model: moonshotai/${id}
     effort: low
 
 # knockout: prepare deletes the real slice (snapshotting it as ground truth);
@@ -164,7 +119,7 @@ tasks:
     prompt: prompts/${id}.txt
     prepare: tasks/prepare_${id}.sh
     timeout: 5m
-  # refusal: write-slice for a package that does not exist in the archive.
+  # refusal: the slicer, on a package that does not exist in the archive.
   # plain checkout, no knockout, no expected file -- the agent must stop and
   # report, not fabricate an SDF. per-target scorers stay out of its suite
   # (no expected file -> targets() fallback would zero them).
@@ -214,8 +169,8 @@ scorers:
 # every id explicit (no wildcards); pats' orphan check errors on any task /
 # scorer / agent left out of every suite, so nothing silently stops running.
 suites:
-  - id: sdf
-    agents: &all-agents [haiku, codex-mini, copilot-mini, gpt-mini, qwen3-coder-flash, gpt-5-mini, kimi-k2.5]
+  - id: slicer
+    agents: &all-agents [haiku, sonnet, codex-mini]
     tasks:
       - base-passwd
       - ca-certificates
@@ -252,11 +207,14 @@ suites:
       - hint-format-compat
       - prefer-format-compat
       - essential-list-on-v1
-  - id: help
-    agents: *all-agents
-    tasks: [mason-help]
-    scorers: [usage-printed, mason-stops-clean]
-  - id: refusal
+  # the slicer again, but on a package that is not in the archive. its own suite
+  # because the per-target scorers above need an expected file and this task has
+  # none -- they would score 0 rather than skip.
+  - id: slicer-refusal
     agents: *all-agents
     tasks: [frobnicator]
     scorers: [refuses-nonexistent, refusal-verified, orientation-called]
+  - id: mason
+    agents: *all-agents
+    tasks: [mason-help]
+    scorers: [usage-printed, mason-stops-clean]
