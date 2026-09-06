@@ -9,16 +9,16 @@ argument-hint: "[request]  (no args -- prints usage)"
 
 # mason
 
-Agent kit for chisel / chisel-releases work -- a cross-agent skill bundle, portable
-across claude code, pi, opencode, copilot, and codex.
+Agent kit for chisel / chisel-releases work.
 
 `/mason` has no actions of its own -- it either routes or prints usage:
 
-- **route** -- if the request clearly maps to a skill below (writing / authoring an SDF or
-  slice, reviewing an SDF -> `chisel-slicer`), load that skill's `SKILL.md` from its
-  sibling directory (`../chisel-slicer/SKILL.md` relative to this file) and follow its
-  dispatch, passing the request through as plain language.
-  e.g. `/mason "please help me write an sdf for foobar"` -> `chisel-slicer` write-slice, foobar.
+- **route** -- if the request clearly maps to a skill below, load that skill's `SKILL.md`
+  from its sibling directory (e.g. `../chisel-slicer/SKILL.md` relative to this file) and
+  follow it, passing the request through as plain language. authoring or adding an SDF ->
+  `chisel-slicer`; reviewing one -> `chisel-slice-reviewer`; moving one between release
+  branches -> `chisel-slice-porter`.
+  e.g. `/mason "please help me write an sdf for foobar"` -> `chisel-slicer`, foobar.
 - **usage** -- no args, "help", or intent not obviously covered by a skill below: print the
   usage block below verbatim, then stop. Do not load or run anything else -- never guess.
 
@@ -26,15 +26,15 @@ across claude code, pi, opencode, copilot, and codex.
 mason -- agent kit for chisel / chisel-releases work
 
 skills:
-  /chisel-slicer           author + review chisel slice definition files (SDFs)
-                             against canonical/chisel-releases.
-    write-slice <pkg>        author + test + commit an SDF (no PR)
-    review-slice <sdf>       read-only review of an SDF
+  /chisel-slicer <pkg>              author + test + commit an SDF (no PR)
+  /chisel-slice-reviewer <sdf>      read-only review of an SDF
+  /chisel-slice-porter <pkg>        move a slice between release branches
 
 usage:
-  /chisel-slicer write-slice <pkg>
-  /chisel-slicer review-slice slices/<pkg>.yaml
-  or plain language: "write a slice for <pkg>", "review slices/foo.yaml"
+  /chisel-slicer curl
+  /chisel-slice-reviewer slices/curl.yaml
+  /chisel-slice-porter curl ubuntu-24.04 ubuntu-26.04
+  or plain language: "write a slice for curl", "review slices/curl.yaml"
 
 docs: https://github.com/canonical/mason
 ```

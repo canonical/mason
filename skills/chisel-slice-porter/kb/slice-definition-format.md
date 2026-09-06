@@ -92,7 +92,7 @@ Some deps only apply on certain arches. How you express that depends on the bran
     dotnet-sdk-aot-10.0_libs: {arch: [amd64, arm64]}
   ```
 
-- **v3** -- native: `essential:` itself **must** be a map (the list form is a chisel parse error: _"essential expects a map"_). Entries without arch gating are bare map keys; `{arch: ...}` values only where gated. `v3-essential:` is **rejected** on v3 (parse error) -- when forward-porting to a v3 branch, fold its entries into the `essential:` map.
+- **v3** -- native: `essential:` itself **must** be a map (the list form is a chisel parse error: _"essential expects a map"_). Entries without arch gating are bare map keys; `{arch: ...}` values only where gated. `v3-essential:` is **rejected** on v3 (parse error).
 
   ```yaml
   essential:

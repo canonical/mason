@@ -2,17 +2,83 @@
 # `make sync-shared` writes the copies; `make check-shared` (ci) catches drift.
 shared:
   chisel-slicer:
-    chisel-cli.md:
-      path: shared/chisel-cli.md
-    chisel-releases.md:
-      path: shared/chisel-releases.md
-    cross-release-porting.md:
-      path: shared/cross-release-porting.md
-    slice-conventions.md:
-      path: shared/slice-conventions.md
     slice-definition-format.md:
-      path: shared/slice-definition-format.md
+      path: kb/slice-definition-format.md
+    slice-conventions.md:
+      path: kb/slice-conventions.md
+    chisel-formats.md:
+      path: kb/chisel-formats.md
     spread-tests.md:
-      path: shared/spread-tests.md
+      path: kb/spread-tests.md
+    chisel-cli.md:
+      path: kb/chisel-cli.md
     upstream-sources.md:
-      path: shared/upstream-sources.md
+      path: kb/upstream-sources.md
+    conventional-commits.md:
+      path: kb/conventional-commits.md
+    orientation:
+      path: scripts/orientation
+    deb-list.py:
+      path: scripts/deb-list.py
+    try-cut:
+      path: scripts/try-cut
+    scaffold-test.py:
+      path: scripts/scaffold-test.py
+    check-slice.py:
+      path: scripts/check-slice.py
+    check-test.py:
+      path: scripts/check-test.py
+    check-diff.py:
+      path: scripts/check-diff.py
+  chisel-slice-reviewer:
+    slice-definition-format.md:
+      path: kb/slice-definition-format.md
+    slice-conventions.md:
+      path: kb/slice-conventions.md
+    chisel-formats.md:
+      path: kb/chisel-formats.md
+    chisel-branches.md:
+      path: kb/chisel-branches.md
+    spread-tests.md:
+      path: kb/spread-tests.md
+    conventional-commits.md:
+      path: kb/conventional-commits.md
+    orientation:
+      path: scripts/orientation
+    check-slice.py:
+      path: scripts/check-slice.py
+    check-test.py:
+      path: scripts/check-test.py
+    check-diff.py:
+      path: scripts/check-diff.py
+  chisel-slice-porter:
+    slice-definition-format.md:
+      path: kb/slice-definition-format.md
+    slice-conventions.md:
+      path: kb/slice-conventions.md
+    chisel-formats.md:
+      path: kb/chisel-formats.md
+    chisel-branches.md:
+      path: kb/chisel-branches.md
+    cross-release-porting.md:
+      path: kb/cross-release-porting.md
+    spread-tests.md:
+      path: kb/spread-tests.md
+    chisel-cli.md:
+      path: kb/chisel-cli.md
+    conventional-commits.md:
+      path: kb/conventional-commits.md
+    orientation:
+      path: scripts/orientation
+    deb-list.py:
+      path: scripts/deb-list.py
+    try-cut:
+      path: scripts/try-cut
+    scaffold-test.py:
+      path: scripts/scaffold-test.py
+    check-slice.py:
+      path: scripts/check-slice.py
+    check-test.py:
+      path: scripts/check-test.py
+    check-diff.py:
+      path: scripts/check-diff.py

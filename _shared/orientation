@@ -11,7 +11,7 @@ set -euo pipefail
 skill_root="$(cd "$(dirname "$0")/.." && pwd)"
 echo "working dir (chisel-releases checkout): $(pwd)"
 echo "skill dir (read-only):                  $skill_root"
-echo "  reference: $skill_root/shared/ -- one file per subject, start with slice-definition-format.md"
+echo "  knowledge: $skill_root/kb/ -- one file per subject, start with slice-definition-format.md"
 echo "  helpers:   $skill_root/scripts/ -- deb-list.py (--sdf drafts an SDF), scaffold-test.py,"
 echo "             check-slice.py, check-test.py, check-diff.py, review-diff.py, try-cut"
 
@@ -34,9 +34,8 @@ done
 # discover the live release landscape -- which ubuntu-XX.XX branches exist, their
 # manifest format, and whether they are still maintained. a branch EXISTING does
 # not establish maintenance: EOL branches stay in the repo, frozen. so read
-# maintenance.end-of-life from each branch's chisel.yaml and compare with today,
-# the same way the upstream forward-port-missing check decides "supported". this
-# is the source of truth for the live release set -- do not guess it. best-effort:
+# maintenance.end-of-life from each branch's chisel.yaml and compare with today.
+# this is the source of truth for the live release set -- do not guess it. best-effort:
 # degrades to a one-line note when there is no network.
 discover_releases() {
     # url overridable for a mirror / fork / air-gapped clone (and hermetic tests).

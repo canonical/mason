@@ -33,5 +33,7 @@ and then, for example, write a new slice file:
 
 ## what's in here
 
-- `chisel-slicer` - writes, tests, and reviews chisel slice definition files
+- `chisel-slicer` - authors, tests and commits chisel slice definition files
+- `chisel-slice-reviewer` - read-only review of an SDF or PR
+- `chisel-slice-porter` - moves a slice between Ubuntu release branches
 - `mason` - routes `/mason` requests to the right skill or prints usage

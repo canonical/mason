@@ -43,7 +43,4 @@ git clone --filter=blob:none --no-checkout --depth 1 \
   -b ubuntu-24.04 https://github.com/canonical/chisel-releases.git /tmp/cr
 git -C /tmp/cr sparse-checkout set slices chisel.yaml
 git -C /tmp/cr checkout
-
-# Diff slice between releases
-git -C <repo> diff ubuntu-22.04:slices/coreutils.yaml ubuntu-24.04:slices/coreutils.yaml
 ```
