@@ -1,42 +1,56 @@
 #!/usr/bin/env bash
 # orientation: deterministic orientation for the slice-authoring agent -- run
-# FIRST, every time. prints where you are, where the skill's read-only files are,
-# the target release + manifest format parsed from ./chisel.yaml, and the live
-# release landscape (which branches exist, their format, and which are still
-# maintained -- discovered, never hardcoded). work from this, not from guesses.
+# FIRST, every time. reports where you are, where the skill's read-only files
+# are, which tools this machine actually has, the target release + manifest
+# format parsed from ./chisel.yaml, and the live release landscape (discovered,
+# never hardcoded). work from this, not from guesses.
+#
+# the output is YAML, so it reads as prose and parses as data. every value is a
+# fact read off the machine or the checkout; nothing here is inferred.
 #
 # usage: orientation
 set -euo pipefail
 
 skill_root="$(cd "$(dirname "$0")/.." && pwd)"
-echo "working dir (chisel-releases checkout): $(pwd)"
-echo "skill dir (read-only):                  $skill_root"
-echo "  knowledge: $skill_root/kb/ -- one file per subject, start with slice-definition-format.md"
+
+# yaml-safe scalar: quote it, so a version or a release number cannot be read as
+# a float and an empty value comes back as null rather than nothing.
+q() {
+    if [ -z "${1:-}" ]; then printf 'null'; else printf '"%s"' "$1"; fi
+}
+
+echo "working dir: $(pwd)"
+echo "skill dir: $skill_root"
+echo "kb: $skill_root/kb"
+echo "scripts: $skill_root/scripts"
 # listed, not hardcoded: each skill ships a different subset.
-echo "  helpers:   $skill_root/scripts/ -- $(ls "$skill_root/scripts" 2>/dev/null | tr '\n' ' ')"
+echo "helpers: [$(ls "$skill_root/scripts" 2>/dev/null | paste -sd, - | sed 's/,/, /g')]"
 
 # what can you actually run here? the scripts degrade, but knowing upfront saves
 # wasted attempts (e.g. no chisel -> skip try-cut, lean on the install-slices CI).
 echo "tools:"
 for t in chisel dpkg-deb spread uv python3 git; do
-    if command -v "$t" >/dev/null 2>&1; then avail="yes"; else avail="NO"; fi
-    case "$t" in
-        chisel)   use="try-cut / chisel cut";;
-        dpkg-deb) use="deb-list.py (inspect + --sdf)";;
-        spread)   use="integration tests";;
-        uv)       use="runs the check-*/scaffold scripts (or python3 + pyyaml)";;
-        python3)  use="deb-list.py (+ check-*/scaffold scripts w/out uv)";;
-        git)      use="check-diff.py / review-diff.py";;
-    esac
-    printf "  %-9s %-4s (%s)\n" "$t" "$avail" "$use"
+    if command -v "$t" >/dev/null 2>&1; then
+        # --version only. a bare "<tool> version" fallback would be a real
+        # invocation -- spread would read spread.yaml and treat it as a job
+        # filter -- and orientation must stay read-only.
+        ver="$("$t" --version 2>/dev/null || true)"
+        ver="$(printf '%s\n' "$ver" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)"
+        # present but unversioned is a fact of its own: chisel prints "unknown"
+        # on an unstamped build, spread has no version flag at all. null is
+        # reserved for a tool that is not here to have a version.
+        echo "  $t: {present: true, version: $(q "${ver:-unknown}")}"
+    else
+        echo "  $t: {present: false, version: null}"
+    fi
 done
 
 # discover the live release landscape -- which ubuntu-XX.XX branches exist, their
 # manifest format, and whether they are still maintained. a branch EXISTING does
 # not establish maintenance: EOL branches stay in the repo, frozen. so read
 # maintenance.end-of-life from each branch's chisel.yaml and compare with today.
-# this is the source of truth for the live release set -- do not guess it. best-effort:
-# degrades to a one-line note when there is no network.
+# this is the source of truth for the live release set -- do not guess it.
+# best-effort: degrades to an empty map when there is no network.
 discover_releases() {
     # url overridable for a mirror / fork / air-gapped clone (and hermetic tests).
     local url="${CHISEL_RELEASES_URL:-https://github.com/canonical/chisel-releases.git}"
@@ -47,25 +61,25 @@ discover_releases() {
     branches="$(git ls-remote --heads "$url" 'ubuntu-*' 2>/dev/null \
         | sed 's|.*refs/heads/||' | sort)"
     if [ -z "$branches" ]; then
-        echo "live releases:   (chisel-releases remote unreachable -- skipped)"
+        echo "live releases: {}  # chisel-releases remote unreachable"
         return 0
     fi
 
-    echo "live releases:   branch | format | end-of-life"
+    echo "live releases:"
     for b in $branches; do
         # prefer a local ref (full clone), else fetch the raw manifest.
         cy="$(git show "origin/$b:chisel.yaml" 2>/dev/null)" \
             || cy="$(curl -fsSL --max-time 8 "$raw/$b/chisel.yaml" 2>/dev/null)" \
             || cy=""
         if [ -z "$cy" ]; then continue; fi
-        # normalise "v3" / "chisel-v1" / "1" -> "v1".."v3" for a tidy column.
+        # normalise "v3" / "chisel-v1" / "1" -> "v1".."v3".
         fmt="$(printf '%s\n' "$cy" | grep -m1 -E '^format:' | grep -oE '[0-9]+' | head -n1 || true)"
         fmt="${fmt:+v$fmt}"
         eol="$(printf '%s\n' "$cy" | sed -n 's/^[[:space:]]*end-of-life:[[:space:]]*//p' | head -n1)"
         # live only. a branch with no end-of-life cannot be shown to be live, so
         # it is not listed either. ISO dates sort lexically == chronologically.
         if [ -z "$eol" ] || [[ ! "$eol" > "$today" ]]; then continue; fi
-        printf "  %-14s %-7s %s\n" "$b" "${fmt:-?}" "$eol"
+        echo "  $b: {format: $(q "$fmt"), end-of-life: $(q "$eol")}"
     done
 }
 
@@ -78,15 +92,15 @@ if [ -f chisel.yaml ]; then
     comps="$(sed -n 's/.*components:[[:space:]]*//p' chisel.yaml | head -n1)"
     eol="$(sed -n 's/^[[:space:]]*end-of-life:[[:space:]]*//p' chisel.yaml | head -n1)"
 
-    echo "branch:          ${branch:-?}"
-    echo "ubuntu version:  ${ver:-?}"
-    echo "manifest format: ${fmt:-?}"
-    echo "suites:          ${suites:-?}"
-    echo "components:      ${comps:-?}"
-    echo "end-of-life:     ${eol:-?}"
-    echo "existing slices: $(ls slices/ 2>/dev/null | wc -l | tr -d ' ') in ./slices/"
+    echo "branch: $(q "$branch")"
+    echo "ubuntu version: $(q "${ver//\'/}")"
+    echo "manifest format: $(q "$fmt")"
+    echo "suites: ${suites:-null}"
+    echo "components: ${comps:-null}"
+    echo "end-of-life: $(q "$eol")"
+    echo "existing slices: $(ls slices/ 2>/dev/null | wc -l | tr -d ' ')"
 else
-    echo "release: UNKNOWN -- no ./chisel.yaml here; cd into a chisel-releases checkout first"
+    echo "release: null  # no ./chisel.yaml here; cd into a chisel-releases checkout first"
 fi
 
 # the live release landscape -- best-effort, independent of the local checkout.

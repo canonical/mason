@@ -349,11 +349,12 @@ def test_branch_format_origin_fallback() -> None:
 
 def test_orientation_release_discovery() -> None:
     # hermetic end-to-end for the live-release table: point discovery at a local
-    # repo (no network) with a future-eol branch (-> live) and a past-eol branch
-    # (-> EOL). asserts the state column is date-derived and the new local-parse
-    # end-of-life line prints. exercises the set -e paths under a real invocation.
+    # repo (no network) with a future-eol branch (listed) and a past-eol branch
+    # (not listed). also pins that the whole report is parseable YAML, which is
+    # what lets a caller read it as data. exercises the set -e paths for real.
     import os
-    import re as _re
+
+    import yaml
 
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
@@ -423,14 +424,19 @@ def test_orientation_release_discovery() -> None:
         )
         out = r.stdout + r.stderr
         assert r.returncode == 0, out
-        # local parse of the checked-out branch: the new end-of-life line.
-        assert _re.search(r"end-of-life:\s+2999-01-01", out), out
+        # the whole report is YAML, so it parses as data, not just reads as prose
+        doc = yaml.safe_load(out)
+        assert doc["end-of-life"] == "2999-01-01", out
+        assert doc["manifest format"] == "v3", out
+        assert doc["tools"]["git"]["present"] is True, out
         # discovery table: live branches only, formats normalised. a branch whose
         # end-of-life has passed is not listed at all -- nor is one that declares
         # no end-of-life, since it cannot be shown to be live.
-        assert "live releases:" in out, out
-        assert _re.search(r"ubuntu-40\.04\s+v3\s+2999-01-01", out), out
-        assert "ubuntu-30.10" not in out, out
+        assert doc["live releases"]["ubuntu-40.04"] == {
+            "format": "v3",
+            "end-of-life": "2999-01-01",
+        }, out
+        assert "ubuntu-30.10" not in doc["live releases"], out
 
 
 def test_check_test() -> None:
