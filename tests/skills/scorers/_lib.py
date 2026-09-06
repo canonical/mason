@@ -249,7 +249,9 @@ def transcript() -> dict:
 
         if "message" in ev or "session_id" in ev:
             saw_claude = True
-        msg = ev.get("message") or {}
+        msg = ev.get("message")
+        if not isinstance(msg, dict):
+            msg = {}
         for c in (msg.get("content") or []):
             if not isinstance(c, dict):
                 continue

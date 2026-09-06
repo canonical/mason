@@ -9,7 +9,7 @@ companion to refuses-nonexistent, which only scores the outcome: an agent that
 refuses (or fabricates) without ever checking scores the same there as one that
 verified. this one greps the transcript commands for evidence of a real
 existence check -- any of the routes seen in live runs counts:
-  - scripts/deb-list.py (the check write-slice.md Step 1.1 names)
+  - scripts/deb-list.py (the archive check the skill's Step 1 names)
   - apt-cache / apt-get / (r)madison
   - an archive index fetch (Packages.gz) or packages.ubuntu.com / launchpad
   - probing chisel-releases branches for slices/<pkg>.yaml (denied by the

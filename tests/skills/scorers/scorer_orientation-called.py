@@ -55,7 +55,8 @@ def _claude_events():
     for ev in _jsonl(OUT / "stdout.log"):
         if "message" in ev or "session_id" in ev:
             saw_claude = True
-        for c in ((ev.get("message") or {}).get("content") or []):
+        msg = ev.get("message")
+        for c in ((msg if isinstance(msg, dict) else {}).get("content") or []):
             if not isinstance(c, dict):
                 continue
             if c.get("type") == "tool_use" and c.get("name") == "Bash":

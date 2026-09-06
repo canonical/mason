@@ -18,10 +18,10 @@ from _lib import *  # noqa: F403
 # skills/mason/SKILL.md; drift there should fail here.
 _MARKERS = (
     "agent kit for chisel / chisel-releases work",
-    "/chisel-slicer",
-    "write-slice <pkg>",
-    "review-slice",
-    "slices/<pkg>.yaml",
+    "/chisel-slicer <pkg>",
+    "/chisel-slice-reviewer <sdf>",
+    "/chisel-slice-porter <pkg>",
+    "slices/curl.yaml",
     "github.com/canonical/mason",
 )
 
