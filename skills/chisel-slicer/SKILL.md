@@ -224,7 +224,7 @@ Both sorted lists -- `contents:` paths and each slice's `essential:` entries -- 
 
 Testing is mandatory. **Every package gets a spread test at `tests/spread/integration/<package>/task.yaml`** -- upstream ships one even for pure-library and data-only packages (`ca-certificates`, `base-passwd`, `fontconfig`, ...). The classification below controls test *depth* only, never whether the file exists.
 
-**Testing blocks commit.** Do NOT proceed to Step 11 (commit) without tests landed. A `feat:` slice and its `test:` tests form one series -- both must exist before you stop. If tests aren't feasible, leave the slice uncommitted and report why; do not commit the slice alone.
+**Testing blocks commit.** Do NOT proceed to Step 10 (commit) without tests landed. A `feat:` slice and its `test:` tests form one series -- both must exist before you stop. If tests aren't feasible, leave the slice uncommitted and report why; do not commit the slice alone.
 
 #### Manual cut (always do this first)
 
@@ -313,7 +313,7 @@ If tool behaviour diverged from the docs during `chisel cut` (a field ignored, a
 
 ### Step 10: Commit
 
-**Precondition:** `scripts/check-slice.py slices/<pkg>.yaml` reports no `block` findings, `scripts/check-test.py slices/<pkg>.yaml` reports no `warn` (a test exists and exercises the binaries), `tests/spread/integration/<pkg>/task.yaml` exists and passes (`spread lxd:tests/spread/integration/<pkg>`), and Step 10 surfaced no unresolved discrepancy. If the linter blocks, the test is missing or exercises no binaries, or tests fail, stop -- do not commit a `feat:` slice with lint blocks or without working tests.
+**Precondition:** `scripts/check-slice.py slices/<pkg>.yaml` reports no `block` findings, `scripts/check-test.py slices/<pkg>.yaml` reports no `warn` (a test exists and exercises the binaries), `tests/spread/integration/<pkg>/task.yaml` exists and passes (`spread lxd:tests/spread/integration/<pkg>`), and Step 9 surfaced no unresolved discrepancy. If the linter blocks, the test is missing or exercises no binaries, or tests fail, stop -- do not commit a `feat:` slice with lint blocks or without working tests.
 
 Commit in two steps (one category per commit): the `feat:` slice first, then the `test:` tests. Both must land before you stop.
 
@@ -343,7 +343,7 @@ Do NOT dump full file contents or raw command output -- summarise.
 
 ## Reference examples
 
-Read live SDFs from the checkout -- they are canonical and can't go stale (Step 5 already mandates this):
+Read live SDFs from the checkout -- they are canonical and can't go stale (Step 4 already mandates this):
 
 - **simple binary package**: `slices/vim-tiny.yaml` (bins + config + copyright)
 - **library package**: `slices/libc6.yaml` (multiarch lib globs, arch-gated entries)

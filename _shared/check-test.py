@@ -14,7 +14,7 @@ package's spread test references.
 
 It cannot judge whether a test is *meaningful* -- only that binaries are
 referenced. Functional depth and hygiene (hermetic, bounded waits, one rootfs
-per test) are still on the author -- see the write-slice / review-slice docs.
+per test) are still on the author -- see the chisel-slicer and chisel-slice-reviewer skills.
 
 Usage:
   check-test.py <slices/pkg.yaml> [<task.yaml>]

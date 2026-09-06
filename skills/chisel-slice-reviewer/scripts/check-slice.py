@@ -8,9 +8,9 @@
 Checks the mechanical conventions reviewers and CI enforce -- the rules that do
 NOT need judgement or a rootfs cut. Use it two ways:
 
-  - authoring: self-check an SDF before commit (write-slice step 8).
-  - review:    the deterministic first pass of a review (review-slice), so the
-               agent only spends judgement on deps, tests, and design.
+  - authoring: self-check an SDF before commit (chisel-slicer, step 7).
+  - review:    the deterministic first pass of a review (chisel-slice-reviewer),
+               so the agent only spends judgement on deps, tests, and design.
 
 It does NOT replace `chisel cut` (installability) or spread tests
 (functionality). It only checks the SDF text. yamllint cosmetics (line

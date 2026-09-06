@@ -55,11 +55,11 @@ These automated checks run on every PR. Understand what each one validates:
 |-------|---------------|
 | `lint` | yamllint failure, or `contents:`/`essential:` entries not sorted (bytewise, `LC_COLLATE=C`) |
 | `install-slices` | Slice can't `chisel cut`, or package not in archive for some arch |
-| `removed-slices` | SDF or slice deleted, or an SDF renamed away -- breaking unless the package is gone from the archive |
+| `removed-slices` | SDF or slice deleted, or an SDF renamed away. The check fires on any removal; whether it is acceptable (package gone from the archive) is the reviewer's call |
 | `forward-port-missing` | New slice in branch but not in newer live releases |
 | `pkg-deps` | Informational diff of declared deps vs `apt depends`; non-blocking but reviewer signal |
 | `validate-hints` | `hint:` text fails the spaCy style check. Runs on every `ubuntu-*` PR that touches `slices/`, whatever the branch's format |
-| `spread` | Integration test failed in the CI test container (docker backend, multi-arch; lxd is the local default) |
+| `spread` | Integration test failed. CI runs the lxd backend across a self-hosted multi-arch matrix (X64, ARM64, S390X, PPC64EL) |
 | `cla-check` | CLA unsigned |
 
 All checks must be green before review. `pkg-deps` is non-blocking but reviewers use it to cross-check dependency accuracy.

@@ -49,5 +49,7 @@ Sliced rootfs is minimal. Tests that need more than bare files must set up the c
 
 `spread.yaml` configures two backends:
 
-- **lxd** -- default for local development. Ephemeral LXC containers.
-- **docker** -- used in CI for multi-arch testing: `amd64`, `arm64`, `armhf`, `ppc64el`, `s390x`, `riscv64`.
+- **lxd** -- ephemeral LXC containers. The local default, and what CI runs
+  (`.github/workflows/spread.yaml` sets `backend: "lxd"`) across a self-hosted
+  runner matrix: X64, ARM64, S390X, PPC64EL.
+- **docker** -- also defined in `spread.yaml`, but not what the CI job drives.

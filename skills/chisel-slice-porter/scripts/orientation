@@ -12,8 +12,8 @@ skill_root="$(cd "$(dirname "$0")/.." && pwd)"
 echo "working dir (chisel-releases checkout): $(pwd)"
 echo "skill dir (read-only):                  $skill_root"
 echo "  knowledge: $skill_root/kb/ -- one file per subject, start with slice-definition-format.md"
-echo "  helpers:   $skill_root/scripts/ -- deb-list.py (--sdf drafts an SDF), scaffold-test.py,"
-echo "             check-slice.py, check-test.py, check-diff.py, review-diff.py, try-cut"
+# listed, not hardcoded: each skill ships a different subset.
+echo "  helpers:   $skill_root/scripts/ -- $(ls "$skill_root/scripts" 2>/dev/null | tr '\n' ' ')"
 
 # what can you actually run here? the scripts degrade, but knowing upfront saves
 # wasted attempts (e.g. no chisel -> skip try-cut, lean on the install-slices CI).
@@ -84,7 +84,7 @@ if [ -f chisel.yaml ]; then
 
     echo "branch:          ${branch:-?}"
     echo "ubuntu version:  ${ver:-?}"
-    echo "manifest format: ${fmt:-?}   (gates SDF features -- see chisel-releases.md schema-versions table)"
+    echo "manifest format: ${fmt:-?}   (gates SDF features -- see kb/chisel-formats.md)"
     echo "suites:          ${suites:-?}"
     echo "components:      ${comps:-?}"
     echo "end-of-life:     ${eol:-?}"
