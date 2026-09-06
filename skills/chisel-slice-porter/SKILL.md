@@ -45,7 +45,7 @@ user opens them.
 for confirmation, make the best-supported decision, proceed, and record it with
 its rationale in your final report.
 
-**Prerequisites**: run `scripts/_orientation <package>` first -- it reports your
+**Prerequisites**: run `scripts/_orientation` first -- it reports your
 working dir, this skill's own dir, the target release + manifest format from
 `chisel.yaml`, and the live release set. Then read
 `kb/_cross-release-porting.md` (what changes between releases -- this is the

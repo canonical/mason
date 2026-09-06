@@ -425,10 +425,12 @@ def test_orientation_release_discovery() -> None:
         assert r.returncode == 0, out
         # local parse of the checked-out branch: the new end-of-life line.
         assert _re.search(r"end-of-life:\s+2999-01-01", out), out
-        # discovery table: state is eol-vs-today, formats normalised, not branch presence.
+        # discovery table: live branches only, formats normalised. a branch whose
+        # end-of-life has passed is not listed at all -- nor is one that declares
+        # no end-of-life, since it cannot be shown to be live.
         assert "live releases:" in out, out
-        assert _re.search(r"ubuntu-40\.04\s+v3\s+2999-01-01\s+live", out), out
-        assert _re.search(r"ubuntu-30\.10\s+v2\s+2000-01-01\s+EOL", out), out
+        assert _re.search(r"ubuntu-40\.04\s+v3\s+2999-01-01", out), out
+        assert "ubuntu-30.10" not in out, out
 
 
 def test_check_test() -> None:

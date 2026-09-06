@@ -5,7 +5,7 @@
 # release landscape (which branches exist, their format, and which are still
 # maintained -- discovered, never hardcoded). work from this, not from guesses.
 #
-# usage: orientation [<package>]
+# usage: orientation
 set -euo pipefail
 
 skill_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -41,7 +41,7 @@ discover_releases() {
     # url overridable for a mirror / fork / air-gapped clone (and hermetic tests).
     local url="${CHISEL_RELEASES_URL:-https://github.com/canonical/chisel-releases.git}"
     local raw="https://raw.githubusercontent.com/canonical/chisel-releases"
-    local today branches b cy fmt eol state
+    local today branches b cy fmt eol
     today="$(date +%F)"
 
     branches="$(git ls-remote --heads "$url" 'ubuntu-*' 2>/dev/null \
@@ -51,7 +51,7 @@ discover_releases() {
         return 0
     fi
 
-    echo "live releases:   branch | format | end-of-life | state (live iff eol in the future)"
+    echo "live releases:   branch | format | end-of-life"
     for b in $branches; do
         # prefer a local ref (full clone), else fetch the raw manifest.
         cy="$(git show "origin/$b:chisel.yaml" 2>/dev/null)" \
@@ -62,14 +62,10 @@ discover_releases() {
         fmt="$(printf '%s\n' "$cy" | grep -m1 -E '^format:' | grep -oE '[0-9]+' | head -n1 || true)"
         fmt="${fmt:+v$fmt}"
         eol="$(printf '%s\n' "$cy" | sed -n 's/^[[:space:]]*end-of-life:[[:space:]]*//p' | head -n1)"
-        if [ -z "$eol" ]; then
-            state="?"
-        elif [[ "$eol" > "$today" ]]; then   # ISO dates sort lexically == chronologically
-            state="live"
-        else
-            state="EOL"
-        fi
-        printf "  %-14s %-7s %-12s %s\n" "$b" "${fmt:-?}" "${eol:-?}" "$state"
+        # live only. a branch with no end-of-life cannot be shown to be live, so
+        # it is not listed either. ISO dates sort lexically == chronologically.
+        if [ -z "$eol" ] || [[ ! "$eol" > "$today" ]]; then continue; fi
+        printf "  %-14s %-7s %s\n" "$b" "${fmt:-?}" "$eol"
     done
 }
 
@@ -84,17 +80,11 @@ if [ -f chisel.yaml ]; then
 
     echo "branch:          ${branch:-?}"
     echo "ubuntu version:  ${ver:-?}"
-    echo "manifest format: ${fmt:-?}   (gates SDF features -- see kb/_chisel-formats.md)"
+    echo "manifest format: ${fmt:-?}"
     echo "suites:          ${suites:-?}"
     echo "components:      ${comps:-?}"
     echo "end-of-life:     ${eol:-?}"
     echo "existing slices: $(ls slices/ 2>/dev/null | wc -l | tr -d ' ') in ./slices/"
-
-    if [ "${1:-}" ]; then
-        pkg="$1"
-        echo "target: $pkg  ->  write to ./slices/${pkg}.yaml"
-        [ -f "slices/${pkg}.yaml" ] && echo "  note: ./slices/${pkg}.yaml already exists"
-    fi
 else
     echo "release: UNKNOWN -- no ./chisel.yaml here; cd into a chisel-releases checkout first"
 fi
