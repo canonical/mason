@@ -9,6 +9,7 @@
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)](#)
 [![rocks](https://img.shields.io/badge/%F0%9F%AA%A8-rocks-E95420)](https://ubuntu.com/server/docs/explanation/virtualisation/about-rock-images/)
 [![test](https://github.com/canonical/mason/actions/workflows/test.yml/badge.svg)](https://github.com/canonical/mason/actions/workflows/test.yml)
+![GitHub Tag](https://img.shields.io/github/v/tag/canonical/mason?label=release)
 
 [![skills.sh](https://skills.sh/b/canonical/mason)](https://skills.sh/canonical/mason)
 [![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fcanonical%2Fmason)](https://tessl.io/registry/canonical/mason)
