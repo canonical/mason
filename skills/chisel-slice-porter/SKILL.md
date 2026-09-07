@@ -6,7 +6,6 @@ description: >-
   back-porting to an older one. Use when a slice exists on one branch and is
   needed on another, or when a PR must be forward-ported across live releases.
   Adapts and tests the SDF on the target branch. Does NOT open PRs.
-argument-hint: "<package> <source-branch> -> <target-branch>"
 ---
 
 # chisel-slice-porter

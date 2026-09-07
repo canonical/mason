@@ -5,7 +5,6 @@ description: >-
   Use when the user wants to slice an Ubuntu package or add a new SDF to the
   release branch they are working on. Runs the full author + test + commit
   workflow autonomously and returns a summary. Does NOT open PRs.
-argument-hint: "<package>"
 ---
 
 # chisel-slicer

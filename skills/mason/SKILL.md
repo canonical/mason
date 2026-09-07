@@ -4,7 +4,6 @@ description: >-
   Entry point for the mason agent kit. Routes a plain-language request to the right mason
   skill, or prints usage when the intent is unclear. Use when user runs /mason (with a request
   or bare), says "mason help", or "what can mason do".
-argument-hint: "[request]  (no args -- prints usage)"
 ---
 
 # mason

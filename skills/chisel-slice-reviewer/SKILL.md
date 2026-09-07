@@ -5,7 +5,6 @@ description: >-
   Use when the user wants a slice / SDF / PR reviewed against chisel conventions:
   CI checks, dependency accuracy, naming, formatting, schema-version compliance,
   testing, and forward-port requirements. Read-only -- returns a review report.
-argument-hint: "<sdf-path|branch|pr>"
 ---
 
 # chisel-slice-reviewer
