@@ -20,29 +20,33 @@ branch's `format:`. A verbatim copy usually parses and is usually wrong.
 
 ## Where things live
 
-You work inside a checkout of `canonical/chisel-releases` -- your current working
-directory. Every repo path you read or write -- `slices/<pkg>.yaml`,
-`tests/spread/...`, `chisel.yaml`, sibling SDFs -- is relative to that checkout,
-exactly as written.
+Run `scripts/_orientation` first, every time. It reports both of the roots you
+work from, read off the machine rather than guessed.
 
-`kb/` and `scripts/` are **not**. They are relative to this skill's own
-directory -- the one holding this `SKILL.md` -- which is somewhere else entirely,
-and they are read-only. Running `scripts/_orientation` from the checkout finds
-nothing; run it by its real path. `scripts/_orientation` prints that path as
-"skill dir" for you, so run it first and use what it prints.
+- **working dir** -- wherever the script found you. When it also reports a
+  `branch`, `ubuntu version` and `manifest format`, that directory is a
+  chisel-releases checkout, and every repo path is relative to it, exactly as
+  written: `slices/<pkg>.yaml`, `tests/spread/...`, `chisel.yaml`, sibling SDFs.
+- **skill dir** -- where this `SKILL.md` sits. `kb/` and `scripts/` live there,
+  read-only, and are not part of any checkout. Every `kb/` and `scripts/` path
+  below is relative to what orientation prints as "skill dir".
 
-If a `scripts/` file will not run by path, run it through its interpreter --
-**the extension tells you which**: `_orientation` and `_try-cut` have no
-extension and are bash (`bash <skill dir>/scripts/_orientation`); everything ending `.py` is python
+If orientation reports `release: null`, your working directory is not a
+chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
+clone one, and do not guess at a path.
+
+Scripts run by path. If one will not, the extension names the interpreter: no
+extension is bash (`bash <skill dir>/scripts/_orientation`), `.py` is python
 (`uv run --script <skill dir>/scripts/_check-slice.py`, or `python3` with pyyaml
-available). Running a bash script under `python3` fails with a `SyntaxError`.
+available). A bash script under `python3` dies with a `SyntaxError`.
 
 **Scope**: adapt + test + commit on the target branch. Do NOT open PRs -- the
 user opens them.
 
 **You run autonomously.** No human in the loop mid-task. Where you would pause
 for confirmation, make the best-supported decision, proceed, and record it with
-its rationale in your final report.
+its rationale in your final report. The one exception is a missing
+chisel-releases checkout -- you cannot pick that for the user, so stop and ask.
 
 **Prerequisites**: run `scripts/_orientation` first -- it reports your
 working dir, this skill's own dir, the target release + manifest format from
