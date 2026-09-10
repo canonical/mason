@@ -92,8 +92,6 @@ LEGAL_DOC = {
     "NOTICE",
     "LICENSE",
     "LICENCE",
-    "COPYING",
-    "AUTHORS",
     "THIRDPARTYNOTICES",
     "THIRD-PARTY-NOTICES",
 }
