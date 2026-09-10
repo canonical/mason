@@ -2,27 +2,21 @@
 """
 List files and maintainer scripts inside a debian package to aid chisel slice authoring.
 
-Usage: deb-list.py <package> [arch] [--scripts] [--sdf]
+Usage: deb-list.py <package> [arch]
   package    debian package name (e.g. bash, libssl3)
   arch       target architecture (default: host arch; fallback amd64)
              valid values: amd64 arm64 armhf i386 ppc64el riscv64 s390x
-  --scripts  print full bodies of all present maintainer scripts
-  --sdf      instead of the listing, print a DRAFT slice definition file:
-             files grouped into bins/libs/config/headers/var/copyright,
-             clutter dropped, multiarch lib dirs globbed, copyright wired
-             (incl. shared-copyright doc-dir symlinks), contents sorted.
-             ambiguous /usr/lib and /usr/share files are left as "unplaced"
-             comments. a starting point -- the author adds cross-package
-             essentials, places unplaced files, and refines the grouping.
 
-Default output:
+Output:
   - package header (name, version, arch)
   - Depends: line for wiring essential: entries
-  - non-directory files, lexicographically sorted, each prefixed with a type tag:
-      [x] executable   [l] symlink -> target   [f] regular file
-  - one-line note listing which maintainer scripts are present
+  - non-directory files, lexicographically sorted: octal mode, owner and path,
+    then what file(1) makes of it on the next line (ELF binary, shell script,
+    symbolic link to <target>, gzip data, ASCII text, ...)
+  - the postinst script in full, if the package has one -- chisel never runs
+    it, so whatever it does is yours to reproduce or drop
 
-Requirements: dpkg-deb, python3, and network access to the ubuntu mirror
+Requirements: dpkg-deb, file, python3, and network access to the ubuntu mirror
 (archive.ubuntu.com / ports.ubuntu.com). No sudo, no apt, no populated apt
 cache: the .deb is fetched straight from the mirror's Packages index.
 Note: the release suite is read from ./chisel.yaml -- run from a chisel-releases
@@ -39,11 +33,6 @@ import urllib.request
 from pathlib import Path
 
 # Only install-time scripts matter for slice authoring; remove scripts are irrelevant.
-MAINTAINER_SCRIPTS = [
-    ("preinst", "before install"),
-    ("postinst", "after install"),
-]
-
 
 def perms_to_octal(perms):
     """Convert symbolic permissions string (e.g. -rwsr-xr-x) to octal (e.g. 4755).
@@ -165,11 +154,10 @@ def deb_field(deb_path, field):
 
 def deb_contents(deb_path):
     """
-    Returns list of (path, tag, perms, owner, symlink_target_or_None), lexicographically sorted.
+    Returns list of (path, perms, owner), lexicographically sorted.
     Directories are excluded -- chisel creates them implicitly.
 
     dpkg-deb --contents columns: perms links owner/group size date time path [-> target]
-    tag: 'x' executable  'l' symlink  'f' regular file
     """
     result = run(["dpkg-deb", "--contents", str(deb_path)], capture=True)
     entries = []
@@ -188,196 +176,46 @@ def deb_contents(deb_path):
         # and '/' chars, corrupting targets like ../lib/foo or /etc/foo.
         if entry_type == "l" and len(parts) >= 3 and parts[-2] == "->":
             path = parts[-3].removeprefix("./")
-            symlink_target = parts[
-                -1
-            ]  # verbatim: absolute, ../-relative, bare all meaningful
-            tag = "l"
         else:
             path = parts[-1].removeprefix("./")
-            symlink_target = None
-            tag = "x" if "x" in perms[1:] else "f"
 
         if not path or path == ".":
             continue
 
-        entries.append((f"/{path}", tag, perms_to_octal(perms), owner, symlink_target))
+        entries.append((f"/{path}", perms_to_octal(perms), owner))
 
     entries.sort(key=lambda e: e[0])
     return entries
 
 
-def deb_maintainer_scripts(deb_path, workdir):
-    """
-    Extracts the control tarball and returns a dict of script_name -> text
-    for whichever of preinst/postinst are present.
-    """
+def deb_postinst(deb_path, workdir):
+    """The package's postinst script, or None if it has none."""
     ctrl_dir = Path(workdir) / "ctrl"
     ctrl_dir.mkdir()
     run(["dpkg-deb", "--control", str(deb_path), str(ctrl_dir)], capture=True)
-
-    scripts = {}
-    for name, _ in MAINTAINER_SCRIPTS:
-        path = ctrl_dir / name
-        if path.exists():
-            scripts[name] = path.read_text()
-    return scripts
+    path = ctrl_dir / "postinst"
+    return path.read_text() if path.exists() else None
 
 
-# --- draft SDF generation (--sdf) --------------------------------------------
-
-BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
-_CLUTTER = (
-    "/usr/share/man/",
-    "/usr/man/",
-    "/usr/share/bash-completion/",
-    "/usr/share/fish/",
-    "/usr/share/zsh/",
-    "/etc/bash_completion.d/",
-    "/usr/share/doc-base/",
-    "/usr/share/lintian/",
-)
-# keep in sync with check-slice.py's LEGAL_DOC
-_LEGAL = {
-    "copyright",
-    "notice",
-    "license",
-    "licence",
-    "copying",
-    "authors",
-    "thirdpartynotices",
-    "third-party-notices",
-}
-# a multiarch lib dir, e.g. /usr/lib/x86_64-linux-gnu/ -> globbed to *-linux-*.
-_TRIPLE = re.compile(r"^(/usr)?/lib(32|64|x32)?/[a-z0-9_]+-linux-[a-z0-9]+/")
-
-
-def _is_legal_doc(base):
-    stem = base
-    for suf in (".gz", ".xz", ".bz2", ".txt", ".md", ".rst"):
-        if stem.lower().endswith(suf):
-            stem = stem[: -len(suf)]
-    return stem.lower() in _LEGAL
-
-
-def classify(path, tag):
-    """Bucket a deb path into a draft slice, or None to drop as clutter."""
-    if any(path.startswith(c) for c in _CLUTTER):
-        return None
-    if path.startswith("/usr/share/doc/"):
-        rest = path[len("/usr/share/doc/") :].rstrip("/")
-        if "/" not in rest:  # the doc dir itself -- shared-copyright symlink target
-            return "copyright"
-        return "copyright" if _is_legal_doc(rest.rsplit("/", 1)[-1]) else None
-    if tag == "x" and any(path.startswith(d) for d in BIN_DIRS):
-        return "bins"
-    base = path.rsplit("/", 1)[-1]
-    if (".so." in base or base.endswith(".so")) and (
-        path.startswith(("/usr/lib", "/lib"))
-    ):
-        return "libs"
-    if path.startswith("/etc/"):
-        return "config"
-    if path.startswith("/usr/include/"):
-        return "headers"
-    if path.startswith("/var/"):
-        return "var"
-    # /usr/lib and /usr/share non-.so files are genuinely ambiguous (modules vs
-    # data vs services vs config) -- leave them for the author, don't misgroup.
-    return "unplaced"
-
-
-def _glob_triple(path):
-    return _TRIPLE.sub("/usr/lib/*-linux-*/", path)
-
-
-def read_format():
-    """format: from ./chisel.yaml (int), or None. gates essential list-vs-map."""
-    try:
-        text = Path("chisel.yaml").read_text()
-    except OSError:
-        return None
-    m = re.search(r"^format:\s*\"?v?(\d+)", text, re.MULTILINE)
-    return int(m.group(1)) if m else None
-
-
-def build_sdf(pkg, depends, entries, fmt=None):
-    """Group deb contents into a draft SDF. Deterministic starting point; the
-    author still wires cross-package essentials and refines the grouping.
-
-    fmt: chisel.yaml format version. on v3+ essential: must be a map (list is a
-    chisel parse error), so the draft emits the map form there."""
-    buckets = {
-        "bins": [],
-        "libs": [],
-        "config": [],
-        "headers": [],
-        "var": [],
-        "copyright": [],
-        "unplaced": [],
-    }
-    for path, tag, _perms, _owner, _sym in entries:
-        b = classify(path, tag)
-        if b is None:
-            continue
-        buckets[b].append(_glob_triple(path) if b == "libs" else path)
-    # fall back to the conventional copyright path only if the deb shipped no
-    # copyright/legal file and no doc-dir symlink (shared copyright) of its own.
-    if not buckets["copyright"]:
-        buckets["copyright"].append(f"/usr/share/doc/{pkg}/copyright")
-
-    out = [f"package: {pkg}", ""]
-    out += [
-        "# DRAFT from deb-list.py --sdf -- a starting point, not a finished SDF.",
-        "# Before use: add each slice's essential: cross-package deps (this deb's",
-        f"#   Depends: {depends or '(none)'}),",
-        "#   place any unplaced files below, reproduce maintainer-script effects,",
-        "#   then run check-slice.py on the result.",
-        "",
-        "essential:",
-        (
-            f"  {pkg}_copyright:"
-            if fmt is not None and fmt >= 3
-            else f"  - {pkg}_copyright"
-        ),
-        "",
-        "slices:",
-    ]
-    for name in ("bins", "libs", "config", "headers", "var"):
-        paths = sorted(set(buckets[name]))
-        if not paths:
-            continue
-        out.append(f"  {name}:")
-        # dep hint as a comment, not an empty `essential:` key -- a null essential
-        # is a chisel parse error, and the draft must stay chisel-valid.
-        out.append(
-            "    # essential: add this slice's cross-package deps (see Depends above)"
-        )
-        out.append("    contents:")
-        out += [f"      {p}:" for p in paths]
-        out.append("")
-    out.append("  copyright:")
-    out.append("    contents:")
-    out += [f"      {p}:" for p in sorted(set(buckets["copyright"]))]
-    out.append("")
-    unplaced = sorted(set(buckets["unplaced"]))
-    if unplaced:
-        out.append(
-            "# unplaced -- slot each into a slice (data/scripts/var/...) or drop as clutter:"
-        )
-        out += [f"#   {p}" for p in unplaced]
-    return "\n".join(out)
+def file_descriptions(deb_path, workdir, paths):
+    """file(1) output for each path, in order. Symlinks are described, not followed."""
+    root = Path(workdir) / "root"
+    root.mkdir()
+    run(["dpkg-deb", "-x", str(deb_path), str(root)], capture=True)
+    out = []
+    # chunked: a big package (python3.x, perl) runs past ARG_MAX in one go.
+    for i in range(0, len(paths), 500):
+        chunk = [str(root) + p for p in paths[i : i + 500]]
+        result = run(["file", "-bh", "--", *chunk], capture=True)
+        out += result.stdout.splitlines()
+    return out
 
 
 def main():
     args = sys.argv[1:]
-    show_scripts = "--scripts" in args
-    emit_sdf = "--sdf" in args
-    args = [a for a in args if a not in ("--scripts", "--sdf")]
 
     if not args:
-        print(
-            "usage: deb-list.py <package> [arch] [--scripts] [--sdf]", file=sys.stderr
-        )
+        print("usage: deb-list.py <package> [arch]", file=sys.stderr)
         sys.exit(1)
 
     pkg = args[0]
@@ -408,35 +246,22 @@ def main():
         version = deb_field(deb, "Version")
         depends = deb_field(deb, "Depends")
 
-        if emit_sdf:
-            print(build_sdf(pkg, depends, deb_contents(deb), fmt=read_format()))
-            return
-
         print(f"package: {pkg}  version: {version}  arch: {arch}\n")
 
         if depends:
             print(f"Depends: {depends}\n")
 
-        print("files (lexicographic):  [x]=executable  [f]=file  [l]=symlink")
-        for path, tag, perms, owner, symlink_target in deb_contents(deb):
-            if tag == "l":
-                print(f"  [l] {perms} {owner}  {path} -> {symlink_target}")
-            else:
-                print(f"  [{tag}] {perms} {owner}  {path}")
+        entries = deb_contents(deb)
+        kinds = file_descriptions(deb, workdir, [e[0] for e in entries])
+        print("files (lexicographic):")
+        for (path, perms, owner), kind in zip(entries, kinds):
+            print(f"  {perms} {owner}  {path}")
+            print(f"      {kind}")
 
-        scripts = deb_maintainer_scripts(deb, workdir)
-        if scripts:
-            present = [name for name, _ in MAINTAINER_SCRIPTS if name in scripts]
-            print(
-                f"\nmaintainer scripts present: {', '.join(present)}  (re-run with --scripts to view)"
-            )
-
-            if show_scripts:
-                for name, label in MAINTAINER_SCRIPTS:
-                    if name not in scripts:
-                        continue
-                    print(f"\n--- {name} ({label}) ---")
-                    print(scripts[name].rstrip())
+        postinst = deb_postinst(deb, workdir)
+        print("\npostinst:" + ("" if postinst else " none"))
+        if postinst:
+            print(postinst.rstrip())
 
 
 if __name__ == "__main__":
