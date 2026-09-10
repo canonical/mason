@@ -32,7 +32,18 @@ __all__ = [
     "fmt", "iter_contents", "iter_bodies", "mutate_map",
     "mutate_paths", "content_paths", "declared_binaries", "path_penalty",
     "targets", "fmt_compat", "CANONICAL", "has_slices", "transcript",
+    "ORIENTATION_MARKERS",
 ]
+
+# lines orientation prints, spread through its output: harnesses truncate long
+# tool output (codex keeps the tail), so any one of these hitting means it ran.
+# "live releases:" is printed whether or not the cwd is a checkout.
+ORIENTATION_MARKERS = (
+    "working dir: ",
+    "manifest format:",
+    "existing slices:",
+    "live releases:",
+)
 
 OUT = Path(os.environ["PATS_OUTPUT_DIR"])
 TASK = os.environ["PATS_TASK_ID"]  # the case id (also the single-target package)

@@ -3,11 +3,11 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""orientation-called: did the agent run scripts/orientation before anything else?
+"""orientation-called: did the agent run scripts/_orientation.py before anything else?
 
-reads the run transcript and checks for orientation's own success marker
-("working dir (chisel-releases checkout):"), the same way scorer_chisel-cut.py
-does. four transcript formats, tried in order (see that scorer's docstring):
+reads the run transcript and checks for orientation's own output lines
+(ORIENTATION_MARKERS in _lib), the same way scorer_chisel-cut.py does. four
+transcript formats, tried in order (see that scorer's docstring):
 claude stream-json, opencode --format json, codex jsonl, plain text.
   0.0  orientation never ran (no invocation attempt found)
   0.5  invocation attempted but failed (e.g. wrong path -- no success marker)
@@ -18,17 +18,7 @@ import json
 import re
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
-# orientation's own output lines. several, spread through the output, because
-# harnesses truncate: codex keeps only the tail of a long aggregated_output, so
-# a marker pinned to the first line (as this scorer once used) reads as failure
-# on a run that succeeded. any one of these hitting means it ran.
-_SUCCESS_MARKERS = (
-    "working dir (chisel-releases checkout):",
-    "skill dir (read-only):",
-    "existing slices:",
-    "(gates SDF features",
-    "->  write to",
-)
+_SUCCESS_MARKERS = ORIENTATION_MARKERS
 _ATTEMPT_MARKERS = ("orientation",)
 
 
