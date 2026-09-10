@@ -18,27 +18,16 @@ differently on different releases: paths move, libraries are renamed, sonames
 bump, packages split, and the `essential:` syntax itself changes with the
 branch's `format:`. A verbatim copy usually parses and is usually wrong.
 
-## Where things live
+## rules
 
-Run `scripts/_orientation` first, every time. It reports both of the roots you
-work from, read off the machine rather than guessed.
+- Run `scripts/_orientation.py` first, every time. It reports the checkout you
+  are in (`branch`, `ubuntu version`, `manifest format`), which tools this
+  machine has, and the live release set -- read off the machine rather than
+  guessed.
 
-- **working dir** -- wherever the script found you. When it also reports a
-  `branch`, `ubuntu version` and `manifest format`, that directory is a
-  chisel-releases checkout, and every repo path is relative to it, exactly as
-  written: `slices/<pkg>.yaml`, `tests/spread/...`, `chisel.yaml`, sibling SDFs.
-- **skill dir** -- where this `SKILL.md` sits. `kb/` and `scripts/` live there,
-  read-only, and are not part of any checkout. Every `kb/` and `scripts/` path
-  below is relative to what orientation prints as "skill dir".
-
-If orientation reports `release: null`, your working directory is not a
-chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
-clone one, and do not guess at a path.
-
-Scripts run by path. If one will not, the extension names the interpreter: no
-extension is bash (`bash <skill dir>/scripts/_orientation`), `.py` is python
-(`uv run --script <skill dir>/scripts/_check-slice.py`, or `python3` with pyyaml
-available). A bash script under `python3` dies with a `SyntaxError`.
+- If orientation reports `release: null`, your working directory is not a
+  chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
+  clone one, and do not guess at a path.
 
 **Scope**: adapt + test + commit on the target branch. Do NOT open PRs -- the
 user opens them.
@@ -48,9 +37,7 @@ for confirmation, make the best-supported decision, proceed, and record it with
 its rationale in your final report. The one exception is a missing
 chisel-releases checkout -- you cannot pick that for the user, so stop and ask.
 
-**Prerequisites**: run `scripts/_orientation` first -- it reports your
-working dir, this skill's own dir, the target release + manifest format from
-`chisel.yaml`, and the live release set. Then read
+**Prerequisites**: read
 `kb/_cross-release-porting.md` (what changes between releases -- this is the
 core reference for this job) and `kb/_chisel-formats.md` (what `format:`
 decides). Pull in `kb/_slice-definition-format.md` and `kb/_slice-conventions.md`
@@ -67,8 +54,9 @@ When this prompt and the repo disagree, trust the repo.
 
 1. **Identify the source branch** -- the one that already has
    `slices/<pkg>.yaml` -- and the **target branch** you are porting to.
-2. **Check the target branch is live.** `maintenance.end-of-life` in its
-   `chisel.yaml` must be in the future. EOL branches are frozen; stop and report.
+2. **Check the target branch is live.** It must appear in orientation's
+   `live releases:` (and, once checked out, report `maintained: true`).
+   EOL branches are frozen; stop and report.
 3. **Check the target does not already have the SDF.** If it does, this is a
    diff-and-reconcile job, not a port: report what differs and stop unless the
    user asked for the reconcile.
@@ -153,7 +141,7 @@ scripts/_try-cut <pkg>_<slice>
 ```
 
 A cut that succeeds on the source branch proves nothing about the target. Cut on
-the target branch. If `_orientation` reported `chisel: {present: false}`, skip
+the target branch. If `_orientation.py` reported `chisel: {present: false}`, skip
 the cut -- the `install-slices` CI check covers it on the PR -- and say so in
 your report. Then run the spread test:
 
@@ -165,7 +153,7 @@ spread lxd:tests/spread/integration/<pkg>
 
 If the port is one link in a chain -- the same change going across several live
 releases -- the other branches need the same treatment. List the live releases
-with `scripts/_orientation` and report which still need the port.
+with `scripts/_orientation.py` and report which still need the port.
 
 If you changed an existing SDF rather than adding one:
 

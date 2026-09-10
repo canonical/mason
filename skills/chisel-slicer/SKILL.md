@@ -13,20 +13,14 @@ You author slices against [`canonical/chisel-releases`](https://github.com/canon
 
 ## rules
 
-- Run `scripts/_orientation` first, every time. It reports both of the roots you
-work from, read off the machine rather than guessed.
-
-- **working dir** -- wherever the script found you. When it also reports a
-  `branch`, `ubuntu version` and `manifest format`, that directory is a
-  chisel-releases checkout, and every repo path is relative to it, exactly as
-  written: `slices/<pkg>.yaml`, `tests/spread/...`, `chisel.yaml`, sibling SDFs.
-- **skill dir** -- where this `SKILL.md` sits. `kb/` and `scripts/` live there,
-  read-only, and are not part of any checkout. Every `kb/` and `scripts/` path
-  below is relative to what orientation prints as "skill dir".
+- Run `scripts/_orientation.py` first, every time. It reports the checkout you
+  are in (`branch`, `ubuntu version`, `manifest format`), which tools this
+  machine has, and the live release set -- read off the machine rather than
+  guessed.
 
 - If orientation reports `release: null`, your working directory is not a
-chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
-clone one, and do not guess at a path.
+  chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
+  clone one, and do not guess at a path.
 
 - Author, test and commit slices locally. Do NOT open PRs unless explicitly asked by the user. When opening PRs please follow the upstream template.
 
@@ -48,32 +42,28 @@ Follow these steps in order. Do NOT skip steps.
 
 ### Step 1: Validate
 
-1. **Confirm it is an Ubuntu package.** Chisel only supports packages from Ubuntu (and Ubuntu Pro) archives. Verify against the archive by running `scripts/_deb-list.py <pkg>`. If the package is not found, stop and report it -- do not author anything.
-2. **Identify the target Ubuntu release** (e.g. `ubuntu-24.04`). This determines which chisel-releases branch to target.
-3. **Check the branch is not EOL.** Read `chisel.yaml` on the target branch: `maintenance.end-of-life` must be in the future.
-4. **Check `format:` version** in `chisel.yaml`. It decides the shape of `essential:` -- list on v1/v2, map on v3+ -- which is a parse error to get wrong. It does not decide `hint:`/`prefer:`, which are chisel-version gated; those still follow branch convention (v3+ / v2+ in practice). See the schema versions table in `kb/_chisel-formats.md`.
-5. **Avoid duplicates.** Check `slices/<pkg>.yaml` does not already exist on the target branch. If it does, stop and report it.
+```bash
+scripts/_deb-list.py <pkg>
+```
+
+Fetches the package from the archive for the release in `chisel.yaml` and prints its `Depends:`, every file with what `file(1)` makes of it, and the `postinst`. If it errors, the package is not in the Ubuntu (or Ubuntu Pro) archive -- stop and report; do not author anything. Keep the output: Steps 2 and 3 read from it.
+
+Then check `slices/<pkg>.yaml` does not already exist on the branch; if it does, stop and report. Branch, `manifest format` and `maintained` are in the orientation output; an unmaintained branch is frozen -- stop and report.
 
 ### Step 2: Build the full dependency tree
 
 Build the whole tree before inspecting or designing anything. Slicing runs bottom-up: a package cannot reference slices that do not exist, so dependencies are sliced before the package that needs them. Only `Depends:` counts -- a `Recommends:` or `Suggests:` pulled in as a dependency is rejected by reviewers.
 
-1. **Get the full recursive dependency list.** Use `apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances <package>` to resolve all transitive `Depends:`. Alternatively, run `scripts/_deb-list.py <package>` to get direct `Depends:` and recurse manually.
+1. **Get the full recursive dependency list.** Start from the `Depends:` line in the listing. Resolve it transitively with `apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances <package>` where apt is available; otherwise run `scripts/_deb-list.py` on each dependency and recurse.
 2. **Check which dependencies already have slices** on the target chisel-releases branch (`ls slices/ | sed 's/\.yaml$//'` or `chisel info --release <release> <dep> ...`).
 3. **Identify unsliced dependencies.** Produce an ordered list of packages that need slicing, sorted **leaves-first** (packages with no unsliced dependencies come first).
 4. **Record the plan** in your final report: the full dependency tree, which deps already have slices, which need new slices, and the slicing order (leaves first). Then proceed.
 
 ### Step 3: Inspect each package
 
-For each package that needs slicing, leaves first:
+For each package that needs slicing, leaves first, read its listing -- the root package's from Step 1, each dependency's via `scripts/_deb-list.py <dep> [arch]`, once per target arch when multiarch differences are plausible.
 
-```
-scripts/_deb-list.py <package> [arch]
-```
-
-It fetches the `.deb` from the ubuntu mirror (suite read from `chisel.yaml`) and prints the package header, the `Depends:` line, every non-directory file sorted -- octal mode, owner, path, and on the next line what `file(1)` makes of it -- and the `postinst` script in full when there is one. Needs `dpkg-deb`, `file` and mirror access; no sudo, no apt cache. Run it once per target arch when multiarch differences are plausible.
-
-Turning that output into slice entries:
+Turning a listing into slice entries:
 
 - `symbolic link to <target>` -- the deb ships the symlink, so a bare path entry suffices. Chisel preserves deb symlinks; an explicit `symlink:` is only for paths the deb does *not* ship.
 - `ELF ... executable` and `... script` under a bin dir go in `bins`; `ELF ... shared object` in `libs`; the rest in `config`/`data` as appropriate.
@@ -135,7 +125,7 @@ slices:
       /usr/share/doc/<package-name>/copyright:
 ```
 
-**On a v3 branch (e.g. `ubuntu-26.04`, `ubuntu-26.10`) every `essential:` must be a map, not a list** -- `chisel cut` rejects the list form with _"essential expects a map"_. This one really is decided by `chisel.yaml`'s `format:`, unlike `hint:`/`prefer:` (see `kb/_chisel-formats.md`). Same shape, map keys:
+**On a v3 branch (e.g. `ubuntu-26.04`, `ubuntu-26.10`) every `essential:` must be a map, not a list** -- `chisel cut` rejects the list form with _"essential expects a map"_. `format:` decides exactly this and nothing else: `hint:` and `prefer:` are gated by the chisel binary's version, not the format, and follow branch convention (v3+ / v2+ in practice) -- see the schema versions table in `kb/_chisel-formats.md`. Same shape, map keys:
 
 ```yaml
 essential:
@@ -180,9 +170,9 @@ Three things it cannot judge, which you apply yourself from the File Layout and 
 
 **Every package gets a spread test at `tests/spread/integration/<package>/task.yaml`** -- upstream ships one even for pure-library and data-only packages (`ca-certificates`, `base-passwd`, `fontconfig`). The package kind below sets test *depth*, never whether the file exists.
 
-**Testing blocks commit.** A `feat:` slice and its `test:` tests are one series -- never commit the slice alone. Not being able to *run* the tests here does not block anything: most machines have no spread or lxd, and `_orientation` tells you up front. Write the test file regardless, verify its shape with `_check-test.py`, commit, and say in your report that spread did not run locally. The only infeasible case is a package whose slices cannot be exercised at all -- then leave the slice uncommitted and report why.
+**Testing blocks commit.** A `feat:` slice and its `test:` tests are one series -- never commit the slice alone. Not being able to *run* the tests here does not block anything: most machines have no spread or lxd, and `_orientation.py` tells you up front. Write the test file regardless, verify its shape with `_check-test.py`, commit, and say in your report that spread did not run locally. The only infeasible case is a package whose slices cannot be exercised at all -- then leave the slice uncommitted and report why.
 
-If `_orientation` reported `chisel: {present: false}`, skip the cut -- the `install-slices` CI check proves installability on the PR -- and note in your report that it was not verified locally. Otherwise, prove the cut succeeds first. `scripts/_try-cut [--arch ARCH] <package>_<slice>` handles the temp root and removes it on exit, so it checks installability only. To poke around the rootfs instead, cut by hand:
+If `_orientation.py` reported `chisel: {present: false}`, skip the cut -- the `install-slices` CI check proves installability on the PR -- and note in your report that it was not verified locally. Otherwise, prove the cut succeeds first. `scripts/_try-cut [--arch ARCH] <package>_<slice>` handles the temp root and removes it on exit, so it checks installability only. To poke around the rootfs instead, cut by hand:
 
 ```bash
 mkdir rootfs/

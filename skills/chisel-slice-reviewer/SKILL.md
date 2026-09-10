@@ -16,34 +16,22 @@ given a branch or PR, the diff against the branch it targets is what you review;
 when given a single SDF, review the file as it stands. If which is meant is
 unclear, review what you were handed and say in the report what you assumed.
 
-**First**: run `scripts/_orientation` -- it reports your working dir, this skill's
-own dir, and the target release + manifest format from `chisel.yaml`. Then read
+**First**, read
 `kb/_slice-definition-format.md` (SDF format) and `kb/_chisel-formats.md` (what
 `format:` decides), plus `kb/_slice-conventions.md` for canonical naming and path
 style. Pull in `kb/_chisel-branches.md` for the branch model and
 `kb/_spread-tests.md` when judging tests.
 
-## Where things live
+## rules
 
-Run `scripts/_orientation` first, every time. It reports both of the roots you
-work from, read off the machine rather than guessed.
+- Run `scripts/_orientation.py` first, every time. It reports the checkout you
+  are in (`branch`, `ubuntu version`, `manifest format`), which tools this
+  machine has, and the live release set -- read off the machine rather than
+  guessed.
 
-- **working dir** -- wherever the script found you. When it also reports a
-  `branch`, `ubuntu version` and `manifest format`, that directory is a
-  chisel-releases checkout, and every repo path is relative to it, exactly as
-  written: `slices/<pkg>.yaml`, `tests/spread/...`, `chisel.yaml`, sibling SDFs.
-- **skill dir** -- where this `SKILL.md` sits. `kb/` and `scripts/` live there,
-  read-only, and are not part of any checkout. Every `kb/` and `scripts/` path
-  below is relative to what orientation prints as "skill dir".
-
-If orientation reports `release: null`, your working directory is not a
-chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
-clone one, and do not guess at a path.
-
-Scripts run by path. If one will not, the extension names the interpreter: no
-extension is bash (`bash <skill dir>/scripts/_orientation`), `.py` is python
-(`uv run --script <skill dir>/scripts/_check-slice.py`, or `python3` with pyyaml
-available). A bash script under `python3` dies with a `SyntaxError`.
+- If orientation reports `release: null`, your working directory is not a
+  chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
+  clone one, and do not guess at a path.
 
 You are read-only: inspect the diff / SDFs and return a review report. Do not edit files.
 
