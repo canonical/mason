@@ -11,9 +11,9 @@ description: >-
 
 You author slices against [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
 
-## Where things live
+## rules
 
-Run `scripts/_orientation` first, every time. It reports both of the roots you
+- Run `scripts/_orientation` first, every time. It reports both of the roots you
 work from, read off the machine rather than guessed.
 
 - **working dir** -- wherever the script found you. When it also reports a
@@ -24,26 +24,23 @@ work from, read off the machine rather than guessed.
   read-only, and are not part of any checkout. Every `kb/` and `scripts/` path
   below is relative to what orientation prints as "skill dir".
 
-If orientation reports `release: null`, your working directory is not a
+- If orientation reports `release: null`, your working directory is not a
 chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
 clone one, and do not guess at a path.
 
-Scripts run by path. If one will not, the extension names the interpreter: no
-extension is bash (`bash <skill dir>/scripts/_orientation`), `.py` is python
-(`uv run --script <skill dir>/scripts/_check-slice.py`, or `python3` with pyyaml
-available). A bash script under `python3` dies with a `SyntaxError`.
+- Author, test and commit slices locally. Do NOT open PRs unless explicitly asked by the user. When opening PRs please follow the upstream template.
 
-**Scope**: author + test + commit slices locally. Do NOT open PRs -- the user opens the PR themselves.
+- Existing slices are append-only. Modify a published slice only when you must: a bug, a missing dependency, an upstream packaging change. Never rename, or remove paths from one -- downstream consumers depend on the current layout. You *can* subslice an existing slice and add the new subslices back as dependencies as long as you dont change the final cut contents of the original slice. If you do change a slice, run `scripts/_check-diff.py --base <target-branch>` before committing; it catches slices and paths dropped by accident.
 
-**You run autonomously.** No human is in the loop mid-task. Where a step below would otherwise pause for confirmation, make the best-supported decision, proceed, and record it (with rationale) in your final report. The one exception is a missing chisel-releases checkout -- you cannot pick that for the user, so stop and ask.
+## knowledge base
 
-**Existing slices are append-only.** Modify a published slice only when you must: a bug, a missing dependency, an upstream packaging change. Never reorganise, rename, or remove paths from one -- downstream consumers depend on the current layout. Prefer a new slice over changing an existing one. If you do change one, run `scripts/_check-diff.py --base <target-branch>` before committing; it catches slices and paths dropped by accident, which the `removed-slices` CI gate rejects.
-
-**When this file and the repo disagree, trust the repo.** `slices/bash.yaml` and `slices/base-files.yaml` on the target branch are canonical.
-
-Read `kb/_slice-definition-format.md` and `kb/_chisel-formats.md` before writing anything. The rest of `kb/` is cited at the step that needs it.
-
----
+- `kb/_chisel-cli.md`
+- `kb/_chisel-formats.md`
+- `kb/_conventional-commits.md`
+- `kb/_slice-conventions.md`
+- `kb/_slice-definition-format.md`
+- `kb/_spread-tests.md`
+- `kb/_upstream-sources.md`
 
 ## Workflow
 
@@ -51,7 +48,7 @@ Follow these steps in order. Do NOT skip steps.
 
 ### Step 1: Validate
 
-1. **Confirm it is an Ubuntu package.** Chisel only supports packages from Ubuntu (and Ubuntu Pro) archives. Verify against the archive -- `scripts/_deb-list.py <pkg>` (or `apt-cache show <pkg>` where apt is available); do not assume existence from the name. If the package is not found, stop and report it -- do not author anything.
+1. **Confirm it is an Ubuntu package.** Chisel only supports packages from Ubuntu (and Ubuntu Pro) archives. Verify against the archive by running `scripts/_deb-list.py <pkg>`. If the package is not found, stop and report it -- do not author anything.
 2. **Identify the target Ubuntu release** (e.g. `ubuntu-24.04`). This determines which chisel-releases branch to target.
 3. **Check the branch is not EOL.** Read `chisel.yaml` on the target branch: `maintenance.end-of-life` must be in the future.
 4. **Check `format:` version** in `chisel.yaml`. It decides the shape of `essential:` -- list on v1/v2, map on v3+ -- which is a parse error to get wrong. It does not decide `hint:`/`prefer:`, which are chisel-version gated; those still follow branch convention (v3+ / v2+ in practice). See the schema versions table in `kb/_chisel-formats.md`.
@@ -71,21 +68,21 @@ Build the whole tree before inspecting or designing anything. Slicing runs botto
 For each package that needs slicing, leaves first:
 
 ```
-scripts/_deb-list.py <package> [arch] [--scripts]
+scripts/_deb-list.py <package> [arch]
 ```
 
-It fetches the `.deb` from the ubuntu mirror (suite read from `chisel.yaml`) and prints the package header, the `Depends:` line, and every non-directory file sorted, tagged `[x]` executable / `[f]` regular / `[l]` symlink-with-target, with octal mode and owner. Needs `dpkg-deb` and mirror access; no sudo, no apt cache. Run it once per target arch when multiarch differences are plausible.
+It fetches the `.deb` from the ubuntu mirror (suite read from `chisel.yaml`) and prints the package header, the `Depends:` line, every non-directory file sorted -- octal mode, owner, path, and on the next line what `file(1)` makes of it -- and the `postinst` script in full when there is one. Needs `dpkg-deb`, `file` and mirror access; no sudo, no apt cache. Run it once per target arch when multiarch differences are plausible.
 
 Turning that output into slice entries:
 
-- `[l] path -> target` -- the deb ships the symlink, so a bare path entry suffices. Chisel preserves deb symlinks; an explicit `symlink:` is only for paths the deb does *not* ship.
-- `[x]` goes in `bins`, `[f]` in `libs`/`config`/`data` as appropriate.
+- `symbolic link to <target>` -- the deb ships the symlink, so a bare path entry suffices. Chisel preserves deb symlinks; an explicit `symlink:` is only for paths the deb does *not* ship.
+- `ELF ... executable` and `... script` under a bin dir go in `bins`; `ELF ... shared object` in `libs`; the rest in `config`/`data` as appropriate.
 - `mode:` only for a non-standard permission (not `0644`/`0755`/`0777`), and never on a glob -- wildcard entries accept only `until:`/`arch:`, anything else is a parse error. Name the file explicitly instead.
 - **Ignore the clutter.** Man pages, shell completions, `/usr/share/doc/**`, changelogs and examples are excluded by convention (see "Exclude by Default" in `kb/_slice-conventions.md`). Under `/usr/share/doc/` ship only legal files -- `copyright`, plus `NOTICE`/`LICENSE`-type notices where present.
 
 Then do the analysis the file list can't do for you:
 
-- **Maintainer scripts.** Chisel never runs them. `--scripts` prints the bodies; whatever `postinst`/`preinst` do -- create symlinks, generate files, register alternatives -- you reproduce as `contents` declarations for simple cases or `mutate:` for logic. `update-alternatives`, `ldconfig` and `update-mime-database` calls have no effect in a chisel rootfs: drop the dep or write the `mutate:` equivalent.
+- **Maintainer scripts.** Chisel never runs them. The listing ends with the `postinst` body; whatever it does -- create symlinks, generate files, register alternatives -- you reproduce as `contents` declarations for simple cases or `mutate:` for logic. `update-alternatives`, `ldconfig` and `update-mime-database` calls have no effect in a chisel rootfs: drop the dep or write the `mutate:` equivalent.
 - **Binaries.** Resolve shared-library deps (`ldd` / `lddtree`) and list every provider explicitly in `essential:`, even ones that would arrive transitively -- reviewers run `lddtree` on emulated arches too and reject a `bins`/`libs` slice missing any. Usual suspects: `libc6_libs`, `libgcc-s1_libs`, `libstdc++6_libs`.
 - **Source package.** Read it for runtime lookups the file list doesn't reveal: config paths, data directories, plugin dirs, hardcoded paths, and which deps are genuinely optional.
 
@@ -113,13 +110,7 @@ Pick one approach per SDF and stick to it. Slice names come from the Canonical S
 
 ### Step 6: Write the SDF
 
-Start from a draft rather than a blank file:
-
-```bash
-scripts/_deb-list.py <package> --sdf > slices/<package>.yaml
-```
-
-It groups the deb's files into `bins`/`libs`/`config`/`headers`/`var`/`copyright`, drops clutter (man pages, completions, docs), globs multiarch lib dirs (`*-linux-*`), wires the `copyright` slice + global `essential` (handling shared-copyright doc-dir symlinks), and sorts contents -- so `check-slice.py` passes on it out of the box. Ambiguous `/usr/lib` and `/usr/share` files are left as `# unplaced` comments for you to place. Then do the judgement the draft can't: add each slice's cross-package `essential:` deps (from Step 3), place the `# unplaced` files into the right slice (`data`/`scripts`/`var`/...) or drop them, reproduce maintainer-script effects, and restructure into functional slices (`core`/`standard`/...) for complex packages. The target shape (list-form `essential:` -- v1/v2 branches):
+Write it from the Step 3 listing. Group the files per the approach chosen in Step 5, drop the clutter, glob multiarch lib dirs as `*-linux-*`, and give every slice its `essential:` -- cross-package deps from `Depends:`, and intra-package ones too: a `bins` slice that needs the package's own config lists `<package-name>_config`, as `bash.yaml` and `vim-tiny.yaml` do. Reproduce maintainer-script effects, and restructure into functional slices (`core`/`standard`/...) for complex packages. The target shape (list-form `essential:` -- v1/v2 branches):
 
 ```yaml
 package: <package-name>
@@ -189,9 +180,9 @@ Three things it cannot judge, which you apply yourself from the File Layout and 
 
 **Every package gets a spread test at `tests/spread/integration/<package>/task.yaml`** -- upstream ships one even for pure-library and data-only packages (`ca-certificates`, `base-passwd`, `fontconfig`). The package kind below sets test *depth*, never whether the file exists.
 
-**Testing blocks commit.** A `feat:` slice and its `test:` tests are one series. If tests aren't feasible, leave the slice uncommitted and report why -- never commit the slice alone.
+**Testing blocks commit.** A `feat:` slice and its `test:` tests are one series -- never commit the slice alone. Not being able to *run* the tests here does not block anything: most machines have no spread or lxd, and `_orientation` tells you up front. Write the test file regardless, verify its shape with `_check-test.py`, commit, and say in your report that spread did not run locally. The only infeasible case is a package whose slices cannot be exercised at all -- then leave the slice uncommitted and report why.
 
-First, prove the cut succeeds. `scripts/_try-cut [--arch ARCH] <package>_<slice>` handles the temp root and removes it on exit, so it checks installability only. To poke around the rootfs instead, cut by hand:
+If `_orientation` reported `chisel: {present: false}`, skip the cut -- the `install-slices` CI check proves installability on the PR -- and note in your report that it was not verified locally. Otherwise, prove the cut succeeds first. `scripts/_try-cut [--arch ARCH] <package>_<slice>` handles the temp root and removes it on exit, so it checks installability only. To poke around the rootfs instead, cut by hand:
 
 ```bash
 mkdir rootfs/

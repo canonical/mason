@@ -153,7 +153,9 @@ scripts/_try-cut <pkg>_<slice>
 ```
 
 A cut that succeeds on the source branch proves nothing about the target. Cut on
-the target branch, then run the spread test:
+the target branch. If `_orientation` reported `chisel: {present: false}`, skip
+the cut -- the `install-slices` CI check covers it on the PR -- and say so in
+your report. Then run the spread test:
 
 ```bash
 spread lxd:tests/spread/integration/<pkg>
