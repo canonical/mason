@@ -1,0 +1,81 @@
+{
+  "context": "Tests whether the agent authors a correct chisel SDF and spread test for the nano editor on the v3-format ubuntu-26.04 branch. nano ships two executables (rnano is a symlink the deb itself provides), a system-wide /etc/nanorc, a directory of syntax definitions under /usr/share/nano/, a Suggests: on hunspell, and a lot of doc clutter. Every check inspects the artefacts: chisel-releases/slices/nano.yaml, chisel-releases/tests/spread/integration/nano/task.yaml and git log in chisel-releases/.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "bins not bin",
+      "description": "chisel-releases/slices/nano.yaml names the executable slice 'bins:', not 'bin:'",
+      "max_score": 6
+    },
+    {
+      "name": "map-form essential",
+      "description": "Every essential: block in chisel-releases/slices/nano.yaml (file-level and per-slice) uses YAML map form (e.g. 'nano_copyright:' as a mapping key), never list form with dashes -- required by the v3 format on ubuntu-26.04",
+      "max_score": 10
+    },
+    {
+      "name": "global essential placement",
+      "description": "The file-level essential: block in chisel-releases/slices/nano.yaml appears immediately after 'package: nano' and before 'slices:'",
+      "max_score": 4
+    },
+    {
+      "name": "copyright slice last",
+      "description": "The 'copyright' slice is the last slice defined in chisel-releases/slices/nano.yaml",
+      "max_score": 4
+    },
+    {
+      "name": "rnano as a bare path",
+      "description": "chisel-releases/slices/nano.yaml lists /usr/bin/rnano as a bare path entry (the deb ships it as a symlink to nano) and does NOT attach an explicit {symlink: ...} option to it",
+      "max_score": 8
+    },
+    {
+      "name": "config in its own slice",
+      "description": "/etc/nanorc in chisel-releases/slices/nano.yaml lives in a 'config' slice, not inside 'bins', and 'bins' lists nano_config in its essential: block",
+      "max_score": 8
+    },
+    {
+      "name": "syntax files out of bins",
+      "description": "The /usr/share/nano/ syntax definitions in chisel-releases/slices/nano.yaml are in their own slice (e.g. 'data' or 'syntax'), not inside 'bins', and are matched with a glob no broader than /usr/share/nano/**",
+      "max_score": 8
+    },
+    {
+      "name": "all three library deps",
+      "description": "The bins slice's essential: block in chisel-releases/slices/nano.yaml lists libc6_libs, libncursesw6_libs and libtinfo6_libs -- every shared-library provider from nano's Depends: line",
+      "max_score": 8
+    },
+    {
+      "name": "suggests not pulled in",
+      "description": "No essential: block in chisel-releases/slices/nano.yaml references hunspell (nano's Suggests:) or any package absent from its Depends: line",
+      "max_score": 6
+    },
+    {
+      "name": "clutter excluded",
+      "description": "chisel-releases/slices/nano.yaml includes nothing under /usr/share/man/, /usr/share/info/ or /usr/share/doc-base/, and under /usr/share/doc/nano/ only 'copyright' -- no AUTHORS, NEWS, README, TODO, faq.html, nano.html, sample.nanorc or changelog",
+      "max_score": 8
+    },
+    {
+      "name": "bytewise sorting",
+      "description": "In every slice of chisel-releases/slices/nano.yaml, contents: paths and essential: entries are each sorted in bytewise (LC_COLLATE=C) ascending order",
+      "max_score": 4
+    },
+    {
+      "name": "config and syntax slices tested",
+      "description": "chisel-releases/tests/spread/integration/nano/task.yaml installs the config and syntax/data slices (directly or via bins' essential) and asserts that /etc/nanorc and at least one /usr/share/nano/*.nanorc file are present in the rootfs -- every slice is exercised, not only bins",
+      "max_score": 8
+    },
+    {
+      "name": "both binaries exercised",
+      "description": "chisel-releases/tests/spread/integration/nano/task.yaml runs both /usr/bin/nano and /usr/bin/rnano inside a chroot of the sliced rootfs (e.g. --version or --help with an assertion on the output); neither binary is left untested",
+      "max_score": 8
+    },
+    {
+      "name": "hermetic tests",
+      "description": "chisel-releases/tests/spread/integration/nano/task.yaml contains no apt-get/apt install, no unbounded loops, and no bare sleep calls",
+      "max_score": 2
+    },
+    {
+      "name": "one category per commit",
+      "description": "git log in chisel-releases/ shows a commit whose subject starts with 'feat(nano):' touching only slices/, followed by a separate commit starting with 'test(nano):' touching only tests/",
+      "max_score": 8
+    }
+  ]
+}

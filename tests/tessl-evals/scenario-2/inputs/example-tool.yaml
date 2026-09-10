@@ -1,0 +1,22 @@
+package: example-tool
+
+essential:
+  example-tool_copyright:
+
+slices:
+  bin:
+    contents:
+      /usr/share/man/man1/example-tool.1.gz:
+      /usr/bin/example-helper:
+      /usr/bin/example-tool:
+      /usr/bin/extra-util: { arch: x86_64 }
+    essential:
+      libc6_libs:
+
+  license:
+    contents:
+      /usr/share/doc/example-tool/NOTICE.txt:
+
+  copyright:
+    contents:
+      /usr/share/doc/example-tool/copyright:

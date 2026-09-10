@@ -1,0 +1,4 @@
+{
+  "description": "SDF review with structured report",
+  "include": ["./inputs"]
+}

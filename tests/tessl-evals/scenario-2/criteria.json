@@ -1,0 +1,71 @@
+{
+  "context": "The agent reviews a pre-written SDF containing deliberate violations of chisel-releases conventions and produces a structured review report. Criteria check whether the agent correctly identifies each violation, classifies it at the right severity level, uses the prescribed report structure, and ends with the correct verdict.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "No false positives",
+      "description": "The report does NOT flag anything that is correct in the file as a violation: the map-form essential: syntax, the copyright slice being last, the /usr/bin/ paths, or the copyright path itself",
+      "max_score": 6
+    },
+    {
+      "name": "Fixes compose to a clean file",
+      "description": "Applying every fix the report proposes would yield an SDF with a 'bins' slice, bytewise-sorted contents, no man page, 'arch: amd64', and NOTICE.txt inside the copyright slice -- i.e. the fixes are concrete enough to act on and do not contradict each other",
+      "max_score": 6
+    },
+    {
+      "name": "bin slice naming violation found",
+      "description": "The report identifies that the slice is named `bin` instead of the required `bins`",
+      "max_score": 10
+    },
+    {
+      "name": "bin violation severity",
+      "description": "The `bin` naming violation is classified as blocking or should-fix (not a nit)",
+      "max_score": 6
+    },
+    {
+      "name": "Unsorted contents violation found",
+      "description": "The report identifies that `/usr/bin/example-helper` appears after `/usr/bin/example-tool` and is therefore out of bytewise (LC_COLLATE=C) sort order",
+      "max_score": 10
+    },
+    {
+      "name": "Unsorted contents severity",
+      "description": "The unsorted contents violation is classified as blocking (not merely should-fix or nit)",
+      "max_score": 6
+    },
+    {
+      "name": "Man page violation found",
+      "description": "The report identifies that `/usr/share/man/man1/example-tool.1.gz` is a man page and should be excluded by convention",
+      "max_score": 10
+    },
+    {
+      "name": "Wrong arch name violation found",
+      "description": "The report identifies that `x86_64` is used in an `arch:` field and must be replaced with the Debian name `amd64`",
+      "max_score": 10
+    },
+    {
+      "name": "Wrong arch name severity",
+      "description": "The wrong arch name violation is classified as blocking",
+      "max_score": 6
+    },
+    {
+      "name": "Separate license slice violation found",
+      "description": "The report identifies that the `license` slice is non-standard and that upstream legal files (NOTICE, LICENSE.txt) must go inside the `copyright` slice instead",
+      "max_score": 10
+    },
+    {
+      "name": "Report sections present",
+      "description": "`review-report.md` is organised into at least two severity-labelled sections (e.g. blocking, should-fix, or nits)",
+      "max_score": 8
+    },
+    {
+      "name": "Per-finding detail",
+      "description": "Each finding in `review-report.md` includes the slice name or file path, a description of what is wrong, and a concrete fix",
+      "max_score": 6
+    },
+    {
+      "name": "Verdict: request-changes",
+      "description": "`review-report.md` ends with an explicit verdict of `request-changes` (not `approve`)",
+      "max_score": 6
+    }
+  ]
+}

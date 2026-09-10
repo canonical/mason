@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent forward-ports a library slice across a format boundary (ubuntu-24.04 v1 -> ubuntu-26.04 v3). Every check inspects the artefacts: chisel-releases/slices/libestr0.yaml, chisel-releases/tests/spread/integration/libestr0/task.yaml, and git log in chisel-releases/.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Map-form essential (file-level)",
+      "description": "In chisel-releases/slices/libestr0.yaml, the file-level essential: block uses map syntax (e.g. 'libestr0_copyright:') not list syntax (e.g. '- libestr0_copyright')",
+      "max_score": 15
+    },
+    {
+      "name": "Map-form essential (slice-level)",
+      "description": "In chisel-releases/slices/libestr0.yaml, every per-slice essential: block uses map syntax (e.g. 'libc6_libs:') not list syntax (e.g. '- libc6_libs')",
+      "max_score": 15
+    },
+    {
+      "name": "Slice structure preserved",
+      "description": "chisel-releases/slices/libestr0.yaml contains exactly the same slice names as the source (libs and copyright), with no added or removed slices",
+      "max_score": 11
+    },
+    {
+      "name": "Copyright slice last",
+      "description": "In chisel-releases/slices/libestr0.yaml, the copyright slice appears after all other slices (it is the last entry under slices:)",
+      "max_score": 5
+    },
+    {
+      "name": "Spread test present",
+      "description": "The file chisel-releases/tests/spread/integration/libestr0/task.yaml exists",
+      "max_score": 10
+    },
+    {
+      "name": "Test exercises the libs slice",
+      "description": "chisel-releases/tests/spread/integration/libestr0/task.yaml contains a reference to libestr0_libs (installing or checking that slice)",
+      "max_score": 11
+    },
+    {
+      "name": "Test proves the library is real",
+      "description": "chisel-releases/tests/spread/integration/libestr0/task.yaml checks that libestr.so.0 is a valid ELF object (magic bytes, 'file', or 'readelf -h'), or loads it, rather than only 'test -f' as the 24.04 source test did",
+      "max_score": 8
+    },
+    {
+      "name": "First commit subject format",
+      "description": "git log in chisel-releases/ shows a commit whose subject starts with 'feat(libestr0):' (lowercase, colon, space)",
+      "max_score": 8
+    },
+    {
+      "name": "Second commit subject format",
+      "description": "git log in chisel-releases/ shows a separate commit whose subject starts with 'test(libestr0):' (lowercase, colon, space)",
+      "max_score": 8
+    },
+    {
+      "name": "Commit body explains the boundary",
+      "description": "The body of the feat(libestr0): commit in chisel-releases/ mentions the essential: syntax change from list (v1) to map (v3) as the adaptation made for the target format",
+      "max_score": 6
+    },
+    {
+      "name": "No PR opened",
+      "description": "No pull request was opened: no PR URL and no 'gh pr create' evidence anywhere in the working directory",
+      "max_score": 3
+    }
+  ]
+}
