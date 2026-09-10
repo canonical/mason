@@ -29,7 +29,7 @@ echo "helpers: [$(ls "$skill_root/scripts" 2>/dev/null | paste -sd, - | sed 's/,
 # what can you actually run here? the scripts degrade, but knowing upfront saves
 # wasted attempts (e.g. no chisel -> skip try-cut, lean on the install-slices CI).
 echo "tools:"
-for t in chisel dpkg-deb spread uv python3 git; do
+for t in chisel dpkg-deb file spread uv python3 git; do
     if command -v "$t" >/dev/null 2>&1; then
         # --version only. a bare "<tool> version" fallback would be a real
         # invocation -- spread would read spread.yaml and treat it as a job

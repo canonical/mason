@@ -51,6 +51,11 @@ if [[ ${#SLICES[@]} -eq 0 ]]; then
     usage
 fi
 
+if ! command -v chisel >/dev/null 2>&1; then
+    echo "chisel not installed; skipping the cut -- the install-slices CI check covers it" >&2
+    exit 0
+fi
+
 RELEASE="$(pwd)"
 ROOT="$(mktemp -d "${RELEASE}/chisel-root.XXXXXX")"
 cleanup() {
