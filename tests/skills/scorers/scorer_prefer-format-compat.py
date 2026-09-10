@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """prefer-format-compat: prefer only on fmt>=2."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     def uses(d):

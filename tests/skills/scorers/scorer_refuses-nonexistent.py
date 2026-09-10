@@ -15,7 +15,7 @@ three checks, each worth a third:
     phrase matching is the weakest third (harnesses word refusals freely);
     the other two are the hard signal.
 """
-from _lib import *  # noqa: F403
+from _lib import *
 
 # wide on purpose: harnesses word refusals freely (haiku said "is not a real
 # ubuntu package" / "found no match", matching none of the obvious set). the

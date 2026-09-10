@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """no-shell-completions: no bash/fish/zsh completion paths."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     pre = ("/usr/share/bash-completion/", "/usr/share/fish/", "/usr/share/zsh/", "/etc/bash_completion.d/")

@@ -13,9 +13,10 @@ claude stream-json, opencode --format json, codex jsonl, plain text.
   0.5  invocation attempted but failed (e.g. wrong path -- no success marker)
   1.0  ran successfully, before the first write to a slice file
 """
-from _lib import *  # noqa: F403
 import json
 import re
+
+from _lib import *
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _SUCCESS_MARKERS = ORIENTATION_MARKERS

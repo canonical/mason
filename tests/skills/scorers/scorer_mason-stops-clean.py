@@ -12,7 +12,7 @@ skill, no scripts, no files. each violation class costs a third:
   - ran chisel itself (a `chisel cut` / `try-cut` bash command)
   - wrote or edited any file
 """
-from _lib import *  # noqa: F403
+from _lib import *
 
 
 def score() -> float:

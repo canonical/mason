@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """essential-list-on-v1: on v1 branches, essential is a string list. NA otherwise."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     f_ = fmt()

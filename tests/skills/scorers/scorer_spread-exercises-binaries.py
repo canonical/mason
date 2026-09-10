@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """spread-exercises-binaries: spread bundle references the sliced binaries."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     bins: set[str] = set()

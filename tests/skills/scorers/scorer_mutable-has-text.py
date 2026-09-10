@@ -11,7 +11,8 @@ bare-extracted config files mutable (e.g. libpam-runtime's /etc/pam.d/common-*),
 so requiring an explicit text/copy would wrongly penalise them. It is rejected
 on a directory (make: true / trailing slash) and on a symlink.
 """
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     def f(t: str) -> float:

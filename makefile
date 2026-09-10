@@ -14,7 +14,7 @@ test:  ## Test the scripts and repo metadata (uvx pytest, pyyaml pulled in on th
 
 .PHONY: lint
 lint:  ## Lint python (ruff, version pinned by RUFF)
-	uvx $(RUFF) check scripts/ _shared/ skills/ tests/scripts/ tests/meta/
+	uvx $(RUFF) check scripts/ _shared/ skills/ tests/scripts/ tests/meta/ tests/skills/
 
 .PHONY: format
 format:  ## Format python in place (ruff, version pinned by RUFF)

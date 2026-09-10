@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """arch-format: arch: lists are sorted, lowercase, tidy."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     def f(t: str) -> float:

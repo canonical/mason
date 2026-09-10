@@ -4,9 +4,10 @@
 # dependencies = ["pyyaml"]
 # ///
 """no-man-pages: no man-page paths shipped."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
-    return avg(path_penalty(lambda p: p.startswith("/usr/share/man/") or p.startswith("/usr/man/")))
+    return avg(path_penalty(lambda p: p.startswith(("/usr/share/man/", "/usr/man/"))))
 
 emit(score)

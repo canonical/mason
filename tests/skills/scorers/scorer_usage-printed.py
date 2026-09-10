@@ -12,7 +12,7 @@ reading SKILL.md (which contains the block) must not count as printing it. on
 the plain-text fallback that distinction is lost; accepted, it only affects old
 opencode runs predating --format json.
 """
-from _lib import *  # noqa: F403
+from _lib import *
 
 # one phrase per load-bearing line of the usage block in
 # skills/mason/SKILL.md; drift there should fail here.

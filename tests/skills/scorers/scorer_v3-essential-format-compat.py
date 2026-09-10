@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """v3-essential-format-compat: v3-essential is a v1/v2 backport, obsolete on v3."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     f_ = fmt()

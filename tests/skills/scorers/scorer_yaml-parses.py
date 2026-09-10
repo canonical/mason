@@ -4,7 +4,8 @@
 # dependencies = ["pyyaml"]
 # ///
 """yaml-parses: each produced <target>.yaml parses."""
-from _lib import *  # noqa: F403
+from _lib import *
+
 
 def score() -> float:
     return avg(lambda t: 1.0 if produced(t) is not None else 0.0)

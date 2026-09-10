@@ -17,7 +17,7 @@ existence check -- any of the routes seen in live runs counts:
 
 binary: 1.0 if any check ran, 0.0 if none.
 """
-from _lib import *  # noqa: F403
+from _lib import *
 
 _CHECK_MARKERS = (
     "deb-list",

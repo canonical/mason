@@ -11,7 +11,7 @@ LICENSE / COPYING / AUTHORS ...), and the package's own doc dir shipped as a
 shared-copyright symlink (/usr/share/doc/<pkg>). Mirrors the skill's
 check-slice.py so the eval and the linter agree.
 """
-from _lib import *  # noqa: F403
+from _lib import *
 
 _LEGAL = {"COPYRIGHT", "NOTICE", "LICENSE", "LICENCE", "COPYING", "AUTHORS", "THIRDPARTYNOTICES", "THIRD-PARTY-NOTICES"}
 
@@ -33,7 +33,7 @@ def score() -> float:
             return True  # doc-dir symlink (shared copyright)
         return _is_legal(path.rstrip("/").rsplit("/", 1)[-1])
     return avg(path_penalty(
-        lambda p: p.startswith("/usr/share/doc/") or p.startswith("/usr/share/doc-base/") or p.startswith("/usr/share/lintian/"),
+        lambda p: p.startswith(("/usr/share/doc/", "/usr/share/doc-base/", "/usr/share/lintian/")),
         allow,
     ))
 

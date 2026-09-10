@@ -22,9 +22,10 @@ four transcript formats, tried in order:
   - plain text (stderr.log/stdout.log, ANSI): `$ <command>` blocks scanned for
     failure markers. fallback for old opencode runs predating --format json.
 """
-from _lib import *  # noqa: F403
 import json
 import re
+
+from _lib import *
 
 # substrings in chisel-cut output that mean the cut failed (case-insensitive).
 _FAIL = ("error:", "no content at", "cannot find", "not found", "panic", "usage:")

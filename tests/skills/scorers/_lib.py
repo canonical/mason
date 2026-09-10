@@ -22,17 +22,34 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
 
 __all__ = [
-    "OUT", "TASK", "NA", "emit", "avg", "produced", "expected",
-    "fmt", "iter_contents", "iter_bodies", "mutate_map",
-    "mutate_paths", "content_paths", "declared_binaries", "path_penalty",
-    "targets", "fmt_compat", "CANONICAL", "has_slices", "transcript",
+    "CANONICAL",
+    "NA",
     "ORIENTATION_MARKERS",
+    "OUT",
+    "TASK",
+    "avg",
+    "content_paths",
+    "declared_binaries",
+    "emit",
+    "expected",
+    "fmt",
+    "fmt_compat",
+    "has_slices",
+    "iter_bodies",
+    "iter_contents",
+    "mutate_map",
+    "mutate_paths",
+    "path_penalty",
+    "produced",
+    "targets",
+    "transcript",
 ]
 
 # lines orientation prints, spread through its output: harnesses truncate long
