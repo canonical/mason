@@ -415,7 +415,7 @@ def test_orientation_release_discovery() -> None:
         )
 
         r = subprocess.run(
-            ["bash", str(SCRIPTS / "orientation")],
+            [sys.executable, str(SCRIPTS / "orientation.py")],
             cwd=str(clone),
             capture_output=True,
             text=True,
@@ -512,4 +512,44 @@ def test_robustness() -> None:
             for tool in ("check-slice.py", "check-test.py", "scaffold-test.py"):
                 out = run(tool, write(d, name, text))
                 assert "Traceback" not in out, f"{tool} crashed on {name}: {out}"
+
+
+def test_orientation_edge_cases() -> None:
+    # the port must keep the bash contract on inputs sed never tripped on: a
+    # block-style suites: list (per-line regexes, no bleed into the next line),
+    # a non-UTF-8 byte in a comment (no traceback), a dotfile in slices/ (not
+    # counted, as ls does not), and a cwd containing a double quote (escaped, so
+    # the first line still parses). remote discovery is pointed at a path that
+    # does not exist so the run is hermetic and fast.
+    import os
+
+    import yaml
+
+    with tempfile.TemporaryDirectory() as td:
+        d = Path(td) / 'q"d'
+        (d / "slices").mkdir(parents=True)
+        (d / "slices" / "foo.yaml").write_text("package: foo\n", encoding="utf-8")
+        (d / "slices" / ".gitkeep").write_text("", encoding="utf-8")
+        (d / "chisel.yaml").write_bytes(
+            b"format: v3\n# \xff\xfe not utf-8\narchives:\n  ubuntu:\n    version: '44.04'\n"
+            b"    suites:\n      - foo\n      - foo-updates\nmaintenance:\n  end-of-life: 2999-01-01\n"
+        )
+        env = {**os.environ, "CHISEL_RELEASES_URL": str(Path(td) / "nowhere")}
+        r = subprocess.run(
+            [sys.executable, str(SCRIPTS / "orientation.py")],
+            cwd=str(d),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        out = r.stdout + r.stderr
+        assert r.returncode == 0, out
+        doc = yaml.safe_load(out)
+        assert doc["working dir"].endswith('q"d'), out
+        assert doc["suites"] is None, out  # block list: nothing on the key's own line
+        assert doc["ubuntu version"] == "44.04", out
+        assert doc["maintained"] is True, out
+        assert doc["existing slices"] == 1, out
+        assert doc["live releases"] == {}, out
 

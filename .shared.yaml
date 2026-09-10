@@ -16,8 +16,8 @@ shared:
       path: kb/_upstream-sources.md
     conventional-commits.md:
       path: kb/_conventional-commits.md
-    orientation:
-      path: scripts/_orientation
+    orientation.py:
+      path: scripts/_orientation.py
     deb-list.py:
       path: scripts/_deb-list.py
     try-cut:
@@ -43,8 +43,8 @@ shared:
       path: kb/_spread-tests.md
     conventional-commits.md:
       path: kb/_conventional-commits.md
-    orientation:
-      path: scripts/_orientation
+    orientation.py:
+      path: scripts/_orientation.py
     check-slice.py:
       path: scripts/_check-slice.py
     check-test.py:
@@ -68,8 +68,8 @@ shared:
       path: kb/_chisel-cli.md
     conventional-commits.md:
       path: kb/_conventional-commits.md
-    orientation:
-      path: scripts/_orientation
+    orientation.py:
+      path: scripts/_orientation.py
     deb-list.py:
       path: scripts/_deb-list.py
     try-cut:
