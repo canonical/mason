@@ -33,6 +33,42 @@ NOTE: the `--ignore=unstable` / `--ignore=unmaintained` flags mean install-slice
 - **Layer 2 -- functionality**: `chroot` + commands prove the sliced rootfs actually works. This is what spread tests validate.
 
 Both layers are required. A slice that installs but doesn't function is rejected.
+When local tools or backends are unavailable, report that layer as unverified;
+static checks cannot substitute for it. The invoking skill's completion gate
+decides whether changes may be committed with that gap.
+
+## Required tests and static checks
+
+Every authored package, including pure-library and data-only packages, gets a
+`tests/spread/integration/<pkg>/task.yaml`. Test depth depends on the contents:
+
+- **Libraries:** check that the selected shared objects exist and are valid ELF.
+- **Data:** cut with a consumer slice and assert that it uses the shipped data
+  (for example, a TLS client verifying against the CA bundle). File existence
+  alone does not establish that the data works.
+- **Simple utilities:** test a representative operation as well as a version or
+  usage invocation.
+- **Applications and runtimes:** cover the selected functional areas. Use the
+  package's docs and upstream tests to identify checks, including runtime
+  lookups such as passwd entries, temporary directories, timezone and locale data.
+
+`_scaffold-test.py` emits starting points for each non-copyright slice. Replace
+every `TODO(author):` marker with real assertions or a justified representative
+test before treating the suite as finished. Globs and executable paths outside
+the recognised binary directories require manual inspection.
+
+`_check-test.py` validates basic task shape (a YAML mapping with non-empty
+`summary` and `execute` strings), checks for unfinished author markers and scans
+the execute script plus sibling shell helpers for explicit binary names. It
+excludes YAML metadata and shell comments. References in strings or uncalled
+helpers can still match; it does not prove execution, assertions, per-slice
+coverage or shell correctness. Run the suite and review its behaviour.
+
+- `warn`: missing or malformed task, unfinished scaffold, or no binary references.
+- `info`: partial references, no explicit binaries to scan, or shell text the
+  scanner cannot analyse. Review these gaps; they are not runtime results.
+- Exit status is advisory (`0` even with findings); inspect the reported
+  severities. A clean scan is not a passing spread run.
 
 ## Chroot environment patterns
 
@@ -49,8 +85,8 @@ Sliced rootfs is minimal. Tests that need more than bare files must set up the c
 
 - **Test real functionality**, not just file existence. A `bins` slice must prove its binaries actually work.
 - **Test each functional slice.** If a package ships `bins` and `scripts`, both need tests.
-- **One rootfs per test.** Call `install-slices` afresh for each test rather than reusing one rootfs -- leftover slices from an earlier test mask a missing dependency in a later one. This is a standard reviewer request.
-- **Every binary in a `bins` slice must be exercised.** Reviewers reject untested binaries. A binary you can't drive fully still gets a skeleton test proving the dynamic linker resolves it -- run it and grep for its own usage/error text, e.g. `chroot "$rootfs" /usr/lib/foo/helper 2>&1 | grep -Fiq "usage"`.
+- **Isolate slice installation sets.** Start with a fresh rootfs for each independently tested slice or intentional consumer combination. Several assertions may share that rootfs if they do not rely on state from earlier assertions. Start afresh when adding slices or when mutated state could hide a missing dependency.
+- **Exercise binaries meaningfully.** Cover each binary where practical; representative tests are appropriate for alternatives, multi-call binaries and large suites when the report explains the coverage choice. A binary that cannot be driven fully can still get a linker-resolves skeleton -- run it and assert its own usage/error text, e.g. `chroot "$rootfs" /usr/lib/foo/helper 2>&1 | grep -Fiq "usage"`. A binary name appearing in a file is not an execution check.
 - **Untestable means unshippable.** Reviewers push to drop rather than ship untested slices. For data-only slices the consumer pattern is the test -- "no binaries" never means "no test".
 - **Set up the chroot before weakening a test.** If a chroot command fails on missing `/dev/null`, `/bin/sh`, or DNS, fix the environment per the chroot patterns table above -- do not retreat to file-existence checks.
 - **Hermetic by default.** Generate inputs (secrets, digests, fixtures) inline; never apt-install extras into the test env. Exception: when the package's function IS the network path (CA bundles, TLS/http clients), hitting one stable well-known endpoint (e.g. `https://example.com`) is accepted upstream -- copy `resolv.conf` in per the chroot patterns table.

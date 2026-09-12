@@ -1,303 +1,215 @@
 ---
 name: chisel-slicer
 description: >-
-  Authors chisel slice definition files (SDFs) against canonical/chisel-releases.
-  Use when the user wants to slice an Ubuntu package or add a new SDF to the
-  release branch they are working on. Runs the full author + test + commit
-  workflow autonomously and returns a summary. Does NOT open PRs.
+  Authors and tests chisel slice definition files (SDFs) against
+  canonical/chisel-releases. Use when the user wants to slice an Ubuntu package
+  or add a new SDF to their release branch. Commits locally when authorised;
+  does not open PRs.
 ---
 
 # chisel-slicer
 
-You author slices against [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
+Author slices against the user's `canonical/chisel-releases` checkout.
 
-## rules
+## roots and boundaries
 
-- Run `scripts/_orientation.py` first, every time. It reports the checkout you
-  are in (`branch`, `ubuntu version`, `manifest format`), which tools this
-  machine has, and the live release set -- read off the machine rather than
-  guessed.
+- **Skill root** is the directory containing this `SKILL.md`. All `kb/` and
+  `scripts/` paths below belong to that directory, not the target repository.
+  Resolve helper paths from the loaded skill's location; keep the checkout as
+  the working directory. For example:
 
-- If orientation reports `release: null`, your working directory is not a
-  chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
-  clone one, and do not guess at a path.
+  ```bash
+  python3 "/absolute/path/to/chisel-slicer/scripts/_orientation.py"
+  ```
 
-- Author, test and commit slices locally. Do NOT open PRs unless explicitly asked by the user. When opening PRs please follow the upstream template.
+  In the remaining commands, replace `<skill-root>` with that absolute path.
+- **Checkout root** contains `chisel.yaml`, `slices/`, and `tests/spread/`.
+  Repository paths below are relative to it. Run orientation first. If it
+  reports `release: null`, stop and ask where the checkout is; do not clone one
+  or guess a path. Confirm the reported release matches the request.
+- Work on the checked-out branch and preserve unrelated changes. Commit only
+  when authorised by the user and allowed by the session's workflow. Leave PR
+  creation to the user.
+- Published slices are append-only. Change one only for a demonstrated need;
+  do not rename it or remove its effective cut contents. Subdivision is allowed
+  if the original slice depends on the new subslices and preserves its contents.
+  Before committing such changes, run
+  `"<skill-root>/scripts/_check-diff.py" --base <target-branch>` and investigate
+  warnings. The checker compares declared paths, so a valid subdivision still
+  needs a before/after cut comparison.
 
-- Existing slices are append-only. Modify a published slice only when you must: a bug, a missing dependency, an upstream packaging change. Never rename, or remove paths from one -- downstream consumers depend on the current layout. You *can* subslice an existing slice and add the new subslices back as dependencies as long as you dont change the final cut contents of the original slice. If you do change a slice, run `scripts/_check-diff.py --base <target-branch>` before committing; it catches slices and paths dropped by accident.
+## 1. validate the target
 
-## knowledge base
-
-- `kb/_chisel-cli.md`
-- `kb/_chisel-formats.md`
-- `kb/_conventional-commits.md`
-- `kb/_slice-conventions.md`
-- `kb/_slice-definition-format.md`
-- `kb/_spread-tests.md`
-- `kb/_upstream-sources.md`
-
-## Workflow
-
-Follow these steps in order. Do NOT skip steps.
-
-### Step 1: Validate
-
-```bash
-scripts/_deb-list.py <pkg>
-```
-
-Fetches the package from the archive for the release in `chisel.yaml` and prints its `Depends:`, every file with what `file(1)` makes of it, and the `postinst`. If it errors, the package is not in the Ubuntu (or Ubuntu Pro) archive -- stop and report; do not author anything. Keep the output: Steps 2 and 3 read from it.
-
-Then check `slices/<pkg>.yaml` does not already exist on the branch; if it does, stop and report. Branch, `manifest format` and `maintained` are in the orientation output; an unmaintained branch is frozen -- stop and report.
-
-### Step 2: Build the full dependency tree
-
-Build the whole tree before inspecting or designing anything. Slicing runs bottom-up: a package cannot reference slices that do not exist, so dependencies are sliced before the package that needs them. Only `Depends:` counts -- a `Recommends:` or `Suggests:` pulled in as a dependency is rejected by reviewers.
-
-1. **Get the full recursive dependency list.** Start from the `Depends:` line in the listing. Resolve it transitively with `apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances <package>` where apt is available; otherwise run `scripts/_deb-list.py` on each dependency and recurse.
-2. **Check which dependencies already have slices** on the target chisel-releases branch (`ls slices/ | sed 's/\.yaml$//'` or `chisel info --release <release> <dep> ...`).
-3. **Identify unsliced dependencies.** Produce an ordered list of packages that need slicing, sorted **leaves-first** (packages with no unsliced dependencies come first).
-4. **Record the plan** in your final report: the full dependency tree, which deps already have slices, which need new slices, and the slicing order (leaves first). Then proceed.
-
-### Step 3: Inspect each package
-
-For each package that needs slicing, leaves first, read its listing -- the root package's from Step 1, each dependency's via `scripts/_deb-list.py <dep> [arch]`, once per target arch when multiarch differences are plausible.
-
-Turning a listing into slice entries:
-
-- `symbolic link to <target>` -- the deb ships the symlink, so a bare path entry suffices. Chisel preserves deb symlinks; an explicit `symlink:` is only for paths the deb does *not* ship.
-- `ELF ... executable` and `... script` under a bin dir go in `bins`; `ELF ... shared object` in `libs`; the rest in `config`/`data` as appropriate.
-- `mode:` only for a non-standard permission (not `0644`/`0755`/`0777`), and never on a glob -- wildcard entries accept only `until:`/`arch:`, anything else is a parse error. Name the file explicitly instead.
-- **Ignore the clutter.** Man pages, shell completions, `/usr/share/doc/**`, changelogs and examples are excluded by convention (see "Exclude by Default" in `kb/_slice-conventions.md`). Under `/usr/share/doc/` ship only legal files -- `copyright`, plus `NOTICE`/`LICENSE`-type notices where present.
-
-Then do the analysis the file list can't do for you:
-
-- **Maintainer scripts.** Chisel never runs them. The listing ends with the `postinst` body; whatever it does -- create symlinks, generate files, register alternatives -- you reproduce as `contents` declarations for simple cases or `mutate:` for logic. `update-alternatives`, `ldconfig` and `update-mime-database` calls have no effect in a chisel rootfs: drop the dep or write the `mutate:` equivalent.
-- **Binaries.** Resolve shared-library deps (`ldd` / `lddtree`) and list every provider explicitly in `essential:`, even ones that would arrive transitively -- reviewers run `lddtree` on emulated arches too and reject a `bins`/`libs` slice missing any. Usual suspects: `libc6_libs`, `libgcc-s1_libs`, `libstdc++6_libs`.
-- **Source package.** Read it for runtime lookups the file list doesn't reveal: config paths, data directories, plugin dirs, hardcoded paths, and which deps are genuinely optional.
-
-### Step 4: Match the existing slices
-
-Before designing new slices, study existing SDFs on the target branch.
-
-1. **Read representative SDFs** for similar packages. Use `slices/bash.yaml`, `slices/base-files.yaml`, `slices/openssl.yaml`, `slices/dpkg.yaml` as references.
-2. **Follow naming conventions** from `kb/_slice-conventions.md` (Canonical Slice Names table). Use `libs` not `lib`, `bins` not `bin` (the table notes the rare `base-files`-style exceptions).
-3. **Check shared dependencies.** If the target package depends on packages with multiple slices (e.g. `libc6_libs`, `libc6_config`), determine which _specific_ slice is needed. Do not over-depend.
-4. **Verify no path conflicts.** Multiple slices from different packages can declare the same path ONLY if:
-   - Both slices are in the same package, OR
-   - The path is not extracted from a package (e.g. `{make: true}`, `{text: ...}`) and the inline definitions match exactly
-
-   Search existing slices: `grep -r "/path/you/want" slices/`
-5. **Need a slimmer variant?** Add a new slice (`core`, `minimal`, ...). Never carve paths out of a published one.
-
-### Step 5: Design the slices
-
-Pick one approach per SDF and stick to it. Slice names come from the Canonical Slice Names table in `kb/_slice-conventions.md`.
-
-**A -- by type of content.** The default, and right for most packages: `copyright` (mandatory), `bins`, `libs`, `config`, then `data` / `scripts` / `var` as needed.
-
-**B -- by function.** For packages with distinct functional subsets (a language's standard library, a large runtime): `core` as the minimum-functional subset, `standard` above it, then named slices like `file-formats`, `networking`, `crypto`.
-
-### Step 6: Write the SDF
-
-Write it from the Step 3 listing. Group the files per the approach chosen in Step 5, drop the clutter, glob multiarch lib dirs as `*-linux-*`, and give every slice its `essential:` -- cross-package deps from `Depends:`, and intra-package ones too: a `bins` slice that needs the package's own config lists `<package-name>_config`, as `bash.yaml` and `vim-tiny.yaml` do. Reproduce maintainer-script effects, and restructure into functional slices (`core`/`standard`/...) for complex packages. The target shape (list-form `essential:` -- v1/v2 branches):
-
-```yaml
-package: <package-name>
-
-essential:
-  - <package-name>_copyright
-
-slices:
-  bins:
-    essential:
-      - <dep-package>_libs
-      - <package-name>_config
-    contents:
-      /usr/bin/<binary>:
-
-  config:
-    contents:
-      /etc/<package>/config-file:
-
-  copyright:
-    contents:
-      /usr/share/doc/<package-name>/copyright:
-```
-
-**On a v3 branch (e.g. `ubuntu-26.04`, `ubuntu-26.10`) every `essential:` must be a map, not a list** -- `chisel cut` rejects the list form with _"essential expects a map"_. `format:` decides exactly this and nothing else: `hint:` and `prefer:` are gated by the chisel binary's version, not the format, and follow branch convention (v3+ / v2+ in practice) -- see the schema versions table in `kb/_chisel-formats.md`. Same shape, map keys:
-
-```yaml
-essential:
-  <package-name>_copyright:
-
-slices:
-  bins:
-    essential:
-      <dep-package>_libs:
-      <package-name>_config:
-```
-
-Key rules:
-- `package:` must match the filename stem
-- File-level `essential:` lists `<pkg>_copyright` so every slice transitively ships it
-- `copyright` slice placed **last** by convention
-- One SDF per package. Never put two packages in one YAML file
-
-#### Upstream legal files
-
-Upstream `LICENSE.txt`, `NOTICE`, `ThirdPartyNotices.txt` are not the deb copyright, but they do not get their own slice -- no SDF in chisel-releases has a `license` or `notice` slice. Ship them **inside** the `copyright` slice, alongside `/usr/share/doc/<pkg>/copyright` (see `apache2-bin`, `dotnet-host-10.0`, `aspnetcore-runtime-10.0`).
-
-### Step 7: Lint and self-check
-
-Run the bundled linter rather than eyeballing the rules:
+Read the orientation output for the release, maintenance status, manifest format
+and available tools. Stop on an unmaintained branch or an existing
+`slices/<pkg>.yaml`; report the conflict before authoring a new SDF.
 
 ```bash
-scripts/_check-slice.py slices/<package>.yaml
+python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
 ```
 
-It reads `format:` from `./chisel.yaml` (override with `--format N` / `--branch ubuntu-XX.XX`) and grades findings `block` (CI or parse failure), `warn` (reviewers reject) and `info` (nit). **Fix every `block`, and every `warn` you cannot justify.**
+Keep the output for inspection. The helper lists a public Ubuntu archive package's
+version, dependencies, file types and `postinst`. It needs `dpkg-deb`; without
+`file(1)` it says so in its header and uses the bundled `_file.py`, which knows
+ELF, scripts, links, compressed data and text but not versions or build ids.
+Exit `1` means the package was absent from all public indexes checked for that
+suite and architecture; exit `2` means verification failed (`dpkg-deb`, manifest,
+network, index or extraction error). Stop on either non-zero result and report
+which outcome occurred.
+Neither establishes absence from Ubuntu Pro. The helper cannot authenticate to
+Pro archives or reproduce arbitrary archive configuration. For those targets,
+inspect the package through an already authorised archive setup; if unavailable,
+report the access limitation and stop. Never invent contents from a failed lookup.
 
-It mechanically owns sorting (contents paths and `essential` entries, bytewise ASCII -- CI checks with `LC_COLLATE=C sort -C`), slice-name validity, absolute paths, duplicate contents keys, arch names, clutter exclusions, copyright presence, the version-gated fields (`hint`/`prefer`/`v3-essential`/essential shape) and `hint:` length. Don't restate its work by hand.
+## 2. inspect the requested functionality
 
-Three things it cannot judge, which you apply yourself from the File Layout and Path Entry Style sections of `kb/_slice-conventions.md`:
+Inspect the root package before expanding dependencies. Establish the runtime
+functionality to ship from the request and package contents; exclude speculative
+features. Repeat this inspection for each required unsliced dependency.
 
-1. **File layout** -- global `essential:` immediately after `package:`, `copyright` slice last.
-2. **Path style** -- multiarch `*-linux-*` globs, no trailing `*` on single-version sonames, major.minor-only version globs, narrow globs, inline option maps, comments on explicit symlinks. Before declaring a path more than one package could own, `grep -r "/shared/path" slices/`.
-3. **yamllint** (`.github/yamllint.yaml`, on `main`) -- 2-space indent, lines <= 100 chars, one consecutive blank line at most, comments aligned to content, at most one space inside `{ }`/`[ ]`.
+- Use the listing for paths, types, modes and shipped symlinks. Inspect each
+  target architecture when layouts or dependencies differ.
+- Read `postinst` and relevant source code for generated files, alternatives,
+  config/data/plugin lookups and optional features. Chisel does not run package
+  maintainer scripts: reproduce required effects with contents declarations or
+  `mutate:`, and omit install-time work that has no runtime purpose.
+- Resolve shared libraries against the target release and architecture, using
+  `lddtree` or a suitable target environment. Do not use host library resolution
+  as evidence for another release or architecture. List needed providers
+  explicitly in `essential:`, including providers that also arrive transitively.
 
-### Step 8: Test
+## 3. resolve the required dependency graph
 
-**Every package gets a spread test at `tests/spread/integration/<package>/task.yaml`** -- upstream ships one even for pure-library and data-only packages (`ca-certificates`, `base-passwd`, `fontconfig`). The package kind below sets test *depth*, never whether the file exists.
+Use `Depends:` and `Pre-Depends:` as candidates, then retain the runtime needs
+identified above. Do not automatically slice every package dependency, or add
+`Recommends:` / `Suggests:` without evidence that selected functionality needs it.
 
-**Testing blocks commit.** A `feat:` slice and its `test:` tests are one series -- never commit the slice alone. Not being able to *run* the tests here does not block anything: most machines have no spread or lxd, and `_orientation.py` tells you up front. Write the test file regardless, verify its shape with `_check-test.py`, commit, and say in your report that spread did not run locally. The only infeasible case is a package whose slices cannot be exercised at all -- then leave the slice uncommitted and report why.
+1. Match each retained dependency to specific slices in the target checkout.
+   A package having an SDF does not prove it ships the needed files. Inspect its
+   slices; reuse sufficient ones and expand only missing runtime functionality.
+2. Resolve alternatives (`a | b`) to a suitable concrete provider, respecting
+   version and architecture constraints. Resolve virtual names through provider
+   metadata; do not treat them as downloadable package names. Record the choice.
+3. Use apt metadata only after confirming its suites, components and architecture
+   match the target manifest. Otherwise use target archive metadata and the
+   package listings. A recursive `apt-cache depends` dump is discovery input,
+   not a resolved slice plan. If provider metadata is unavailable, report the
+   unresolved edge rather than guessing.
+4. Track visited packages and dependency edges. Inspect each required unsliced
+   package before recursing. Detect cycles instead of recursing indefinitely:
+   discard only edges shown to be install-time or outside selected functionality.
+   If a required slice cycle remains, stop and report it for design resolution.
+5. Record the retained graph, existing slices reused, new slices needed, and
+   significant exclusions with reasons. Author dependencies before their consumers
+   once the graph is resolved; update the plan if inspection finds another need.
 
-If `_orientation.py` reported `chisel: {present: false}`, skip the cut -- the `install-slices` CI check proves installability on the PR -- and note in your report that it was not verified locally. Otherwise, prove the cut succeeds first. `scripts/_try-cut [--arch ARCH] <package>_<slice>` handles the temp root and removes it on exit, so it checks installability only. To poke around the rootfs instead, cut by hand:
+Dependency field semantics: [Debian package relationships](https://www.debian.org/doc/debian-policy/ch-relationships.html).
+
+## 4. design and write
+
+Read representative SDFs from the target checkout: `bash`, `base-files`, `openssl`
+and `dpkg`, choosing those relevant to the package. Read these references before
+writing:
+
+- `kb/_slice-conventions.md`: naming, grouping, legal files, exclusions, path
+  style and file layout.
+- `kb/_chisel-formats.md`: fields supported by the manifest format and installed
+  chisel version. Use the actual format, not a release-name guess.
+- `kb/_slice-definition-format.md`: contents options, essentials, conflicts and
+  mutation semantics; consult the relevant sections for the design.
+
+Write only inspected paths. Wire both cross-package dependencies and required
+siblings (for example, a binary needing its own package's config). Search existing
+SDFs for shared paths before declaring them; check conflicts with an actual cut.
+
+## 5. lint and test
+
+For every new or modified SDF:
 
 ```bash
-mkdir rootfs/
-chisel cut --ignore=unstable --ignore=unmaintained --release ./ --root rootfs/ <package>_<slice>
+"<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
 ```
 
-Then scaffold the suite rather than starting from a blank file:
+Fix every `block` and every unjustified `warn`. The helper covers mechanical SDF
+rules; review layout and path style against `kb/_slice-conventions.md` and run
+the target repository's applicable lint checks as well.
+
+Read `kb/_spread-tests.md` before writing tests. It owns test depth, representative
+coverage, rootfs isolation and interpretation of static checks. Scaffold only a
+new test file; preserve existing tests:
 
 ```bash
-scripts/_scaffold-test.py slices/<package>.yaml > tests/spread/integration/<package>/task.yaml
+mkdir -p tests/spread/integration/<pkg>
+"<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
 ```
 
-It emits a fresh rootfs per slice and a `chroot` line per declared binary, so coverage is complete by construction:
-
-```yaml
-summary: Integration tests for <package>
-
-execute: |
-  # <package>_bins: fresh rootfs so a missing dep can't hide behind another test.
-  rootfs="$(install-slices <package>_bins)"
-  chroot "$rootfs" <command> --version  # replace with a real functional check
-```
-
-Replacing those placeholders is the actual work, and how deep you go depends on the package:
-
-- **Library** (`libssl3`): `.so` files exist and are valid ELF. Minimal depth is fine -- but the task.yaml still exists.
-- **Data-only** (certificate stores, locale data, fonts): install the slice **with a consumer slice** and prove the consumer uses the data -- a TLS client verifying against the shipped CA bundle, a renderer loading the font. File-existence checks alone are weak.
-- **Simple utility** (`grep`, `sed`): `--version` plus one representative functional test.
-- **Application** (`python3`, `nginx`, `curl`, `git`): thorough suite. Read the package docs and the upstream test suite (`test*/`, `tests/`, `t/` in the source package), give each key functional area at least one test, and check runtime lookups (`/etc/passwd`, `/tmp`, timezone and locale data).
-
-The design principles and the recurring review nits are in `kb/_spread-tests.md` -- read them before writing the suite, not after review.
-
-Run with `spread lxd:tests/spread/integration/<package>`, then check coverage deterministically:
+Replace the scaffold's author placeholders with checks that satisfy the testing
+policy. It is a starting point, not proof of coverage. The test file is always
+written: spread not being runnable here is reported at the gate as an
+unavailable run, never as a reason to leave the file out. Then run:
 
 ```bash
-scripts/_check-test.py slices/<package>.yaml
+"<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
 ```
 
-It `warn`s when there's no test, or a test that exercises no binaries -- fix those before committing. Partial coverage is `info` plus the list of untested binaries: add a check, or at least a linker-resolves skeleton, for each you reasonably can. Full coverage isn't demanded; alternatives symlinks, multi-call binaries and big suites are fine tested representatively.
-
-### Step 9: Verify against docs
-
-Cross-reference the SDF against the official chisel documentation before committing -- landing first and finding the divergence after means an avoidable amend.
+Run a cut for each independently usable new slice when chisel is available:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/how-to/slice-a-package.md
-curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/reference/chisel-releases/slice-definitions.md
-curl -fsSL https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/reference/chisel-releases/chisel.yaml.md
+"<skill-root>/scripts/_try-cut" --arch <arch> <pkg>_<slice>
+spread lxd:tests/spread/integration/<pkg>
 ```
 
-Check for undocumented fields or patterns, a design that contradicts a documented recommendation, and features the branch's `format:` cannot support. Fix what you find; report deliberate divergence. If `chisel cut` itself behaved differently from the docs -- a field ignored, a wildcard that didn't match -- say so: the tool source (`internal/setup/setup.go`) is the ultimate arbiter.
+`_try-cut` removes its temporary rootfs on exit and proves installability only.
+For rootfs inspection use the manual cut commands in `kb/_chisel-cli.md`. The cut
+reads the checkout (`--release ./`) and the Ubuntu archive; a denied or failed
+request to the upstream chisel-releases repository says nothing about it, so a
+403 from `chisel info` or `git ls-remote` is not a reason to skip the cut. Run
+spread when its backend is usable; orientation reports executables, not backend
+readiness. Classify each required check using the completion gate below.
 
-`kb/_upstream-sources.md` has the remaining pages, the raw-URL pattern, and the precedence rule for when two docs disagree. If the fetches fail (offline or egress-restricted), skip this step, lean on `kb/` plus `check-slice.py`, and note the skip in your report.
+## 6. verify against upstream
 
-### Step 10: Commit
+Before completion, consult the official slicing guide and the SDF/manifest
+references through `kb/_upstream-sources.md`. Check fields, design choices and
+branch compatibility. Fix discrepancies or document justified divergence using
+that reference's source precedence. If documentation is unreachable, record the
+check as unavailable and use the bundled references; do not claim live verification.
 
-**Preconditions**, all of them: `_check-slice.py` reports no `block`, `_check-test.py` reports no `warn`, `tests/spread/integration/<pkg>/task.yaml` exists and passes, and Step 9 left no unresolved discrepancy. Any of those failing means stop, not commit.
+## 7. completion and commit gate
 
-One category per commit, both landing before you stop:
+Record each applicable lint, static test check, cut, spread run and documentation
+check as **passed**, **failed** or **unavailable**, with evidence or a reason.
 
-```bash
-git -C <repo> commit -m "feat(<pkg>): add <slice-list> slices"   # the SDF(s)
-git -C <repo> commit -m "test(<pkg>): add integration tests"     # the spread test(s)
-```
+- **Passed:** the check ran and met its acceptance criteria. Static checks do not
+  establish runtime success.
+- **Failed:** malformed or missing tests, unfinished scaffold markers, SDF blocks,
+  unjustified SDF warnings, test-check warnings, unresolved documentation conflicts,
+  or observed cut/spread failures. Fix these before committing. If no fix is
+  possible in scope, leave changes uncommitted and report the failure.
+- **Unavailable:** a required tool, backend, archive or documentation endpoint
+  could not be used. Report the exact missing verification and command to run.
+  Do not relabel a product failure as unavailable. Leave changes uncommitted
+  unless the user and session workflow permit commits with that verification
+  gap. Continue writing and statically checking tests even when spread cannot run.
 
-Messages follow `kb/_conventional-commits.md`.
+Apply this gate and the shared testing policy to every package added or changed,
+including dependencies. Review assertions and coverage before declaring tests
+finished.
 
-**Stop here. The user opens the PR themselves.**
+When commits are authorised and the gate permits them, stage only task-owned
+changes. Follow `kb/_conventional-commits.md` for messages and category separation.
+Prepare both SDF and test changes before committing either; complete the series
+before reporting success. Otherwise hand over the uncommitted changes.
 
----
+## final report
 
-## Final report
+Respond to the user for direct invocation, or to the parent agent when delegated.
+Summarise:
 
-Return a concise summary to the caller (this is your output -- it is not shown to the user as chat). Include:
-- which SDFs you created/changed and the slice breakdown
-- the dependency tree and slicing order, with any new dependency slices created
-- tests written and their pass/fail status
-- decisions made at points that would have needed confirmation, with rationale
-- open questions or risks the user should resolve before opening a PR
+- SDFs created or changed and their slice breakdown.
+- Required dependency graph, reused slices, new dependencies and authoring order.
+- Checks passed, failed or unavailable; representative coverage choices and gaps.
+- Commit hashes, or why changes remain uncommitted.
+- Remaining decisions or risks before the user opens a PR.
 
-Do NOT dump full file contents or raw command output -- summarise.
-
----
-
-## Reference examples
-
-Read live SDFs from the checkout -- canonical, and they can't go stale:
-
-- **simple binary package**: `slices/vim-tiny.yaml` (bins + config + copyright)
-- **library package**: `slices/libc6.yaml` (multiarch lib globs, arch-gated entries)
-- **multi-slice package**: `slices/dpkg.yaml` (bins/config/tables/var split)
-- **mutate scripts in the wild**: `grep -l "mutate:" slices/*.yaml` (e.g. `slices/apt.yaml`, `slices/libpam-runtime.yaml`)
-
-The one non-obvious shape worth showing -- the `mutate:` + `until: mutate` + `mutable:` triad for a file that must be *generated* from shipped inputs (schematic, not a real package):
-
-```yaml
-package: foo
-
-essential:
-  - foo_copyright
-
-slices:
-  data:
-    contents:
-      /etc/foo/merged.conf: {text: FIXME, mutable: true}   # placeholder, rewritten by mutate
-      /usr/share/foo/conf.d/: {until: mutate}              # inputs: present for the script,
-      /usr/share/foo/conf.d/**: {until: mutate}            # removed from the final rootfs
-    mutate: |
-      dir = "/usr/share/foo/conf.d/"
-      parts = [content.read(dir + p) for p in content.list(dir)]
-      content.write("/etc/foo/merged.conf", "".join(parts))
-
-  copyright:
-    contents:
-      /usr/share/doc/foo/copyright:
-```
-
----
-
-## Common pitfalls
-
-The ones with no step of their own:
-
-1. **Ignoring architecture differences.** Use `{arch: ...}` for arch-specific paths -- inspect each target arch with `deb-list.py <pkg> <arch>` before assuming one layout.
-2. **Adding speculative slices.** Only ship slices that are needed and testable. Speculative slices are rejected.
-3. **Use-case-specific comments.** Comments like "this slice exists for app X" are rejected. Describe what the slice ships.
-4. **Over-including "to be safe".** If a dep or path isn't demonstrably needed, leave it out (add a one-line comment noting why). Reviewers prune speculative deps.
-5. **Shipping config for a tool that isn't sliced.** A config file for a program not in chisel-releases (e.g. a `logrotate` drop-in when `logrotate` isn't sliced) is dead weight -- drop it.
+Keep the report concise; do not dump file contents or raw logs.

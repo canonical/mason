@@ -79,6 +79,28 @@ This is a chisel-releases CI gate, not a chisel parse error -- the parser decode
 - For merging/transforming existing files -- **not synthesis**. If a binary needs file `F`, ship `F` from the deb.
 - `until: mutate` partner: file available to the script, deleted post-mutate.
 
+For a generated file, declare a mutable placeholder and keep its shipped inputs
+until mutation. For example (v3 essential shape; use a list on v1/v2):
+
+```yaml
+package: foo
+essential:
+  foo_copyright:
+slices:
+  data:
+    contents:
+      /etc/foo/merged.conf: {text: "", mutable: true}
+      /usr/share/foo/conf.d/: {until: mutate}
+      /usr/share/foo/conf.d/**: {until: mutate}
+    mutate: |
+      dir = "/usr/share/foo/conf.d/"
+      parts = [content.read(dir + p) for p in content.list(dir)]
+      content.write("/etc/foo/merged.conf", "".join(parts))
+  copyright:
+    contents:
+      /usr/share/doc/foo/copyright:
+```
+
 ## Arch-gated Essentials
 
 Some deps only apply on certain arches. How you express that depends on the branch's `chisel.yaml` `format:`:

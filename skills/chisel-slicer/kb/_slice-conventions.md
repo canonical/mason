@@ -2,6 +2,16 @@
 
 Conventions the chisel-releases reviewers enforce on Slice Definition Files (SDFs). These are not parse errors -- chisel accepts any well-formed slice name -- but a PR that ignores them is rejected.
 
+## Grouping
+
+Group by content type for ordinary packages: executables, libraries, config and
+data. For large runtimes or packages with distinct functional subsets, use a
+minimum-functional `core`, a fuller `standard`, and named subsets as needed.
+Choose a coherent scheme per SDF and ship only functionality that can be tested.
+Do not include configuration for a tool that is not sliced, such as a logrotate
+drop-in without logrotate. Describe what a slice ships, not which application
+prompted its creation.
+
 ## Canonical Slice Names
 
 Names are convention but reviewers enforce them. The counts below are how many SDFs on `ubuntu-26.04` use each name, as a rough signal of how established it is; a name is not wrong for being rare, but a rare one wants a reason.
@@ -50,6 +60,8 @@ Conventions on how a `contents:` path is written. Chisel accepts either form; re
 ## File Layout
 
 - Global `essential:` at the top of the file, right after `package:`.
+- Include `<pkg>_copyright` in the global `essential:` so every slice ships the
+  package's legal files.
 - The `copyright` slice last in the `slices:` block.
 - `package:` matches the filename stem -- `slices/foo.yaml` -> `package: foo`.
 - One SDF per package. Never two packages in one YAML file.
