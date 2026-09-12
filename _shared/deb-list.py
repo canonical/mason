@@ -9,30 +9,43 @@ Usage: deb-list.py <package> [arch]
 
 Output:
   - package header (name, version, arch)
-  - Depends: line for wiring essential: entries
+  - Depends: and Pre-Depends: candidates for runtime dependency inspection
   - non-directory files, lexicographically sorted: octal mode, owner and path,
     then what file(1) makes of it on the next line (ELF binary, shell script,
     symbolic link to <target>, gzip data, ASCII text, ...)
   - the postinst script in full, if the package has one -- chisel never runs
     it, so whatever it does is yours to reproduce or drop
 
-Requirements: dpkg-deb, file, python3, and network access to the ubuntu mirror
+Requirements: dpkg-deb, python3, and network access to the ubuntu mirror. file(1)
+gives the per-file type line; without it the bundled file.py stands in with
+less detail (no ELF version/BuildID, no timestamps) and the header says so.
 (archive.ubuntu.com / ports.ubuntu.com). No sudo, no apt, no populated apt
 cache: the .deb is fetched straight from the mirror's Packages index.
+Only public mirrors are supported, not authenticated Ubuntu Pro archives or
+arbitrary manifest archive configuration. The first matching package in the
+updates/security/base search is inspected; this is not chisel's version resolver.
 Note: the release suite is read from ./chisel.yaml -- run from a chisel-releases
       checkout (or a dir whose chisel.yaml names the suite).
+
+Exit codes: 0 listed; 1 absent from all public indexes checked; 2 verification
+unavailable or failed (tools, manifest, network, indexes or extraction).
 """
 
 import gzip
 import io
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import urllib.request
+import zlib
 from pathlib import Path
 
-# Only install-time scripts matter for slice authoring; remove scripts are irrelevant.
+
+class ArchiveError(Exception):
+    """The archive lookup could not establish a package result."""
+
 
 def perms_to_octal(perms):
     """Convert symbolic permissions string (e.g. -rwsr-xr-x) to octal (e.g. 4755).
@@ -104,52 +117,66 @@ def _fetch(url):
         req = urllib.request.Request(url, headers={"User-Agent": _UA})
         with urllib.request.urlopen(req, timeout=60) as resp:
             return resp.read()
-    except OSError:
-        return None
+    except OSError as e:
+        raise ArchiveError(f"could not fetch {url}: {e}") from e
 
 
 def _filename_from_packages(data, pkg):
     """Find pkg's `Filename:` (pool path) in a gzipped Packages index blob."""
     try:
         text = gzip.GzipFile(fileobj=io.BytesIO(data)).read().decode("utf-8", "replace")
-    except (OSError, EOFError):
-        return None
+    except (OSError, EOFError, zlib.error) as e:
+        raise ArchiveError(f"invalid Packages index: {e}") from e
     cur = {}
-    for line in text.splitlines():
-        if not line:
+    for line in text.splitlines() + [""]:
+        if not line.strip():
+            if cur and not cur.get("Package"):
+                raise ArchiveError(
+                    "invalid Packages index: record has no Package field"
+                )
             if cur.get("Package") == pkg:
-                return cur.get("Filename")
+                if not cur.get("Filename"):
+                    raise ArchiveError(f"Packages entry for {pkg} has no Filename")
+                return cur["Filename"]
             cur = {}
-        elif ":" in line and not line.startswith(" "):
-            k, _, v = line.partition(":")
+        elif not line.startswith((" ", "\t")):
+            k, separator, v = line.partition(":")
+            if not separator or not k or any(c.isspace() for c in k):
+                raise ArchiveError("invalid Packages index: malformed field")
             cur[k] = v.strip()
-    return cur.get("Filename") if cur.get("Package") == pkg else None
+    return None
 
 
 def download_deb(pkg, arch, suite, workdir):
     """Fetch pkg's .deb straight from the mirror: walk the Packages indexes for
     suite{,-updates,-security} x components, resolve Filename, download it."""
     base = arch_base_url(arch)
+    failures = []
     for try_suite in (f"{suite}-updates", f"{suite}-security", suite):
         for comp in _COMPONENTS:
-            data = _fetch(f"{base}/dists/{try_suite}/{comp}/binary-{arch}/Packages.gz")
-            if data is None:
+            url = f"{base}/dists/{try_suite}/{comp}/binary-{arch}/Packages.gz"
+            try:
+                filename = _filename_from_packages(_fetch(url), pkg)
+            except ArchiveError as e:
+                failures.append(f"{url}: {e}")
                 continue
-            filename = _filename_from_packages(data, pkg)
             if not filename:
                 continue
             deb = _fetch(f"{base}/{filename}")
-            if deb is None:
-                return None
             dest = Path(workdir) / Path(filename).name
             dest.write_bytes(deb)
             return dest
+    if failures:
+        raise ArchiveError(
+            f"package absence not established; {len(failures)} index lookups failed; "
+            f"first failure: {failures[0]}"
+        )
     return None
 
 
 def deb_field(deb_path, field):
-    result = run(["dpkg-deb", "-f", str(deb_path), field], capture=True, check=False)
-    return result.stdout.strip() if result.returncode == 0 else ""
+    result = run(["dpkg-deb", "-f", str(deb_path), field], capture=True)
+    return result.stdout.strip()
 
 
 def deb_contents(deb_path):
@@ -197,8 +224,20 @@ def deb_postinst(deb_path, workdir):
     return path.read_text() if path.exists() else None
 
 
-def file_descriptions(deb_path, workdir, paths):
-    """file(1) output for each path, in order. Symlinks are described, not followed."""
+def file_command():
+    """file(1) if installed, else the bundled reduced-capacity file.py next to
+    this script (synced into a skill as _file.py, kept as file.py in _shared)."""
+    if shutil.which("file"):
+        return ["file"]
+    here = Path(__file__).resolve().parent
+    for name in ("_file.py", "file.py"):
+        if (here / name).exists():
+            return [sys.executable, str(here / name)]
+    return None
+
+
+def file_descriptions(deb_path, workdir, paths, file_cmd):
+    """file(1)-style line for each path, in order. Symlinks are described, not followed."""
     root = Path(workdir) / "root"
     root.mkdir()
     run(["dpkg-deb", "-x", str(deb_path), str(root)], capture=True)
@@ -206,7 +245,7 @@ def file_descriptions(deb_path, workdir, paths):
     # chunked: a big package (python3.x, perl) runs past ARG_MAX in one go.
     for i in range(0, len(paths), 500):
         chunk = [str(root) + p for p in paths[i : i + 500]]
-        result = run(["file", "-bh", "--", *chunk], capture=True)
+        result = run([*file_cmd, "-bh", "--", *chunk], capture=True)
         out += result.stdout.splitlines()
     return out
 
@@ -214,9 +253,17 @@ def file_descriptions(deb_path, workdir, paths):
 def main():
     args = sys.argv[1:]
 
-    if not args:
+    if len(args) not in (1, 2):
         print("usage: deb-list.py <package> [arch]", file=sys.stderr)
-        sys.exit(1)
+        return 2
+
+    if not shutil.which("dpkg-deb"):
+        print("error: verification unavailable; missing tools: dpkg-deb", file=sys.stderr)
+        return 2
+    file_cmd = file_command()
+    if not file_cmd:
+        print("error: verification unavailable; neither file(1) nor the bundled file.py found", file=sys.stderr)
+        return 2
 
     pkg = args[0]
     arch = args[1] if len(args) > 1 else host_arch()
@@ -228,31 +275,35 @@ def main():
             file=sys.stderr,
         )
         print("hint:  run deb-list.py from a chisel-releases checkout", file=sys.stderr)
-        sys.exit(1)
+        return 2
 
     with tempfile.TemporaryDirectory() as workdir:
         deb = download_deb(pkg, arch, suite, workdir)
         if not deb:
             print(
-                f"error: {pkg} (arch {arch}) not found on the mirror for suite {suite}",
+                f"error: {pkg} (arch {arch}) absent from checked public indexes for suite {suite}",
                 file=sys.stderr,
             )
             print(
-                "hint:  check the package name + arch; the mirror must be reachable",
+                "hint:  check the package name + arch; Ubuntu Pro archives were not checked",
                 file=sys.stderr,
             )
-            sys.exit(1)
+            return 1
 
         version = deb_field(deb, "Version")
-        depends = deb_field(deb, "Depends")
 
-        print(f"package: {pkg}  version: {version}  arch: {arch}\n")
+        print(f"package: {pkg}  version: {version}  arch: {arch}")
+        if file_cmd[0] != "file":
+            print("file types: bundled file.py fallback (file(1) not installed; reduced detail)")
+        print()
 
-        if depends:
-            print(f"Depends: {depends}\n")
+        for field in ("Depends", "Pre-Depends"):
+            value = deb_field(deb, field)
+            if value:
+                print(f"{field}: {value}\n")
 
         entries = deb_contents(deb)
-        kinds = file_descriptions(deb, workdir, [e[0] for e in entries])
+        kinds = file_descriptions(deb, workdir, [e[0] for e in entries], file_cmd)
         print("files (lexicographic):")
         for (path, perms, owner), kind in zip(entries, kinds):
             print(f"  {perms} {owner}  {path}")
@@ -262,7 +313,16 @@ def main():
         print("\npostinst:" + ("" if postinst else " none"))
         if postinst:
             print(postinst.rstrip())
+    return 0
+
+
+def cli():
+    try:
+        return main()
+    except (ArchiveError, OSError, UnicodeError, subprocess.SubprocessError) as e:
+        print(f"error: package verification failed: {e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli())

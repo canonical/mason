@@ -20,6 +20,8 @@ shared:
       path: scripts/_orientation.py
     deb-list.py:
       path: scripts/_deb-list.py
+    file.py:
+      path: scripts/_file.py
     try-cut:
       path: scripts/_try-cut
     scaffold-test.py:
@@ -72,6 +74,8 @@ shared:
       path: scripts/_orientation.py
     deb-list.py:
       path: scripts/_deb-list.py
+    file.py:
+      path: scripts/_file.py
     try-cut:
       path: scripts/_try-cut
     scaffold-test.py:
