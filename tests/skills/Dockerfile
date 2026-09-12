@@ -14,13 +14,20 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        file \
         git \
         nodejs \
         npm \
         python3 \
+        python3-yaml \
         ripgrep \
         dpkg-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# uv: the pyyaml-dependent helpers (check-slice, check-test, scaffold-test,
+# check-diff) run as `uv run --script`; python3-yaml above is the fallback for
+# invoking them with plain python3.
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 ARG CLAUDE_CLI_VERSION=latest
 ARG CODEX_CLI_VERSION=latest

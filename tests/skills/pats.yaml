@@ -39,8 +39,15 @@ sandboxes:
         - linux.die.net
         - www.kernel.org
         - lwn.net
+      # the git refs advertisement (info/refs) stays reachable: orientation's
+      # `git ls-remote` reads branch names only, and a denial there would be
+      # routine noise in the cheat detector. the pack fetch a clone needs
+      # (git-upload-pack), the web ui, raw files and archives stay denied.
       deny-urls:
-        - "github.com/*/chisel-releases*"
+        - "github.com/*/chisel-releases"
+        - "github.com/*/chisel-releases/*"
+        - "github.com/*/chisel-releases.git"
+        - "github.com/*/chisel-releases.git/git-upload-pack"
         - "raw.githubusercontent.com/*/chisel-releases*"
         - "codeload.github.com/*/chisel-releases*"
         - "api.github.com/repos/*/chisel-releases*"
@@ -63,7 +70,7 @@ agents:
   # that is really a harness quirk shows up as one.
   - id: codex-mini
     kind: codex-cli-keyless
-    model: gpt-5.4-mini
+    model: gpt-5.6-luna
     effort: low
 
 # knockout: prepare deletes the real slice (snapshotting it as ground truth);
