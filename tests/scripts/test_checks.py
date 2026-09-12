@@ -15,6 +15,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[2] / "_shared"
 
 
@@ -454,7 +456,7 @@ def test_check_test() -> None:
         # a test that touches none of the binaries is the red flag (warn).
         missing = write(d, "empty.yaml", "summary: x\nexecute: |\n  true\n")
         out = run("check-test.py", sdf, missing)
-        assert "warn" in out and "exercises none" in out, out
+        assert "warn" in out and "references none" in out, out
 
         # partial coverage is advisory (info), not a warn: two bins, one tested.
         two = "package: foo\nessential:\n  - foo_copyright\nslices:\n  bins:\n    contents:\n      /usr/bin/foo:\n      /usr/bin/zzz:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
@@ -463,8 +465,81 @@ def test_check_test() -> None:
             d, "one.yaml", 'summary: x\nexecute: |\n  chroot "$r" foo --version\n'
         )
         out = run("check-test.py", sdf2, one)
-        assert "info" in out and "1/2 binaries exercised" in out and "zzz" in out, out
+        assert "info" in out and "1/2 binaries referenced" in out and "zzz" in out, out
         assert "warn" not in out, out
+
+
+@pytest.mark.parametrize(
+    "contents", ["/usr/share/foo/data", "/usr/lib/libfoo.so.1", "/usr/bin/*"]
+)
+def test_check_test_requires_task_without_explicit_binaries(
+    tmp_path: Path, contents: str
+) -> None:
+    sdf = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
+    out = run("check-test.py", sdf, str(tmp_path / "missing.yaml"))
+    assert "warn" in out and "no spread test found" in out, out
+
+
+@pytest.mark.parametrize(
+    "task",
+    [
+        "",
+        "[]",
+        "summary: [broken",
+        "summary: x\nexecute: []\n",
+        "summary: x\nexecute: ''\n",
+        "execute: true\n",
+    ],
+)
+def test_check_test_rejects_malformed_task(tmp_path: Path, task: str) -> None:
+    sdf = write(tmp_path, "foo.yaml", CLEAN)
+    out = run("check-test.py", sdf, write(tmp_path, "task.yaml", task))
+    assert "warn" in out and "cannot validate spread task" in out, out
+    assert "Traceback" not in out, out
+
+
+def test_check_test_ignores_metadata_and_comments(tmp_path: Path) -> None:
+    sdf = write(tmp_path, "foo.yaml", CLEAN)
+    task = write(
+        tmp_path,
+        "task.yaml",
+        (
+            "summary: foo\nenvironment:\n  NAME: foo\nexecute: |\n"
+            "  # foo --version\n  true  # foo\n"
+        ),
+    )
+    out = run("check-test.py", sdf, task)
+    assert "warn" in out and "references none" in out, out
+    write(tmp_path, "test.sh", "# foo\ntrue # foo\n")
+    assert "references none" in run("check-test.py", sdf, task)
+    write(tmp_path, "test.sh", 'chroot "$rootfs" /usr/bin/foo --version\n')
+    task = write(tmp_path, "task.yaml", "summary: x\nexecute: ./test.sh\n")
+    assert "ok:" in run("check-test.py", sdf, task)
+
+
+def test_check_test_accepts_data_assertions(tmp_path: Path) -> None:
+    sdf = write(
+        tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", "/usr/share/foo/data")
+    )
+    task = write(
+        tmp_path,
+        "task.yaml",
+        (
+            'summary: x\nexecute: |\n  rootfs="$(install-slices foo_bins consumer_bins)"\n'
+            '  chroot "$rootfs" consumer /usr/share/foo/data | grep -Fiq expected\n'
+        ),
+    )
+    out = run("check-test.py", sdf, task)
+    assert "info" in out and "review slice assertions manually" in out, out
+    assert "warn" not in out, out
+
+
+def test_check_test_reports_unreadable_helper(tmp_path: Path) -> None:
+    sdf = write(tmp_path, "foo.yaml", CLEAN)
+    task = write(tmp_path, "task.yaml", "summary: x\nexecute: ./test.sh\n")
+    (tmp_path / "test.sh").write_bytes(b"\xff")
+    out = run("check-test.py", sdf, task)
+    assert "warn" in out and "Traceback" not in out, out
 
 
 def test_check_diff() -> None:
@@ -486,12 +561,39 @@ def test_scaffold_test() -> None:
         d = Path(td)
         sdf = write(d, "foo.yaml", CLEAN)  # ships /usr/bin/foo in the bins slice.
         out = run("scaffold-test.py", str(sdf))
-        assert "install-slices foo_bins" in out and 'chroot "$rootfs" foo' in out, out
-        # round-trip: the scaffold exercises every binary by construction, so
-        # check-test reports full coverage on it.
+        assert (
+            "install-slices foo_bins" in out and 'chroot "$rootfs" /usr/bin/foo' in out
+        ), out
         task = write(d, "task.yaml", out)
         ct = run("check-test.py", str(sdf), str(task))
-        assert "ok:" in ct, ct
+        assert "warn" in ct and "unfinished scaffold" in ct, ct
+
+
+@pytest.mark.parametrize("contents", ["/usr/share/foo/data", "/usr/bin/*"])
+def test_scaffold_marks_non_explicit_binary_tests(
+    tmp_path: Path, contents: str
+) -> None:
+    sdf = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
+    scaffold = run("scaffold-test.py", sdf)
+    task = write(tmp_path, "task.yaml", scaffold)
+    assert "install-slices foo_bins" in scaffold, scaffold
+    out = run("check-test.py", sdf, task)
+    assert "warn" in out and "unfinished scaffold" in out, out
+
+
+def test_scaffold_keeps_helpers_and_mixed_slices(tmp_path: Path) -> None:
+    sdf = write(
+        tmp_path,
+        "foo.yaml",
+        CLEAN.replace("/usr/bin/foo", "/usr/libexec/foo/helper").replace(
+            "  copyright:\n",
+            "  data:\n    contents:\n      /usr/share/foo/data:\n  copyright:\n",
+        ),
+    )
+    out = run("scaffold-test.py", sdf)
+    assert 'chroot "$rootfs" /usr/libexec/foo/helper' in out, out
+    assert "install-slices foo_data" in out, out
+    assert "install-slices foo_copyright" not in out, out
 
 
 def test_robustness() -> None:
@@ -552,4 +654,3 @@ def test_orientation_edge_cases() -> None:
         assert doc["maintained"] is True, out
         assert doc["existing slices"] == 1, out
         assert doc["live releases"] == {}, out
-

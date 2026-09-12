@@ -5,12 +5,11 @@
 # ///
 """scaffold-test: emit a spread task.yaml skeleton for a slice's binaries.
 
-Authoring tests is boilerplate-heavy and easy to get subtly wrong (the
-install-slices call, one rootfs per slice, exercising every binary). This reads
-an SDF and prints a starting task.yaml: one fresh rootfs per binary-bearing
-slice, and a chroot line per declared executable, so every binary is covered by
-construction. It is a STARTING point -- replace the `--version` placeholders
-with real functional checks and make `spread` pass.
+This reads an SDF and prints a starting task.yaml with a fresh rootfs for each
+non-copyright slice. Explicit paths in recognised binary directories get a
+chroot placeholder; other slices and globbed binaries get author markers.
+Replace these with functional checks following kb/_spread-tests.md. The
+scaffold does not establish coverage or prove that any command works.
 
 Usage:
   scaffold-test.py slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
@@ -32,14 +31,17 @@ BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
 
 
 def slice_execs(doc: Any) -> dict[str, tuple[list[str], list[str]]]:
-    """slice name -> (explicit binary basenames, glob paths), ordered as in the SDF."""
+    """slice name -> (explicit binary paths, glob paths), ordered as in the SDF."""
     out: dict[str, tuple[list[str], list[str]]] = {}
     slices = doc.get("slices") if isinstance(doc, dict) else None
     if not isinstance(slices, dict):
         return out
     for sname, body in slices.items():
+        if sname == "copyright":
+            continue
         contents = body.get("contents") if isinstance(body, dict) else None
         if not isinstance(contents, dict):
+            out[sname] = ([], [])
             continue
         bins, globs = [], []
         for path in contents:
@@ -52,9 +54,8 @@ def slice_execs(doc: Any) -> dict[str, tuple[list[str], list[str]]]:
             if "*" in path or "?" in path:
                 globs.append(path)
             else:
-                bins.append(path.rsplit("/", 1)[-1])
-        if bins or globs:
-            out[sname] = (bins, globs)
+                bins.append(path)
+        out[sname] = (bins, globs)
     return out
 
 
@@ -62,40 +63,11 @@ def scaffold(doc: Any, pkg: str) -> str:
     execs = slice_execs(doc)
     lines = [f"summary: Integration tests for {pkg}", ""]
     lines += [
-        "# Scaffold from scaffold-test.py -- a STARTING point, not a finished test.",
-        "# Replace each --version placeholder with a real functional check and make",
-        "# `spread lxd:tests/spread/integration/"
-        + pkg
-        + "` pass. Every declared binary",
-        "# is listed so check-test.py reports full coverage once these are real.",
+        "# Replace author placeholders using kb/_spread-tests.md before running spread.",
         "",
     ]
     if not execs:
-        # no binaries != no test: emit one rootfs per real slice with the
-        # consumer pattern spelled out, so the scaffold is runnable as-is.
-        slices = doc.get("slices") if isinstance(doc, dict) else None
-        names = (
-            [n for n in slices if n != "copyright"] if isinstance(slices, dict) else []
-        )
-        names = names or ["<slice>"]
-        lines.append("execute: |")
-        first = True
-        for sname in names:
-            if not first:
-                lines.append("")
-            first = False
-            lines.append(f'  rootfs="$(install-slices {pkg}_{sname})"')
-            lines.append(
-                f"  # TODO(author): {pkg}_{sname} declares no binaries. install it together"
-            )
-            lines.append(
-                "  # with a consumer slice (a runtime or tool that uses this data) and"
-            )
-            lines.append(
-                "  # assert the consumer works -- file-existence checks alone are weak."
-            )
-        lines.append("")
-        return "\n".join(lines)
+        execs = {"<slice>": ([], [])}
 
     lines.append("execute: |")
     first = True
@@ -113,6 +85,10 @@ def scaffold(doc: Any, pkg: str) -> str:
             )
         for g in globs:
             lines.append(f"  # TODO(author): exercise the binaries matching {g}")
+        if not bins and not globs:
+            lines.append(
+                "  # TODO(author): add assertions for this slice using the shared testing policy"
+            )
     lines.append("")
     return "\n".join(lines)
 

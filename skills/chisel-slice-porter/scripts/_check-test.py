@@ -3,18 +3,16 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""check-test: how well does the spread test exercise a slice's binaries?
+"""check-test: validate a spread task and scan for binary references.
 
-"Please test every binary being delivered" is a recurring reviewer ask, but it
-isn't a hard rule -- alternatives symlinks, multi-call binaries, and big utility
-suites are legitimately tested representatively. So this reports coverage rather
-than demanding every binary: it lists the executables an SDF declares (explicit
-paths under /usr/bin, /usr/sbin, /bin, /sbin, /usr/libexec) and how many the
-package's spread test references.
+Reports references to explicit paths under /usr/bin, /usr/sbin, /bin, /sbin and
+/usr/libexec from the package's execute script and sibling shell helpers.
 
 It cannot judge whether a test is *meaningful* -- only that binaries are
-referenced. Functional depth and hygiene (hermetic, bounded waits, one rootfs
-per test) are still on the author -- see the chisel-slicer and chisel-slice-reviewer skills.
+referenced. Shell comments and YAML metadata are excluded, but strings and
+uncalled helpers can still match. Globs and binaries outside the recognised
+directories need manual review. Test depth and rootfs isolation are defined in
+kb/_spread-tests.md; only running spread proves runtime behaviour.
 
 Usage:
   check-test.py <slices/pkg.yaml> [<task.yaml>]
@@ -23,7 +21,7 @@ With no task.yaml, it looks for tests/spread/integration/<pkg>/task.yaml under
 the cwd, and folds in any sibling *.sh helper files.
 
 Output: one finding per line, `SEVERITY  where: message`.
-  warn   no spread test at all, or a test that exercises none of the binaries.
+  warn   missing/malformed task, unfinished scaffold, or no binary references.
   info   partial coverage (lists the untested binaries to review), or nothing
          to check (the SDF declares no explicit binaries).
 Exit code is always 0 (advisory); grep for `warn` to gate. Stdlib + pyyaml.
@@ -32,6 +30,7 @@ Exit code is always 0 (advisory); grep for `warn` to gate. Stdlib + pyyaml.
 from __future__ import annotations
 
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -62,42 +61,75 @@ def declared_binaries(doc: Any) -> dict[str, str]:
     return out
 
 
-def test_text(sdf: Path, task_arg: str | None) -> tuple[str, Path | None]:
-    """concatenated text of the package's test files, and the task.yaml path."""
-    if task_arg:
-        task = Path(task_arg)
-    else:
-        pkg = sdf.name[:-5] if sdf.name.endswith(".yaml") else sdf.stem
-        task = Path("tests/spread/integration") / pkg / "task.yaml"
-    if not task.exists():
-        return "", None
-    # errors="replace": a non-UTF8 helper must not crash the check (a crash here
-    # reads as "no findings" to review-diff and silently skips coverage).
-    parts = [task.read_text(encoding="utf-8", errors="replace")]
-    for sh in sorted(task.parent.glob("*.sh")):
-        parts.append(sh.read_text(encoding="utf-8", errors="replace"))
-    return "\n".join(parts), task
+def task_sources(task: Path) -> list[str]:
+    """Validate the task's basic shape and return its shell sources."""
+    doc = yaml.safe_load(task.read_text(encoding="utf-8"))
+    if not isinstance(doc, dict):
+        raise TypeError("task must be a mapping")
+    for key in ("summary", "execute"):
+        if not isinstance(doc.get(key), str) or not doc[key].strip():
+            raise ValueError(f"task needs a non-empty {key} string")
+    return [
+        doc["execute"],
+        *(sh.read_text(encoding="utf-8") for sh in sorted(task.parent.glob("*.sh"))),
+    ]
 
 
 def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
     rows: list[tuple[str, str, str]] = []
     try:
         doc = yaml.safe_load(sdf.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as e:
+    except (OSError, UnicodeError, yaml.YAMLError) as e:
         rows.append(("warn", str(sdf), f"cannot read SDF: {e}"))
         return rows
 
     bins = declared_binaries(doc)
-    text, task = test_text(sdf, task_arg)
-    if not bins:
-        rows.append(("info", str(sdf), "no explicit binaries to exercise"))
-        return rows
-    if task is None:
+    task = (
+        Path(task_arg)
+        if task_arg
+        else (Path("tests/spread/integration") / sdf.stem / "task.yaml")
+    )
+    if not task.exists():
         rows.append(
             (
                 "warn",
                 str(sdf),
-                "no spread test found -- add one that exercises the binaries",
+                "no spread test found -- every package needs a task.yaml",
+            )
+        )
+        return rows
+
+    try:
+        sources = task_sources(task)
+    except (OSError, UnicodeError, TypeError, ValueError, yaml.YAMLError) as e:
+        return [("warn", str(task), f"cannot validate spread task: {e}")]
+    if any("TODO(author):" in source for source in sources):
+        rows.append(
+            (
+                "warn",
+                str(task),
+                "unfinished scaffold -- replace TODO(author) placeholders",
+            )
+        )
+    if not bins:
+        rows.append(
+            (
+                "info",
+                str(sdf),
+                "no explicit binaries to scan; review slice assertions manually",
+            )
+        )
+        return rows
+    try:
+        text = "\n".join(
+            " ".join(shlex.split(source, comments=True)) for source in sources
+        )
+    except ValueError as e:
+        rows.append(
+            (
+                "info",
+                str(task),
+                f"cannot scan shell references: {e}; review coverage manually",
             )
         )
         return rows
@@ -105,30 +137,27 @@ def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
     # lookarounds, not \b: \b needs a word char adjacent, so names ending in
     # non-word chars (c++, g++, [) never match. exclude name-continuation
     # chars but allow a leading / so path-prefixed invocations still count.
-    exercised = {
+    referenced = {
         n for n in bins if re.search(rf"(?<![\w.+-]){re.escape(n)}(?![\w.+-])", text)
     }
-    untested = sorted(set(bins) - exercised)
-    if not exercised:
-        # the real red flag: a test exists but touches none of the binaries.
+    unreferenced = sorted(set(bins) - referenced)
+    if not referenced:
         rows.append(
             (
                 "warn",
                 str(task),
-                f"spread test exercises none of the {len(bins)} declared binaries",
+                f"spread test references none of the {len(bins)} declared binaries",
             )
         )
-    elif untested:
-        # partial coverage is normal for big suites and alternatives symlinks;
-        # surface the gap as info so the author can judge, don't alarm.
-        shown = ", ".join(untested[:12]) + (
-            f", +{len(untested) - 12} more" if len(untested) > 12 else ""
+    elif unreferenced:
+        shown = ", ".join(unreferenced[:12]) + (
+            f", +{len(unreferenced) - 12} more" if len(unreferenced) > 12 else ""
         )
         rows.append(
             (
                 "info",
                 str(task),
-                f"{len(exercised)}/{len(bins)} binaries exercised; untested: {shown}",
+                f"{len(referenced)}/{len(bins)} binaries referenced; unreferenced: {shown}",
             )
         )
     return rows
@@ -148,7 +177,9 @@ def main(argv: list[str]) -> int:
     for sev, where, msg in rows:
         print(f"{sev:5}  {where}: {msg}")
     if not rows:
-        print(f"ok: {sdf} binaries all exercised")
+        print(
+            f"ok: {sdf} task shape valid; all explicit binaries referenced (not runtime proof)"
+        )
     return 0
 
 
