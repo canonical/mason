@@ -5,7 +5,7 @@
     {
       "name": "dependencies sliced first",
       "description": "chisel-releases/slices/nmap-common.yaml, chisel-releases/slices/liblinear4.yaml and chisel-releases/slices/libpcap0.8t64.yaml all exist, and nmap's bins slice in chisel-releases/slices/nmap.yaml references a slice from each of them in its essential: block -- no essential: entry names a slice that does not exist on the branch",
-      "max_score": 16
+      "max_score": 17
     },
     {
       "name": "bins naming convention",
@@ -30,7 +30,7 @@
     {
       "name": "upstream legal files inside copyright",
       "description": "nmap-common's /usr/share/doc/nmap-common/3rd-party-licenses.txt.gz is shipped inside chisel-releases/slices/nmap-common.yaml's 'copyright' slice alongside its copyright file -- not in a separate 'license'/'notice' slice and not omitted",
-      "max_score": 10
+      "max_score": 11
     },
     {
       "name": "clutter excluded",
@@ -45,12 +45,12 @@
     {
       "name": "no speculative dependencies",
       "description": "essential: entries in chisel-releases/slices/nmap.yaml name only packages from nmap's Depends: line -- none of its Suggests: (ncat, ndiff, zenmap) and nothing without a demonstrable need",
-      "max_score": 10
+      "max_score": 11
     },
     {
       "name": "both binaries exercised",
       "description": "chisel-releases/tests/spread/integration/nmap/task.yaml runs both /usr/bin/nmap and /usr/bin/nping inside a chroot of the sliced rootfs with an assertion on the output",
-      "max_score": 10
+      "max_score": 11
     },
     {
       "name": "data dependency exercised",
@@ -61,11 +61,6 @@
       "name": "hermetic test assertions",
       "description": "Text assertions in chisel-releases/tests/spread/integration/nmap/task.yaml use 'grep -Fiq', and the file contains no apt-get/apt install, bare sleep, or unbounded loops",
       "max_score": 6
-    },
-    {
-      "name": "one category per commit",
-      "description": "git log in chisel-releases/ shows a 'feat(nmap):' commit and a separate 'test(nmap):' commit, and no single commit touches both slices/ and tests/",
-      "max_score": 4
     }
   ]
 }

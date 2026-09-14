@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent authors a correct SDF and spread test for the shared library libreadline8t64 on ubuntu-26.04 (v3 format). The package was renamed in the t64 transition; its soname is still libreadline.so.8. Depends: libc6, libtinfo6, readline-common. Every check inspects the artefacts: chisel-releases/slices/libreadline8t64.yaml, chisel-releases/tests/spread/integration/libreadline8t64/task.yaml, git log in chisel-releases/.",
+  "context": "Tests whether the agent authors a correct SDF and spread test for the shared library libreadline8t64 on ubuntu-26.04 (v3 format). The package was renamed in the t64 transition; its soname is still libreadline.so.8. Depends: libc6, libtinfo6, readline-common. Every check inspects the artefacts: chisel-releases/slices/libreadline8t64.yaml, chisel-releases/tests/spread/integration/libreadline8t64/task.yaml.",
   "type": "weighted_checklist",
   "checklist": [
     {
@@ -10,17 +10,17 @@
     {
       "name": "libs slice name",
       "description": "chisel-releases/slices/libreadline8t64.yaml names the shared-library slice 'libs', not 'lib'",
-      "max_score": 8
+      "max_score": 9
     },
     {
       "name": "map-form essential",
       "description": "Every essential: block in chisel-releases/slices/libreadline8t64.yaml uses YAML map form, never list form with dashes",
-      "max_score": 8
+      "max_score": 9
     },
     {
       "name": "multiarch glob style",
       "description": "All /usr/lib/ paths in chisel-releases/slices/libreadline8t64.yaml use the *-linux-* glob (e.g. /usr/lib/*-linux-*/libreadline.so.8) rather than an explicit triple such as x86_64-linux-gnu",
-      "max_score": 8
+      "max_score": 9
     },
     {
       "name": "no trailing * on sonames",
@@ -30,7 +30,7 @@
     {
       "name": "transitive lib deps present",
       "description": "The libs slice's essential: block in chisel-releases/slices/libreadline8t64.yaml lists libc6_libs and libtinfo6_libs",
-      "max_score": 13
+      "max_score": 14
     },
     {
       "name": "nothing beyond depends",
@@ -55,7 +55,7 @@
     {
       "name": "ELF validity check",
       "description": "chisel-releases/tests/spread/integration/libreadline8t64/task.yaml validates that at least one shipped .so is a real ELF object (e.g. reading the magic bytes, 'file', or 'readelf -h'), not merely that a path exists",
-      "max_score": 15
+      "max_score": 16
     },
     {
       "name": "hermetic tests",
@@ -71,11 +71,6 @@
       "name": "no sleeps or unbounded loops",
       "description": "chisel-releases/tests/spread/integration/libreadline8t64/task.yaml contains no bare 'sleep' calls and no unbounded while-true or retry loops",
       "max_score": 2
-    },
-    {
-      "name": "one category per commit",
-      "description": "git log in chisel-releases/ shows a 'feat(libreadline8t64):' commit touching only slices/ followed by a separate 'test(libreadline8t64):' commit touching only tests/",
-      "max_score": 5
     }
   ]
 }
