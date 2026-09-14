@@ -72,8 +72,6 @@ These automated checks run on every PR. Understand what each one validates:
 | `spread` | Integration test failed. CI runs the lxd backend across a self-hosted multi-arch matrix (X64, ARM64, S390X, PPC64EL) |
 | `cla-check` | CLA unsigned |
 
-All checks must be green before review. `pkg-deps` is non-blocking but reviewers use it to cross-check dependency accuracy.
-
 ## Dependency Validation
 
 - **`Depends:` only.** Not `Recommends:` or `Suggests:`. Including `Recommends:` is an immediate rejection.
@@ -132,18 +130,16 @@ Only one SDF field is genuinely decided by `chisel.yaml`'s `format:` -- the shap
 
 ## Forward-Port Requirements
 
-- **All PRs must be forward-ported** to every newer live release branch. PR chain goes oldest -> newest.
+- **Forward-porting is required** by upstream's CONTRIBUTING.md (`kb/_contributing.md`). PR chain goes oldest -> newest.
 - `forward-port-missing` CI auto-labels PRs that lack this.
 - Exception: package gone from the newer archive -- auto-ignored.
-- Cross-link forward-port PRs in descriptions.
 - Non-forward-port PRs: mark with `### Forward porting\nn/a` in description.
 - Trivial forward-port PRs (cherry-picks of approved changes) sometimes land on one approval. Do not rely on it for substantive work.
 
 ## Contribution Process
 
-`kb/_conventional-commits.md` has the commit format and the PR rules -- branch off
-the target release branch, one cohesive change, two approvals, CLA, green CI, no
-force-push after review. Check the PR against it.
+Check the PR against upstream's commit conventions and PR etiquette, linked
+from `kb/_contributing.md`.
 
 ## Copilot Warning
 

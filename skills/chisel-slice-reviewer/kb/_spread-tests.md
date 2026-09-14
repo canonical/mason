@@ -34,8 +34,7 @@ NOTE: the `--ignore=unstable` / `--ignore=unmaintained` flags mean install-slice
 
 Both layers are required. A slice that installs but doesn't function is rejected.
 When local tools or backends are unavailable, report that layer as unverified;
-static checks cannot substitute for it. The invoking skill's completion gate
-decides whether changes may be committed with that gap.
+static checks cannot substitute for it.
 
 ## Required tests and static checks
 

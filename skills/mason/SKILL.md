@@ -25,7 +25,7 @@ Agent kit for chisel / chisel-releases work.
 mason -- agent kit for chisel / chisel-releases work
 
 skills:
-  /chisel-slicer <pkg>              author + test + commit an SDF (no PR)
+  /chisel-slicer <pkg>              author + test an SDF (no PR)
   /chisel-slice-reviewer <sdf>      read-only review of an SDF
   /chisel-slice-porter <pkg> <from> <to>
                                     move a slice between release branches

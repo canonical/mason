@@ -3,8 +3,7 @@ name: chisel-slicer
 description: >-
   Authors and tests chisel slice definition files (SDFs) against
   canonical/chisel-releases. Use when the user wants to slice an Ubuntu package
-  or add a new SDF to their release branch. Commits locally when authorised;
-  does not open PRs.
+  or add a new SDF to their release branch. Does not open PRs.
 ---
 
 # chisel-slicer
@@ -27,13 +26,14 @@ Author slices against the user's `canonical/chisel-releases` checkout.
   Repository paths below are relative to it. Run orientation first. If it
   reports `release: null`, stop and ask where the checkout is; do not clone one
   or guess a path. Confirm the reported release matches the request.
-- Work on the checked-out branch and preserve unrelated changes. Commit only
-  when authorised by the user and allowed by the session's workflow. Leave PR
+- Work on the checked-out branch and preserve unrelated changes. Leave PR
   creation to the user.
+- When you make commits, use Conventional Commits as upstream does; see
+  `kb/_contributing.md`.
 - Published slices are append-only. Change one only for a demonstrated need;
   do not rename it or remove its effective cut contents. Subdivision is allowed
   if the original slice depends on the new subslices and preserves its contents.
-  Before committing such changes, run
+  After such changes, run
   `"<skill-root>/scripts/_check-diff.py" --base <target-branch>` and investigate
   warnings. The checker compares declared paths, so a valid subdivision still
   needs a before/after cut comparison.
@@ -175,7 +175,7 @@ branch compatibility. Fix discrepancies or document justified divergence using
 that reference's source precedence. If documentation is unreachable, record the
 check as unavailable and use the bundled references; do not claim live verification.
 
-## 7. completion and commit gate
+## 7. completion gate
 
 Record each applicable lint, static test check, cut, spread run and documentation
 check as **passed**, **failed** or **unavailable**, with evidence or a reason.
@@ -184,22 +184,16 @@ check as **passed**, **failed** or **unavailable**, with evidence or a reason.
   establish runtime success.
 - **Failed:** malformed or missing tests, unfinished scaffold markers, SDF blocks,
   unjustified SDF warnings, test-check warnings, unresolved documentation conflicts,
-  or observed cut/spread failures. Fix these before committing. If no fix is
-  possible in scope, leave changes uncommitted and report the failure.
+  or observed cut/spread failures. Fix these. If no fix is possible in scope,
+  report the failure and do not claim completion.
 - **Unavailable:** a required tool, backend, archive or documentation endpoint
   could not be used. Report the exact missing verification and command to run.
-  Do not relabel a product failure as unavailable. Leave changes uncommitted
-  unless the user and session workflow permit commits with that verification
-  gap. Continue writing and statically checking tests even when spread cannot run.
+  Do not relabel a product failure as unavailable. Continue writing and
+  statically checking tests even when spread cannot run.
 
 Apply this gate and the shared testing policy to every package added or changed,
 including dependencies. Review assertions and coverage before declaring tests
 finished.
-
-When commits are authorised and the gate permits them, stage only task-owned
-changes. Follow `kb/_conventional-commits.md` for messages and category separation.
-Prepare both SDF and test changes before committing either; complete the series
-before reporting success. Otherwise hand over the uncommitted changes.
 
 ## final report
 
@@ -209,7 +203,6 @@ Summarise:
 - SDFs created or changed and their slice breakdown.
 - Required dependency graph, reused slices, new dependencies and authoring order.
 - Checks passed, failed or unavailable; representative coverage choices and gaps.
-- Commit hashes, or why changes remain uncommitted.
 - Remaining decisions or risks before the user opens a PR.
 
 Keep the report concise; do not dump file contents or raw logs.

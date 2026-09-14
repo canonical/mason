@@ -29,8 +29,9 @@ branch's `format:`. A verbatim copy usually parses and is usually wrong.
   chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
   clone one, and do not guess at a path.
 
-**Scope**: adapt + test + commit on the target branch. Do NOT open PRs -- the
-user opens them.
+**Scope**: adapt + test on the target branch. Do NOT open PRs -- the
+user opens them. When you make commits, use Conventional Commits as
+upstream does; see `kb/_contributing.md`.
 
 **You run autonomously.** No human in the loop mid-task. Where you would pause
 for confirmation, make the best-supported decision, proceed, and record it with
@@ -164,19 +165,11 @@ scripts/_check-diff.py --base <target-branch>
 It flags any slice or path dropped by accident. The `removed-slices` CI gate
 rejects those.
 
-### Step 7: Commit
+### Step 7: Done
 
-**Precondition:** `check-slice.py` reports no `block`, `check-test.py` reports no
-`warn`, the cut succeeds on the target branch, and the spread test passes.
-
-Commit in two steps, one category each:
-
-```bash
-git -C <repo> commit -m "feat(<pkg>): add <slice-list> slices"
-git -C <repo> commit -m "test(<pkg>): add integration tests"
-```
-
-Commit messages follow `kb/_conventional-commits.md`.
+The port is done when `check-slice.py` reports no `block`, `check-test.py`
+reports no `warn`, the cut succeeds on the target branch, and the spread test
+passes -- or, for a check that cannot run here, when the report says so.
 
 **Stop here. The user opens the PR themselves.**
 
@@ -203,6 +196,6 @@ Return a summary to the caller. Include:
 - **Porting the SDF but not the test.** A slice without a working test is not
   shippable.
 - **Reorganising while porting.** Structural changes and a port in the same
-  commit make the diff unreviewable. Port first; propose a redesign separately.
+  change make the diff unreviewable. Port first; propose a redesign separately.
 - **Assuming the package still exists.** Packages leave the archive. If the
   target release has no such package, that is the answer -- report it and stop.

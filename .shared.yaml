@@ -14,8 +14,8 @@ shared:
       path: kb/_chisel-cli.md
     upstream-sources.md:
       path: kb/_upstream-sources.md
-    conventional-commits.md:
-      path: kb/_conventional-commits.md
+    contributing.md:
+      path: kb/_contributing.md
     orientation.py:
       path: scripts/_orientation.py
     deb-list.py:
@@ -43,8 +43,8 @@ shared:
       path: kb/_chisel-branches.md
     spread-tests.md:
       path: kb/_spread-tests.md
-    conventional-commits.md:
-      path: kb/_conventional-commits.md
+    contributing.md:
+      path: kb/_contributing.md
     orientation.py:
       path: scripts/_orientation.py
     check-slice.py:
@@ -68,8 +68,8 @@ shared:
       path: kb/_spread-tests.md
     chisel-cli.md:
       path: kb/_chisel-cli.md
-    conventional-commits.md:
-      path: kb/_conventional-commits.md
+    contributing.md:
+      path: kb/_contributing.md
     orientation.py:
       path: scripts/_orientation.py
     deb-list.py:
