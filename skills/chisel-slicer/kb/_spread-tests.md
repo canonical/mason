@@ -12,20 +12,12 @@ tests/spread/lib/                                   # shared helpers (on PATH vi
 
 ## `install-slices` helper
 
-Located at `tests/spread/lib/install-slices`. Added to `PATH` by `spread.yaml`. Usage:
+Use `tests/spread/lib/install-slices` in spread tasks to prepare each independent
+slice installation set:
 
 ```bash
 rootfs="$(install-slices <pkg>_<slice> [<pkg2>_<slice2> ...])"
 ```
-
-What it does:
-1. Creates a temporary directory for the rootfs.
-2. Runs `chisel cut --ignore=unstable --ignore=unmaintained --release "$PROJECT_PATH" --root "$rootfs" $slices` -- validates against the **local checkout**.
-3. Automatically appends `base-files_chisel` to every cut (for manifest generation). You do not need to include it.
-4. Retries on transient archive fetch failures (up to 3 attempts).
-5. Prints the rootfs path to stdout.
-
-NOTE: the `--ignore=unstable` / `--ignore=unmaintained` flags mean install-slices succeeds on devel/EOL branches where a bare manual `chisel cut` errors out -- pass them yourself when testing manually on such a branch.
 
 ## Two-layer testing model
 
@@ -51,23 +43,10 @@ Every authored package, including pure-library and data-only packages, gets a
   package's docs and upstream tests to identify checks, including runtime
   lookups such as passwd entries, temporary directories, timezone and locale data.
 
-`_scaffold-test.py` emits starting points for each non-copyright slice. Replace
-every `TODO(author):` marker with real assertions or a justified representative
-test before treating the suite as finished. Globs and executable paths outside
-the recognised binary directories require manual inspection.
-
-`_check-test.py` validates basic task shape (a YAML mapping with non-empty
-`summary` and `execute` strings), checks for unfinished author markers and scans
-the execute script plus sibling shell helpers for explicit binary names. It
-excludes YAML metadata and shell comments. References in strings or uncalled
-helpers can still match; it does not prove execution, assertions, per-slice
-coverage or shell correctness. Run the suite and review its behaviour.
-
-- `warn`: missing or malformed task, unfinished scaffold, or no binary references.
-- `info`: partial references, no explicit binaries to scan, or shell text the
-  scanner cannot analyse. Review these gaps; they are not runtime results.
-- Exit status is advisory (`0` even with findings); inspect the reported
-  severities. A clean scan is not a passing spread run.
+Use `_scaffold-test.py` only when creating a new task. Replace all placeholders
+with real assertions or justified representative tests. Run `_check-test.py`
+after writing or changing a task, then review assertions and coverage manually
+and run the suite. Apply `kb/_verification.md` to the results.
 
 ## Chroot environment patterns
 

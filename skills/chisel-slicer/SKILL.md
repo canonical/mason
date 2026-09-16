@@ -23,43 +23,32 @@ Author slices against the user's `canonical/chisel-releases` checkout.
 
   In the remaining commands, replace `<skill-root>` with that absolute path.
 - **Checkout root** contains `chisel.yaml`, `slices/`, and `tests/spread/`.
-  Repository paths below are relative to it. Run orientation first. If it
-  reports `release: null`, stop and ask where the checkout is; do not clone one
-  or guess a path. Confirm the reported release matches the request.
+  Repository paths below are relative to it. Run orientation first. If no
+  checkout is present, stop and ask where it is; do not clone one or guess a
+  path. Confirm the target release matches the request.
 - Work on the checked-out branch and preserve unrelated changes. Leave PR
   creation to the user.
+- Read `kb/_verification.md` for blockers, check status and completion.
 - When you make commits, use Conventional Commits as upstream does; see
   `kb/_contributing.md`.
-- Published slices are append-only. Change one only for a demonstrated need;
-  do not rename it or remove its effective cut contents. Subdivision is allowed
-  if the original slice depends on the new subslices and preserves its contents.
-  After such changes, run
-  `"<skill-root>/scripts/_check-diff.py" --base <target-branch>` and investigate
-  warnings. The checker compares declared paths, so a valid subdivision still
-  needs a before/after cut comparison.
+- For changes to published slices, apply the preservation policy in
+  `kb/_slice-conventions.md` and run
+  `"<skill-root>/scripts/_check-diff.py" --base <target-base-ref>`.
 
 ## 1. validate the target
 
 Read the orientation output for the release, maintenance status, manifest format
-and available tools. Stop on an unmaintained branch or an existing
+and available tools. Stop on an unmaintained or unknown target, or an existing
 `slices/<pkg>.yaml`; report the conflict before authoring a new SDF.
+Check release-discovery status before drawing conclusions about other releases.
+Read `kb/_dependency-policy.md` for package inspection.
 
 ```bash
 python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
 ```
 
-Keep the output for inspection. The helper lists a public Ubuntu archive package's
-version, dependencies, file types and `postinst`. It needs `dpkg-deb`; without
-`file(1)` it says so in its header and uses the bundled `_file.py`, which knows
-ELF, scripts, links, compressed data and text but not versions or build ids.
-Exit `1` means the package was absent from all public indexes checked for that
-suite and architecture; exit `2` means verification failed (`dpkg-deb`, manifest,
-network, index or extraction error). Stop on either non-zero result and report
-which outcome occurred.
-Neither establishes absence from Ubuntu Pro. The helper cannot authenticate to
-Pro archives or reproduce arbitrary archive configuration. For those targets,
-inspect the package through an already authorised archive setup; if unavailable,
-report the access limitation and stop. Never invent contents from a failed lookup.
+Keep the output as evidence for the design and stop the affected package work
+if inspection cannot complete.
 
 ## 2. inspect the requested functionality
 
@@ -67,43 +56,17 @@ Inspect the root package before expanding dependencies. Establish the runtime
 functionality to ship from the request and package contents; exclude speculative
 features. Repeat this inspection for each required unsliced dependency.
 
-- Use the listing for paths, types, modes and shipped symlinks. Inspect each
-  target architecture when layouts or dependencies differ.
-- Read `postinst` and relevant source code for generated files, alternatives,
-  config/data/plugin lookups and optional features. Chisel does not run package
-  maintainer scripts: reproduce required effects with contents declarations or
-  `mutate:`, and omit install-time work that has no runtime purpose.
-- Resolve shared libraries against the target release and architecture, using
-  `lddtree` or a suitable target environment. Do not use host library resolution
-  as evidence for another release or architecture. List needed providers
-  explicitly in `essential:`, including providers that also arrive transitively.
+Use `kb/_dependency-policy.md` to inspect package contents, maintainer effects
+and runtime lookups. Inspect each target architecture when layouts or
+dependencies differ.
 
 ## 3. resolve the required dependency graph
 
-Use `Depends:` and `Pre-Depends:` as candidates, then retain the runtime needs
-identified above. Do not automatically slice every package dependency, or add
-`Recommends:` / `Suggests:` without evidence that selected functionality needs it.
-
-1. Match each retained dependency to specific slices in the target checkout.
-   A package having an SDF does not prove it ships the needed files. Inspect its
-   slices; reuse sufficient ones and expand only missing runtime functionality.
-2. Resolve alternatives (`a | b`) to a suitable concrete provider, respecting
-   version and architecture constraints. Resolve virtual names through provider
-   metadata; do not treat them as downloadable package names. Record the choice.
-3. Use apt metadata only after confirming its suites, components and architecture
-   match the target manifest. Otherwise use target archive metadata and the
-   package listings. A recursive `apt-cache depends` dump is discovery input,
-   not a resolved slice plan. If provider metadata is unavailable, report the
-   unresolved edge rather than guessing.
-4. Track visited packages and dependency edges. Inspect each required unsliced
-   package before recursing. Detect cycles instead of recursing indefinitely:
-   discard only edges shown to be install-time or outside selected functionality.
-   If a required slice cycle remains, stop and report it for design resolution.
-5. Record the retained graph, existing slices reused, new slices needed, and
-   significant exclusions with reasons. Author dependencies before their consumers
-   once the graph is resolved; update the plan if inspection finds another need.
-
-Dependency field semantics: [Debian package relationships](https://www.debian.org/doc/debian-policy/ch-relationships.html).
+Build and record the retained graph under `kb/_dependency-policy.md`, resolving
+providers and checking existing slice contents. Apply the blockers in
+`kb/_verification.md` to unresolved edges and cycles. Once resolved, author
+dependencies before their consumers; update the graph if inspection finds
+another runtime need.
 
 ## 4. design and write
 
@@ -130,12 +93,12 @@ For every new or modified SDF:
 "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
 ```
 
-Fix every `block` and every unjustified `warn`. The helper covers mechanical SDF
-rules; review layout and path style against `kb/_slice-conventions.md` and run
-the target repository's applicable lint checks as well.
+Resolve findings under `kb/_verification.md`. Review layout and path style
+against `kb/_slice-conventions.md` and run the target repository's applicable
+lint checks as well.
 
 Read `kb/_spread-tests.md` before writing tests. It owns test depth, representative
-coverage, rootfs isolation and interpretation of static checks. Scaffold only a
+coverage and rootfs isolation. Scaffold only a
 new test file; preserve existing tests:
 
 ```bash
@@ -152,45 +115,31 @@ unavailable run, never as a reason to leave the file out. Then run:
 "<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
 ```
 
-Run a cut for each independently usable new slice when chisel is available:
+Run a cut for each independently usable new or changed slice when chisel is available:
 
 ```bash
 "<skill-root>/scripts/_try-cut" --arch <arch> <pkg>_<slice>
 spread lxd:tests/spread/integration/<pkg>
 ```
 
-`_try-cut` removes its temporary rootfs on exit and proves installability only.
-For rootfs inspection use the manual cut commands in `kb/_chisel-cli.md`. Run
-spread when its backend is usable; orientation reports executables, not backend
-readiness. Classify each required check using the completion gate below.
+For rootfs inspection use the manual cut commands in `kb/_chisel-cli.md`. Check
+backend readiness before running spread. Classify each required check using the
+completion gate below.
 
 ## 6. verify against upstream
 
 Before completion, consult the official slicing guide and the SDF/manifest
 references through `kb/_upstream-sources.md`. Check fields, design choices and
 branch compatibility. Fix discrepancies or document justified divergence using
-that reference's source precedence. If documentation is unreachable, record the
-check as unavailable and use the bundled references; do not claim live verification.
+that reference's source precedence. Apply `kb/_verification.md` when a source
+cannot be reached.
 
 ## 7. completion gate
 
-Record each applicable lint, static test check, cut, spread run and documentation
-check as **passed**, **failed** or **unavailable**, with evidence or a reason.
-
-- **Passed:** the check ran and met its acceptance criteria. Static checks do not
-  establish runtime success.
-- **Failed:** malformed or missing tests, unfinished scaffold markers, SDF blocks,
-  unjustified SDF warnings, test-check warnings, unresolved documentation conflicts,
-  or observed cut/spread failures. Fix these. If no fix is possible in scope,
-  report the failure and do not claim completion.
-- **Unavailable:** a required tool, backend, archive or documentation endpoint
-  could not be used. Report the exact missing verification and command to run.
-  Do not relabel a product failure as unavailable. Continue writing and
-  statically checking tests even when spread cannot run.
-
-Apply this gate and the shared testing policy to every package added or changed,
-including dependencies. Review assertions and coverage before declaring tests
-finished.
+Apply `kb/_verification.md` to each applicable lint, static test check, cut,
+spread run and documentation check, including dependency packages. Review
+assertions and coverage under `kb/_spread-tests.md` before declaring tests
+finished. Report complete, ready for remaining verification or blocked.
 
 ## final report
 

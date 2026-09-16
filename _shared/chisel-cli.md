@@ -21,9 +21,18 @@ Accepts:
 
 - `ubuntu-XX.XX` -- an online release branch.
 - a directory path -- anything containing a `/`, e.g. `./` for the current checkout.
-- omitted -- inferred from the host's `/etc/lsb-release` (`DISTRIB_ID` / `DISTRIB_RELEASE`). Not `/etc/os-release`.
+- omitted -- inferred from the host's `/etc/lsb-release` (`DISTRIB_ID` / `DISTRIB_RELEASE`), not `/etc/os-release`, and fetched from the chisel-releases repository, so the checkout's own SDFs are not used.
 
 On a devel (unstable) or EOL (unmaintained) branch, add `--ignore=unstable` / `--ignore=unmaintained` or `cut` errors out.
+
+## Cutting from a checkout
+
+```bash
+mkdir -p rootfs
+chisel cut --release ./ --root rootfs/ <pkg>_<slice> ...
+```
+
+`--root` must be an existing directory: chisel stops with `target directory does not exist` instead of creating it.
 
 ## Inspecting the Repo Without a Full Checkout
 

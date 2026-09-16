@@ -2,200 +2,122 @@
 name: chisel-slice-porter
 description: >-
   Ports chisel slice definition files (SDFs) between Ubuntu release branches of
-  canonical/chisel-releases -- forward-porting a slice to a newer release, or
-  back-porting to an older one. Use when a slice exists on one branch and is
-  needed on another, or when a PR must be forward-ported across live releases.
-  Adapts and tests the SDF on the target branch. Does NOT open PRs.
+  canonical/chisel-releases, adapting package contents, dependencies and tests
+  to the target release. Use for forward-ports or back-ports. Does not open PRs.
 ---
 
 # chisel-slice-porter
 
-You move slices between release branches of
-[`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
+Adapt the source slices and tests to the user's target release checkout.
 
-**Porting is adaptation, not copy-paste.** The same package is packaged
-differently on different releases: paths move, libraries are renamed, sonames
-bump, packages split, and the `essential:` syntax itself changes with the
-branch's `format:`. A verbatim copy usually parses and is usually wrong.
+## roots and boundaries
 
-## rules
+- `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
+  `kb/` and `scripts/` there; run helpers with the checkout as working directory.
+- Run `python3 "<skill-root>/scripts/_orientation.py"` first. If no checkout is
+  present, ask where it is; do not clone or guess one.
+- Confirm the checkout's release is the requested target. Work on its current
+  branch and preserve unrelated changes. Read source branches with `git show`
+  or upstream URLs; do not switch branches as part of the port.
+- Read `kb/_verification.md` for blockers, unavailable checks and completion.
+  Leave PR creation to the user. If asked to commit, follow `kb/_contributing.md`.
 
-- Run `scripts/_orientation.py` first, every time. It reports the checkout you
-  are in (`branch`, `ubuntu version`, `manifest format`), which tools this
-  machine has, and the live release set -- read off the machine rather than
-  guessed.
+## 1. establish source and target
 
-- If orientation reports `release: null`, your working directory is not a
-  chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
-  clone one, and do not guess at a path.
+Identify the source revision, target release and requested packages. Read both
+manifests and source SDFs/tests. Use `kb/_chisel-branches.md` for the branch model
+and `kb/_chisel-formats.md` for format compatibility.
 
-**Scope**: adapt + test on the target branch. Do NOT open PRs -- the
-user opens them. When you make commits, use Conventional Commits as
-upstream does; see `kb/_contributing.md`.
+Establish target maintenance from its manifest; stop on an EOL or unknown target.
+Check orientation's release-discovery status before drawing conclusions about
+other releases. If the target already has an SDF, compare and report differences;
+reconcile it only when that work was requested.
 
-**You run autonomously.** No human in the loop mid-task. Where you would pause
-for confirmation, make the best-supported decision, proceed, and record it with
-its rationale in your final report. The one exception is a missing
-chisel-releases checkout -- you cannot pick that for the user, so stop and ask.
-
-**Prerequisites**: read
-`kb/_cross-release-porting.md` (what changes between releases -- this is the
-core reference for this job) and `kb/_chisel-formats.md` (what `format:`
-decides). Pull in `kb/_slice-definition-format.md` and `kb/_slice-conventions.md`
-when writing, `kb/_spread-tests.md` when porting the test, and
-`kb/_chisel-branches.md` for the branch model.
-
-When this prompt and the repo disagree, trust the repo.
-
----
-
-## Workflow
-
-### Step 1: Establish source and target
-
-1. **Identify the source branch** -- the one that already has
-   `slices/<pkg>.yaml` -- and the **target branch** you are porting to.
-2. **Check the target branch is live.** It must appear in orientation's
-   `live releases:` (and, once checked out, report `maintained: true`).
-   EOL branches are frozen; stop and report.
-3. **Check the target does not already have the SDF.** If it does, this is a
-   diff-and-reconcile job, not a port: report what differs and stop unless the
-   user asked for the reconcile.
-4. **Read both `format:` versions.** Source and target formats decide the shape
-   of `essential:`, and a mismatch is the single most common porting failure.
-   See `kb/_chisel-formats.md`.
-
-Fetch the source SDF without a full checkout:
+For a locally available source revision:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/<source-branch>/slices/<pkg>.yaml
+git show <source-ref>:chisel.yaml
+git show <source-ref>:slices/<pkg>.yaml
+git show <source-ref>:tests/spread/integration/<pkg>/task.yaml
 ```
 
-To compare two branches in a local checkout that has both:
+If source objects are unavailable locally, read the upstream revision online.
+Distinguish an absent source test from a failed source lookup.
+
+## 2. inspect target packages
+
+Read `kb/_cross-release-porting.md` for packaging differences and
+`kb/_dependency-policy.md` for inspection and dependency evidence. For each
+affected target package and architecture:
 
 ```bash
-git -C <repo> diff <source-branch>:slices/<pkg>.yaml <target-branch>:slices/<pkg>.yaml
+python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
 ```
 
-### Step 2: Diff the packages, not just the SDFs
+Compare target contents, dependencies and maintainer scripts with the source
+design. Record changed paths, package identities, features and dependency edges.
+Inspect required unsliced dependencies before authoring their consumers. A failed
+lookup does not establish that a package disappeared; apply `kb/_verification.md`
+when inspection cannot complete.
 
-The source SDF tells you what *was* true. The target release's `.deb` tells you
-what *is*. Run `scripts/_deb-list.py <pkg>` against the target release and
-compare against the source SDF's `contents:`.
+## 3. adapt SDFs and tests
 
-Work through the Cross-Release Differences table in
-`kb/_cross-release-porting.md`. The recurring ones:
+Read `kb/_slice-conventions.md` and the relevant sections of
+`kb/_slice-definition-format.md`. Preserve the source's grouping unless target
+packaging or verified functionality requires a change. Adapt paths, dependencies,
+legal files and format-sensitive fields using the inspected target evidence.
+Preserve effective contents of any published target slices being reconciled.
 
-- **usrmerge** -- `/bin/x` becomes `/usr/bin/x` on 24.04+.
-- **t64** -- `libfoo3` becomes `libfoo3t64` on 24.04+; both the SDF filename and
-  every `essential:` reference change.
-- **soname bumps** -- the package name itself changes, so the SDF is a new file
-  and the old one is not touched.
-- **package splits and renames** -- the source SDF may have no single successor.
-- **new or removed files** -- paths present on one release and absent on another.
-- **changed dependencies** -- re-derive `essential:` from the target's
-  `Depends:`; do not trust the source SDF's list.
-
-Record every difference you find. They go in the final report.
-
-### Step 3: Adapt the SDF
-
-Write `slices/<pkg>.yaml` on the target branch, starting from the source but
-correcting everything Step 2 turned up.
-
-- **Keep the structure.** Slice names, grouping, and `mutate:` scripts should
-  match the source unless a packaging change forces otherwise. Gratuitous
-  divergence between branches is what reviewers push back on hardest.
-- **Fix `essential:` for the target format.** List on v1/v2, map on v3+. Getting
-  this wrong is a parse error, not a style nit.
-- **Re-derive paths from the target `.deb`**, never from the source SDF's text.
-- **Carry the `copyright` slice** and any upstream legal files, checking their
-  paths on the target.
-
-Then self-check:
+Read `kb/_spread-tests.md`. Port the source task and its shell helpers, adapting
+binary paths, installed slices and assertions. If no source test exists, create
+one; use `_scaffold-test.py` only for a new task, then replace its placeholders.
+Apply the same policy to any dependency package authored during the port.
 
 ```bash
-scripts/_check-slice.py slices/<pkg>.yaml
+mkdir -p tests/spread/integration/<pkg>
+"<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
 ```
 
-Fix every `block` and every `warn` you cannot justify.
+## 4. verify the target
 
-### Step 4: Port the test
-
-The spread test moves with the slice. Copy
-`tests/spread/integration/<pkg>/task.yaml` from the source branch and adapt it
-the same way: binary paths may have moved, and the slices it installs may have
-been renamed.
-
-If the source branch has no test, write one -- `scripts/_scaffold-test.py
-slices/<pkg>.yaml` emits a skeleton. `kb/_spread-tests.md` has the
-`install-slices` contract and the chroot setup patterns.
+For every new or modified SDF:
 
 ```bash
-scripts/_check-test.py slices/<pkg>.yaml
+"<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
+"<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
 ```
 
-### Step 5: Verify on the target
+Run the target repository's applicable lint checks. Cut each independently usable
+new or changed slice and run the affected spread tasks when tools/backends permit:
 
 ```bash
-scripts/_try-cut <pkg>_<slice>
-```
-
-A cut that succeeds on the source branch proves nothing about the target. Cut on
-the target branch. If `_orientation.py` reported `chisel: {present: false}`, skip
-the cut -- the `install-slices` CI check covers it on the PR -- and say so in
-your report. Then run the spread test:
-
-```bash
+"<skill-root>/scripts/_try-cut" --arch <arch> <pkg>_<slice>
 spread lxd:tests/spread/integration/<pkg>
 ```
 
-### Step 6: Check what else moved
-
-If the port is one link in a chain -- the same change going across several live
-releases -- the other branches need the same treatment. List the live releases
-with `scripts/_orientation.py` and report which still need the port.
-
-If you changed an existing SDF rather than adding one:
+For changes to published target SDFs, compare against the target base revision:
 
 ```bash
-scripts/_check-diff.py --base <target-branch>
+"<skill-root>/scripts/_check-diff.py" --base <target-base-ref>
 ```
 
-It flags any slice or path dropped by accident. The `removed-slices` CI gate
-rejects those.
+Investigate removed declarations using before/after cuts. A successful source
+cut is not target verification. For retained rootfs inspection, use
+`kb/_chisel-cli.md`.
 
-### Step 7: Done
+Consult the live sources in `kb/_upstream-sources.md` for the affected fields,
+design and contribution requirements. Apply `kb/_verification.md` to every
+result, including unavailable upstream access and unjustified warnings.
 
-The port is done when `check-slice.py` reports no `block`, `check-test.py`
-reports no `warn`, the cut succeeds on the target branch, and the spread test
-passes -- or, for a check that cannot run here, when the report says so.
+## final report
 
-**Stop here. The user opens the PR themselves.**
+Return the completion status from `kb/_verification.md`, with:
 
----
+- Source revision, target release, formats and architectures inspected.
+- Packaging differences, adaptations, retained dependency graph and justified
+  unchanged parts.
+- Checks passed, failed or unavailable, with evidence and coverage gaps.
+- Other maintained releases still needing the port, or the discovery gap that
+  prevents establishing that list.
 
-## Final report
-
-Return a summary to the caller. Include:
-
-- source branch, target branch, and both `format:` versions
-- every cross-release difference found, and how you adapted to it
-- anything you carried over unchanged, and why you judged it still correct
-- the verification you ran (cut, spread) and its result
-- which other live releases still need this port
-- decisions made autonomously, with rationale, and any open questions
-
-## Common pitfalls
-
-- **Copying `essential:` verbatim across a format boundary.** v1/v2 use a list,
-  v3+ requires a map. The list form on v3 is the parse error
-  _"essential expects a map"_.
-- **Trusting the source SDF's paths.** usrmerge and t64 both silently invalidate
-  paths that used to be right.
-- **Porting the SDF but not the test.** A slice without a working test is not
-  shippable.
-- **Reorganising while porting.** Structural changes and a port in the same
-  change make the diff unreviewable. Port first; propose a redesign separately.
-- **Assuming the package still exists.** Packages leave the archive. If the
-  target release has no such package, that is the answer -- report it and stop.
+Respond to the user when invoked directly, or the parent agent when delegated.

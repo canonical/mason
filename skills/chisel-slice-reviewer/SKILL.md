@@ -1,163 +1,99 @@
 ---
 name: chisel-slice-reviewer
 description: >-
-  Reviews chisel slice definition files (SDFs) in canonical/chisel-releases.
-  Use when the user wants a slice / SDF / PR reviewed against chisel conventions:
-  CI checks, dependency accuracy, naming, formatting, schema-version compliance,
-  testing, and forward-port requirements. Read-only -- returns a review report.
+  Reviews chisel slice definition files (SDFs), branches or PRs in
+  canonical/chisel-releases for correctness, dependencies, conventions, tests
+  and forward-port requirements. Read-only; returns findings and a verdict.
 ---
 
 # chisel-slice-reviewer
 
-You review slices in [`canonical/chisel-releases`](https://github.com/canonical/chisel-releases).
+Review the supplied SDF as it stands, or a branch/PR against its target base.
+State the scope and any assumption needed to interpret the request.
 
-**Input**: an SDF path (`slices/<pkg>.yaml`), a branch, or a PR to review. When
-given a branch or PR, the diff against the branch it targets is what you review;
-when given a single SDF, review the file as it stands. If which is meant is
-unclear, review what you were handed and say in the report what you assumed.
+## roots and boundaries
 
-**First**, read
-`kb/_slice-definition-format.md` (SDF format) and `kb/_chisel-formats.md` (what
-`format:` decides), plus `kb/_slice-conventions.md` for canonical naming and path
-style. Pull in `kb/_chisel-branches.md` for the branch model and
-`kb/_spread-tests.md` when judging tests.
+- `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
+  `kb/` and `scripts/` there; keep the checkout as working directory.
+- Run `python3 "<skill-root>/scripts/_orientation.py"` first. If no checkout is
+  present, ask where it is; do not clone or guess one.
+- Confirm that the files and manifest being checked match the review's revision
+  and target release. Use read-only git and upstream reads; do not switch branches
+  or edit the checkout. If the requested revision is not available to a helper,
+  report that check as unavailable rather than checking different files.
+- Read `kb/_verification.md` for check status and review completion. Runtime
+  evidence may come from CI for the reviewed revision; do not claim that static
+  inspection or future CI proves runtime success.
 
-## rules
+## 1. run static checks
 
-- Run `scripts/_orientation.py` first, every time. It reports the checkout you
-  are in (`branch`, `ubuntu version`, `manifest format`), which tools this
-  machine has, and the live release set -- read off the machine rather than
-  guessed.
-
-- If orientation reports `release: null`, your working directory is not a
-  chisel-releases checkout. **Stop and ask the user where theirs is.** Do not
-  clone one, and do not guess at a path.
-
-You are read-only: inspect the diff / SDFs and return a review report. Do not edit files.
-
----
-
-## Deterministic first pass
-
-Before reasoning about anything, run the deterministic checks over the diff. When reviewing a PR or branch, one command does it all -- pass the branch the PR targets:
+For a branch or PR represented by the working tree:
 
 ```bash
-scripts/review-diff.py --base <target-branch>
+"<skill-root>/scripts/review-diff.py" --base <target-base-ref>
 ```
 
-It finds the changed SDFs and runs the three checkers over them, then prints findings grouped by severity plus a verdict, and exits non-zero if anything `block`s (the same command a CI PR-review job would call). The three it drives, also runnable on their own:
+For a single SDF:
 
-- `scripts/_check-slice.py slices/<pkg>.yaml` -- static conventions: sorting, naming, absolute paths, duplicate contents keys, copyright presence, clutter exclusion, arch names, the format-gated `essential:` shape and `v3-essential:`, the path-shape parse errors (glob with content options, `make:` without a trailing `/`, `generate:` rules, `prefer:` naming its own package), and `hint:` length + mechanical style (the noun-phrase rule needs NLP -- `validate-hints` CI covers that, not this script). Reads `format:` from `./chisel.yaml` (or pass `--branch ubuntu-XX.XX`).
-- `scripts/_check-test.py slices/<pkg>.yaml` -- test coverage: `warn` if there's no test or it exercises none of the binaries; `info` listing untested binaries under partial coverage (normal for suites and alternatives symlinks -- judge whether the gaps matter).
-- `scripts/_check-diff.py --base <target-branch>` -- append-only regressions: a removed SDF or slice fails the `removed-slices` CI gate (unless the package left the archive); a content path dropped from a kept slice has no CI gate but is a regression reviewers reject.
+```bash
+"<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
+"<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
+```
 
-Fold the output straight into your report: map `block` -> blocking, `warn` -> should-fix, `info` -> judge. Then spend your own judgement on what they can't check: dependency accuracy, test *depth*, design, forward-porting, and hint phrasing (noun phrase, no finite verbs -- see `kb/_slice-definition-format.md`).
+Fold findings into the review under `kb/_verification.md`, then assess design
+and runtime evidence before choosing the overall verdict.
 
-None cut a rootfs or run tests -- `chisel cut` (the `install-slices` CI check) and spread cover those.
+## 2. assess correctness and design
 
----
+Read the references relevant to the changed slices:
 
-## CI Checks
+- `kb/_slice-definition-format.md` and `kb/_chisel-formats.md`: field semantics,
+  manifest format and tool-version compatibility.
+- `kb/_slice-conventions.md`: grouping, naming, legal files, path style and
+  preservation of published slice contents.
+- `kb/_dependency-policy.md`: target package inspection, runtime dependency
+  selection, provider resolution and generated files.
 
-These automated checks run on every PR. Understand what each one validates:
+Inspect actual target package contents where needed:
 
-| Check | Failure means |
-|-------|---------------|
-| `lint` | yamllint failure, or `contents:`/`essential:` entries not sorted (bytewise, `LC_COLLATE=C`) |
-| `install-slices` | Slice can't `chisel cut`, or package not in archive for some arch |
-| `removed-slices` | SDF or slice deleted, or an SDF renamed away. The check fires on any removal; whether it is acceptable (package gone from the archive) is the reviewer's call |
-| `forward-port-missing` | New slice in branch but not in newer live releases |
-| `pkg-deps` | Informational diff of declared deps vs `apt depends`; non-blocking but reviewer signal |
-| `validate-hints` | `hint:` text fails the spaCy style check. Runs on every `ubuntu-*` PR that touches `slices/`, whatever the branch's format |
-| `spread` | Integration test failed. CI runs the lxd backend across a self-hosted multi-arch matrix (X64, ARM64, S390X, PPC64EL) |
-| `cla-check` | CLA unsigned |
+```bash
+python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
+```
 
-## Dependency Validation
+Trace the retained dependencies and compare against the files actually supplied
+by their slices. Review broad globs, shared paths and mutation effects. For
+removed declarations, establish whether effective contents are preserved through
+dependencies; static path comparison cannot decide this.
 
-- **`Depends:` only.** Not `Recommends:` or `Suggests:`. Including `Recommends:` is an immediate rejection.
-- **Stay true to deb's declared deps.** Each direct `apt Depends:` should appear as an `essential:` entry. Cross-check via `pkg-deps` CI output.
-- **Maintainer postinst is not mirrored.** If upstream `postinst` invokes another package's tool (e.g. `update-mime-database`), either drop the dep or write a `mutate:` equivalent. Do not pull in the tool's package as a dependency.
-- **Only slices we need.** Speculative slices (slices added "just in case") are rejected.
-- **Don't over-include.** A dep or path with no demonstrated need is pruned -- "if in doubt, leave it out". Flag deps that aren't justified by `ldd`/`lddtree` or a documented runtime lookup.
-- **All transitive lib providers listed.** `bins`/`libs` slices must name every shared-lib provider `lddtree` shows, even transitive ones (`libc6_libs`, `libgcc-s1_libs`, `libstdc++6_libs`, ...). `pkg-deps` CI helps, but check `lddtree` per arch.
-- **No config for un-sliced tools.** A config file for a program not sliced in chisel-releases (e.g. a `logrotate` drop-in with no `logrotate` slice) is redundant -- push to drop it.
-- **Use-case-agnostic.** Comments like "this slice exists for app X" are rejected. Describe what the slice ships, not who it's for.
+Validate disputed rules against the live sources in `kb/_upstream-sources.md`.
+Distinguish parser errors, demonstrated runtime defects and repository
+conventions. Do not turn an unsupported stylistic preference into a hard gate.
 
-## Append-Only Principle
+## 3. assess tests and upstream checks
 
-Published slices are **append-only in spirit**. Removing files from an existing slice is a regression for downstream consumers. If a slimmer variant is needed, create a new slice (`core`, `minimal`, or a more specific name) rather than removing from an existing one. `check-diff.py --base <target-branch>` catches these regressions deterministically.
+Use `kb/_spread-tests.md` for coverage, assertions and rootfs isolation. Review
+each affected package, including libraries, data and dependency packages.
+Explicit binary references alone do not prove execution or meaningful tests.
 
-## Naming Conventions
+Inspect the target branch's CI configuration and the reusable workflows it calls,
+using `kb/_upstream-sources.md`. Compare available lint, cut and spread results
+with the reviewed revision and architectures. Mark missing evidence unavailable;
+do not change the checkout to obtain it.
 
-Verify against the Canonical Slice Names table in `kb/_slice-conventions.md`:
+Read `kb/_chisel-branches.md` and live contribution guidance linked from
+`kb/_contributing.md` to establish forward-port obligations and PR requirements.
+Check discovery completeness before claiming that all maintained releases are
+covered. Package disappearance requires archive evidence, not a denied lookup.
 
-- `bins` not `bin` for executables (the singular `bin` is only right in `base-files`, which builds the `/bin` directory tree)
-- `libs` not `lib` for shared libraries (same `base-files` exception for the `/lib` tree)
-- `config` for configuration files; break large configs into `<purpose>-config`
-- `scripts` for non-binary executables (not in `bins`)
-- `copyright` for the deb copyright **and** any upstream `NOTICE` / `LICENSE` / `ThirdPartyNotices` (mandatory). There is no separate `license` or `notice` slice -- flag one as wrong
-- `core` for minimum-functional subset; avoid `all` -- `fonts-ubuntu` is the only SDF that legitimately uses it
-- `fonts` for font files (not `data`); `udev-rules`, not bare `rules`
-- When deb already names `<pkg>-core`, keep verbatim
+## review report
 
-Slice names must start with `a-z`, be >= 3 characters, and use only `a-z`, `0-9` and `-`. Chisel rejects anything else at parse time, so this is a hard gate rather than a convention.
+Return findings with file, slice/path, evidence and proposed correction:
 
-## Formatting and Path Style
+- **Blocking:** demonstrated parse/runtime failures or other hard requirements.
+- **Should-fix:** justified convention, design or test deficiencies.
+- **Nits:** optional improvements.
 
-Hard gates, all of them mechanical -- `check-slice.py` reports every one, so fold its output in rather than re-deriving them:
-
-1. **Contents paths and `essential:` entries sorted** bytewise (`LC_COLLATE=C`) within each slice. Both are CI `lint` gates.
-2. **Arch names**: lowercase Debian names only (`amd64`, `arm64`, `armhf`, `i386`, `ppc64el`, `riscv64`, `s390x`) -- never `x86_64`/`aarch64`.
-3. **File layout**: global `essential:` right after `package:`, `copyright` slice last, `package:` matching the filename stem, one package per file.
-
-The style rules the script can't judge -- multiarch globs, soname trailing `*`, version-glob pinning, glob narrowness, when a `symlink:` is redundant, symlink comments, inline option style -- are in the Path Entry Style section of `kb/_slice-conventions.md`. Review against that, and treat arch-list *order* as a nit rather than a gate.
-
-## Schema Version Compliance
-
-Only one SDF field is genuinely decided by `chisel.yaml`'s `format:` -- the shape of `essential:` (list on v1/v2, map on v3+) and, with it, whether `v3-essential:` is allowed. `check-slice.py` blocks on that deterministically; fold its output in. `kb/_chisel-formats.md` is the reference.
-
-`hint:` and `prefer:` are **not** format-gated -- chisel validates them under every format. Writing one on a v1/v2 branch is a convention violation worth a should-fix, not a parse error; do not report it as CI-breaking. The gate the script cannot see: `pro:` under `archives:` is v2+, and v1 uses a separate `v2-archives:` block.
-
-## Testing Requirements
-
-- **Binaries in a `bins` slice should be exercised** in spread tests. "Please test every binary being delivered" is a recurring ask, though representative coverage is accepted for suites and alternatives symlinks. `scripts/_check-test.py slices/<pkg>.yaml` reports the coverage and lists untested binaries -- flag a test that exercises none of them, and judge whether partial gaps matter.
-- **Untestable means unshippable.** Push to drop rather than ship untested.
-- **~80% coverage** is a soft target mentioned in PR coverage comments. Not a hard gate but actively watched.
-- **Functional slices need functional tests.** `--version` alone is insufficient for applications. Test actual functionality.
-- **One rootfs per test.** Reusing a rootfs across tests lets leftover slices mask a missing dependency -- push to split into a fresh `install-slices` per test.
-- **Hermetic by default.** Inputs generated inline, no apt-installing extras, bounded waits (no naked `sleep`/infinite retry), `grep -Fiq` for assertions. Exception: packages whose function IS the network path (CA bundles, TLS/http clients) may hit one stable well-known endpoint (e.g. `https://example.com`) -- upstream does.
-- Tests live at `tests/spread/integration/<pkg>/task.yaml`. `kb/_spread-tests.md` has the `install-slices` contract and the chroot setup patterns a test is expected to use.
-
-## Forward-Port Requirements
-
-- **Forward-porting is required** by upstream's CONTRIBUTING.md (`kb/_contributing.md`). PR chain goes oldest -> newest.
-- `forward-port-missing` CI auto-labels PRs that lack this.
-- Exception: package gone from the newer archive -- auto-ignored.
-- Non-forward-port PRs: mark with `### Forward porting\nn/a` in description.
-- Trivial forward-port PRs (cherry-picks of approved changes) sometimes land on one approval. Do not rely on it for substantive work.
-
-## Contribution Process
-
-Check the PR against upstream's commit conventions and PR etiquette, linked
-from `kb/_contributing.md`.
-
-## Copilot Warning
-
-GitHub Copilot auto-reviews and proposes patterns that reviewers reject:
-- Inner-spaced arch lists: `{ arch: [ amd64 ] }` (wrong)
-- `: {}` on essential entries (wrong for v1/v2)
-
-Do not follow Copilot suggestions blindly.
-
----
-
-## Review report
-
-Return a structured review to the caller (this is your output -- it is not shown to the user as chat). Organise findings by severity:
-- **blocking** -- hard-gate violations (formatting, missing copyright, wrong deps, regressions) that would fail CI or be rejected outright
-- **should-fix** -- convention / naming / testing issues reviewers reliably push back on
-- **nits** -- minor style points
-
-For each finding, give the file, the slice/path, what's wrong, and the fix. End with an overall verdict (approve / request-changes) and note any forward-port PRs still required.
-
-When fetching the diff to review, use read-only git (`git diff`, `git show`, `git log`) -- do not modify the working tree.
+List passed, failed and unavailable checks separately, then give the overall
+verdict under `kb/_verification.md`: approve, request-changes or incomplete.
+Include remaining forward ports and verification gaps. Respond to the user when
+invoked directly, or the parent agent when delegated.

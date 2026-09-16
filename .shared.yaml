@@ -2,6 +2,10 @@
 # `make sync-shared` writes the copies; `make check-shared` (ci) catches drift.
 shared:
   chisel-slicer:
+    verification.md:
+      path: kb/_verification.md
+    dependency-policy.md:
+      path: kb/_dependency-policy.md
     slice-definition-format.md:
       path: kb/_slice-definition-format.md
     slice-conventions.md:
@@ -33,6 +37,16 @@ shared:
     check-diff.py:
       path: scripts/_check-diff.py
   chisel-slice-reviewer:
+    verification.md:
+      path: kb/_verification.md
+    dependency-policy.md:
+      path: kb/_dependency-policy.md
+    upstream-sources.md:
+      path: kb/_upstream-sources.md
+    deb-list.py:
+      path: scripts/_deb-list.py
+    file.py:
+      path: scripts/_file.py
     slice-definition-format.md:
       path: kb/_slice-definition-format.md
     slice-conventions.md:
@@ -54,6 +68,12 @@ shared:
     check-diff.py:
       path: scripts/_check-diff.py
   chisel-slice-porter:
+    verification.md:
+      path: kb/_verification.md
+    dependency-policy.md:
+      path: kb/_dependency-policy.md
+    upstream-sources.md:
+      path: kb/_upstream-sources.md
     slice-definition-format.md:
       path: kb/_slice-definition-format.md
     slice-conventions.md:

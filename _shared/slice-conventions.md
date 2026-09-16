@@ -12,6 +12,14 @@ Do not include configuration for a tool that is not sliced, such as a logrotate
 drop-in without logrotate. Describe what a slice ships, not which application
 prompted its creation.
 
+## Published contents
+
+Preserve the effective contents of published slices. When subdividing a slice,
+keep its original name and make it depend on the new subslices so existing
+consumers retain their files. Run `_check-diff.py` after changing published
+slices and verify effective contents with before/after cuts. A package
+leaving an archive requires archive evidence, not a failed lookup.
+
 ## Canonical Slice Names
 
 Names are convention but reviewers enforce them. The counts below are how many SDFs on `ubuntu-26.04` use each name, as a rough signal of how established it is; a name is not wrong for being rare, but a rare one wants a reason.
