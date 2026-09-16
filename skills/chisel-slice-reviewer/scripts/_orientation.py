@@ -123,7 +123,6 @@ def live_releases(today: str) -> list[str]:
     """Which ubuntu-XX.XX branches exist, their manifest format, and whether they
     are still maintained. A branch EXISTING does not establish maintenance: EOL
     branches stay in the repo, frozen. Best-effort: an empty map without network."""
-    # url overridable for a mirror / fork / air-gapped clone (and hermetic tests).
     url = os.environ.get("CHISEL_RELEASES_URL", DEFAULT_URL)
     refs = run(["git", "ls-remote", "--heads", url, "ubuntu-*"], timeout=30) or ""
     branches = sorted(line.rsplit("refs/heads/", 1)[-1] for line in refs.splitlines() if "refs/heads/" in line)

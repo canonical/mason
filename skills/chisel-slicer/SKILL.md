@@ -160,10 +160,7 @@ spread lxd:tests/spread/integration/<pkg>
 ```
 
 `_try-cut` removes its temporary rootfs on exit and proves installability only.
-For rootfs inspection use the manual cut commands in `kb/_chisel-cli.md`. The cut
-reads the checkout (`--release ./`) and the Ubuntu archive; a denied or failed
-request to the upstream chisel-releases repository says nothing about it, so a
-403 from `chisel info` or `git ls-remote` is not a reason to skip the cut. Run
+For rootfs inspection use the manual cut commands in `kb/_chisel-cli.md`. Run
 spread when its backend is usable; orientation reports executables, not backend
 readiness. Classify each required check using the completion gate below.
 
