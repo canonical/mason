@@ -18,9 +18,12 @@
 
 ## skill design
 
-- The skills are to be succinct and provide the needed information without needless repetition
+- The skills are to be succinct and provide the needed information without needless repetition.
 - The SKILL.md contents ought not to duplicate knowledge from the knowledgebase, and vice-versa.
 - For each task make sure to define: what is a successful completion, what can block the task and what part of the task can remain unverified. Distinguish failed checks from unavailable checks. Make sure that these rules are consistent throughout the workflow.
 - It should be clear what every helper script does. Each helper script ought to have one distinct purpose, and few (ideally one) concrete ways of running it. The helper scripts ought not to duplicate one another's functionality.
 - Skills are explicitly designed to work online. Offline work is out of scope. Skills may assume network access to the Ubuntu archive, GitHub and upstream documentation. An unreachable network is an unavailable check to report, not something to work around: do not write offline fallbacks or bundle copies of upstream material for offline use.
 - The skills should not make special accommodations for tests and should instead be able to natively deal with the access refusal.
+- Markdown guidance should instruct agents when to use helper scripts, not describe their implementation or repeat their
+  output contracts. Scripts should make their purpose and results clear through their names, usage help and output. Agents can read the scripts when more detail is needed.
+- Shared markdown must not specify which skills use it. Their inclusion is defined via `.shared.yaml`. Describe the subject and task rules, not the consuming skills.
