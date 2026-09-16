@@ -258,10 +258,10 @@ def test_branch_format_from_git() -> None:
         assert "essential must be a map on v3" in lint("ubuntu-99.10"), lint(
             "ubuntu-99.10"
         )
-        # an unknown ref resolves to no format -> gated checks skipped, no crash.
+        # an unknown ref resolves to no format -> gated checks cannot run: block.
         out = lint("ubuntu-00.00")
         assert "essential must be a map on v3" not in out, out
-        assert "format unknown" in out, out
+        assert "block" in out and "format unknown" in out, out
 
 
 def test_branch_format_origin_fallback() -> None:
@@ -431,6 +431,7 @@ def test_orientation_release_discovery() -> None:
         assert doc["end-of-life"] == "2999-01-01", out
         assert doc["manifest format"] == "v3", out
         assert doc["tools"]["git"]["present"] is True, out
+        assert doc["release discovery"]["status"] == "passed", out
         # discovery table: live branches only, formats normalised. a branch whose
         # end-of-life has passed is not listed at all -- nor is one that declares
         # no end-of-life, since it cannot be shown to be live.
@@ -646,8 +647,10 @@ def test_orientation_edge_cases() -> None:
             check=False,
         )
         out = r.stdout + r.stderr
-        assert r.returncode == 0, out
+        assert r.returncode == 2, out
         doc = yaml.safe_load(out)
+        assert doc["release discovery"]["status"] == "unavailable", out
+        assert doc["release discovery"]["reasons"], out
         assert doc["working dir"].endswith('q"d'), out
         assert doc["suites"] is None, out  # block list: nothing on the key's own line
         assert doc["ubuntu version"] == "44.04", out

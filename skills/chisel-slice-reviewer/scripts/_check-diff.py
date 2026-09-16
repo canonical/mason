@@ -25,8 +25,8 @@ Usage:
 --base mode enumerates changed slices/*.yaml via git and compares each against
 <ref> (e.g. the release branch a PR targets). Default pathspec: slices/*.yaml.
 
-Output: one finding per line, `SEVERITY  where: message`. Exit code always 0
-(advisory); grep for `warn` to gate. Stdlib + pyyaml + git.
+Output: one finding per line, `SEVERITY  where: message`. Exit 1 on error (git
+failure, unreadable revision), otherwise 0 (advisory); inspect `warn` to gate.
 """
 
 from __future__ import annotations
@@ -60,9 +60,12 @@ def slice_paths(doc: Any) -> dict[str, set[str]]:
 
 def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, str]]:
     rows: list[tuple[str, str, str]] = []
-    old, new = slice_paths(parse(old_text)), slice_paths(parse(new_text))
+    old_doc = parse(old_text)
+    if not isinstance(old_doc, dict) or not isinstance(old_doc.get("slices"), dict):
+        raise SystemExit(f"error: {label}: base is not a parseable SDF")
+    old, new = slice_paths(old_doc), slice_paths(parse(new_text))
     if not old:
-        return rows  # nothing published before, or old wasn't an SDF
+        return rows
     if parse(new_text) is None or not new:
         # don't report every old slice as removed when the real defect is a
         # broken new file -- that misdirects the fix.
@@ -101,13 +104,9 @@ def run_base(base: str, pathspecs: list[str]) -> list[tuple[str, str, str]]:
     specs = pathspecs or ["slices/*.yaml"]
     status = git(["diff", "--name-status", base, "--", *specs])
     if status is None:
-        return [
-            (
-                "warn",
-                base,
-                "git diff failed -- is this a chisel-releases checkout, and is the ref present?",
-            )
-        ]
+        raise SystemExit(
+            f"error: git diff against {base!r} failed -- is this a chisel-releases checkout, and is the ref present?"
+        )
     rows: list[tuple[str, str, str]] = []
     for line in status.splitlines():
         parts = line.split("\t")
@@ -138,11 +137,13 @@ def run_base(base: str, pathspecs: list[str]) -> list[tuple[str, str, str]]:
             new = Path(new_path)
             if old_text is not None and new.exists():
                 rows += compare(old_text, new.read_text(encoding="utf-8"), new_path)
+            else:
+                raise SystemExit(f"error: {new_path}: cannot read both revisions")
         elif code.startswith("M"):
             old_text = git(["show", f"{base}:{path}"])
             new = Path(path)
             if old_text is None or not new.exists():
-                continue
+                raise SystemExit(f"error: {path}: cannot read both revisions")
             rows += compare(old_text, new.read_text(encoding="utf-8"), path)
     return rows
 

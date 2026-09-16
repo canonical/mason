@@ -13,7 +13,7 @@ changed SDFs and runs the three checkers over them:
   - check-diff    append-only regressions (removed SDF / slice / path)
 
 then prints one report grouped by severity, with a verdict, and exits non-zero
-if anything `block`s -- so a CI job or bot can gate on it without an agent.
+if anything `block`s (1) or a check is unavailable (2).
 
 Usage:
   review-diff.py --base <ref>
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SEVERITIES = ("block", "warn", "info")
+SEVERITIES = ("block", "warn", "info", "unavailable")
 
 
 def git(args: list[str]) -> str | None:
@@ -42,24 +42,31 @@ def git(args: list[str]) -> str | None:
 
 
 def run_check(script: str, *args: str) -> list[str]:
-    r = subprocess.run(
-        [sys.executable, str(HERE / script), *args],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        r = subprocess.run(
+            [sys.executable, str(HERE / script), *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as e:
+        return [f"unavailable  {script}: cannot run checker ({e})"]
     lines = (r.stdout + r.stderr).splitlines()
     findings = [ln for ln in lines if ln.split() and ln.split()[0] in SEVERITIES]
-    # a checker crash must not read as "no findings" -- exit 1 with zero
-    # parseable findings, or a traceback, means the check never ran.
-    if (r.returncode != 0 and not findings) or "Traceback" in r.stderr:
+    unavailable = any(ln.startswith("unavailable") for ln in findings)
+    expected_failure = r.returncode == 1 and any(
+        ln.startswith("block") for ln in findings
+    )
+    if "Traceback" in r.stderr or (
+        r.returncode != 0 and not unavailable and not expected_failure
+    ):
         tail = (
             r.stderr.strip().splitlines()[-1]
             if r.stderr.strip()
             else f"exit {r.returncode}"
         )
         findings.append(
-            f"warn   {script} {' '.join(args)}: checker crashed, findings unknown ({tail})"
+            f"unavailable  {script} {' '.join(args)}: checker did not complete ({tail})"
         )
     return findings
 
@@ -93,31 +100,42 @@ def main(argv: list[str]) -> int:
     changed = changed_slices(base)
     if changed is None:
         print(
-            f"error: git diff against '{base}' failed -- is this a checkout, and is the ref present?",
-            file=sys.stderr,
+            f"unavailable  {base}: git diff failed -- is this a checkout, and is the ref present?"
         )
+        print("verdict: incomplete")
         return 2
 
     findings: list[str] = []
     if changed:
-        findings += run_check("check-slice.py", *changed)
+        findings += run_check("_check-slice.py", *changed)
         for sdf in changed:
-            findings += run_check("check-test.py", sdf)
-    findings += run_check("check-diff.py", "--base", base)
+            findings += run_check("_check-test.py", sdf)
+    findings += run_check("_check-diff.py", "--base", base)
 
     rank = {s: i for i, s in enumerate(SEVERITIES)}
     findings.sort(key=lambda ln: rank.get(ln.split()[0], 9))
     blocks = sum(ln.startswith("block") for ln in findings)
     warns = sum(ln.startswith("warn") for ln in findings)
+    unavailable = sum(ln.startswith("unavailable") for ln in findings)
+    infos = sum(ln.startswith("info") for ln in findings)
 
     print(
-        f"reviewed {len(changed)} changed SDF(s) against {base}: {blocks} block, {warns} warn, {len(findings) - blocks - warns} info"
+        f"reviewed {len(changed)} changed SDF(s) against {base}: "
+        f"{blocks} block, {warns} warn, {infos} info, {unavailable} unavailable"
     )
     for ln in findings:
         print(ln)
-    verdict = "request-changes" if blocks else ("comment" if warns else "approve")
+    verdict = (
+        "request-changes"
+        if blocks
+        else "incomplete"
+        if unavailable
+        else "comment"
+        if warns
+        else "approve"
+    )
     print(f"verdict: {verdict}")
-    return 1 if blocks else 0
+    return 2 if unavailable else 1 if blocks else 0
 
 
 if __name__ == "__main__":

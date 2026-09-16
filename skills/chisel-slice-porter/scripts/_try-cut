@@ -13,7 +13,8 @@ Usage: try-cut [--arch ARCH] <pkg>_<slice> [...]
 
 Runs chisel cut --release <cwd> --root <tmpdir> with the given slices.
 The temp root is created in the current directory (chisel snap compat)
-and removed on exit. Passes chisel output through unchanged.
+and removed on exit. Passes chisel output and exit status through unchanged.
+Exit 2 with an unavailable diagnostic when chisel is not installed.
 EOF
     exit 1
 }
@@ -52,8 +53,8 @@ if [[ ${#SLICES[@]} -eq 0 ]]; then
 fi
 
 if ! command -v chisel >/dev/null 2>&1; then
-    echo "chisel not installed; skipping the cut -- the install-slices CI check covers it" >&2
-    exit 0
+    printf '%s\n' 'unavailable: chisel not installed; cut not run' >&2
+    exit 2
 fi
 
 RELEASE="$(pwd)"

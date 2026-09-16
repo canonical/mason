@@ -24,7 +24,8 @@ Output: one finding per line, `SEVERITY  where: message`.
   warn   missing/malformed task, unfinished scaffold, or no binary references.
   info   partial coverage (lists the untested binaries to review), or nothing
          to check (the SDF declares no explicit binaries).
-Exit code is always 0 (advisory); grep for `warn` to gate. Stdlib + pyyaml.
+  unavailable   an input could not be accessed.
+Exit 2 for unavailable checks, otherwise 0 (advisory); inspect `warn` to gate.
 """
 
 from __future__ import annotations
@@ -79,9 +80,11 @@ def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
     rows: list[tuple[str, str, str]] = []
     try:
         doc = yaml.safe_load(sdf.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, yaml.YAMLError) as e:
+    except (FileNotFoundError, UnicodeError, yaml.YAMLError) as e:
         rows.append(("warn", str(sdf), f"cannot read SDF: {e}"))
         return rows
+    except OSError as e:
+        return [("unavailable", str(sdf), f"cannot read SDF: {e}")]
 
     bins = declared_binaries(doc)
     task = (
@@ -101,8 +104,10 @@ def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
 
     try:
         sources = task_sources(task)
-    except (OSError, UnicodeError, TypeError, ValueError, yaml.YAMLError) as e:
+    except (UnicodeError, TypeError, ValueError, yaml.YAMLError) as e:
         return [("warn", str(task), f"cannot validate spread task: {e}")]
+    except OSError as e:
+        return [("unavailable", str(task), f"cannot read spread sources: {e}")]
     if any("TODO(author):" in source for source in sources):
         rows.append(
             (
@@ -180,7 +185,7 @@ def main(argv: list[str]) -> int:
         print(
             f"ok: {sdf} task shape valid; all explicit binaries referenced (not runtime proof)"
         )
-    return 0
+    return 2 if any(sev == "unavailable" for sev, _, _ in rows) else 0
 
 
 if __name__ == "__main__":

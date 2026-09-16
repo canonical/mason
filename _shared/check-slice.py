@@ -28,7 +28,7 @@ chisel.yaml from the local git object store, else the format: field of
 Output: one finding per line, `SEVERITY  file: where: message`.
   block  hard gate -- chisel won't parse it, or CI/lint fails. exit code 1.
   warn   reviewers reliably reject this. exit code stays 0.
-  info   nit, or a check skipped because format is unknown.
+  info   nit.
 
 Exit code is 1 if any block finding, else 0. Stdlib + pyyaml only; runs under
 `uv run` (per the shebang) or `python3 check-slice.py` if pyyaml is importable.
@@ -412,11 +412,11 @@ def check_v3_essential(doc: Any, fmt: int | None, f: Findings) -> None:
 def format_of_branch(branch: str) -> int | None:
     """Resolve a branch's format from *its own* chisel.yaml, read out of the local
     git object store -- no hardcoded branch->format table, no network. A static
-    linter stays offline and deterministic: `git show <ref>:chisel.yaml`, trying
+    linter reads the reviewed revision: `git show <ref>:chisel.yaml`, trying
     the local ref then origin/<ref> (in a fresh clone the target release is often
     only a remote-tracking ref, which is exactly the cross-branch case --branch
-    serves). None if the ref/file/format can't be found -- callers treat unknown
-    format by skipping the version-gated checks. Pass --format N to force it."""
+    serves). None if the ref/file/format can't be found, which blocks: the
+    version-gated checks cannot run. Pass --format N to force it."""
     for ref in (branch, f"origin/{branch}"):
         try:
             r = subprocess.run(
@@ -479,7 +479,7 @@ def check_file(path: Path, fmt: int | None) -> Findings:
     f = Findings(str(path))
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError as e:
+    except (OSError, UnicodeError) as e:
         f.block("", f"cannot read: {e}")
         return f
     try:
@@ -495,7 +495,7 @@ def check_file(path: Path, fmt: int | None) -> Findings:
     check_slices(doc, fmt, f)
     check_v3_essential(doc, fmt, f)
     if fmt is None:
-        f.info(
+        f.block(
             "",
             "format unknown: version-gated checks (hint/prefer/v3-essential/essential-map) skipped -- run inside the target checkout, or pass --format N",
         )
