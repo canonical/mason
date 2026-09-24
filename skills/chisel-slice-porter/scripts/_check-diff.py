@@ -13,10 +13,16 @@ checks -- single-file linting can't see them. This does:
   - an SDF that existed is now gone (or renamed) -> removed-slices CI fails
   - a slice key that existed is now gone         -> removed-slices CI fails
   - a content path dropped from a kept slice     -> append-only regression
+  - a kept path limited to fewer arches, or to
+    before mutation (until: mutate)              -> append-only regression
 
 Each is reported unless the package or path genuinely left the archive (which
 only the archive can confirm -- a human/CI decides that), so these are warnings
 carrying the CI consequence, not hard blocks.
+
+A dropped path the slice still installs through its essentials is a subdivided
+slice, not a regression, and is reported as info. Only same-package essentials
+that apply on every arch count; paths moved to another package still warn.
 
 Usage:
   check-diff.py --base <ref> [<pathspec> ...]   # git: compare <ref> vs worktree
@@ -46,16 +52,77 @@ def parse(text: str) -> Any:
         return None
 
 
-def slice_paths(doc: Any) -> dict[str, set[str]]:
-    """slice name -> set of content paths. empty if not an SDF."""
-    out: dict[str, set[str]] = {}
+def slice_contents(doc: Any) -> dict[str, dict[str, Any]]:
+    """slice name -> {content path: its options}. empty if not an SDF."""
+    out: dict[str, dict[str, Any]] = {}
     slices = doc.get("slices") if isinstance(doc, dict) else None
     if not isinstance(slices, dict):
         return out
     for name, body in slices.items():
         contents = body.get("contents") if isinstance(body, dict) else None
-        out[name] = set(contents) if isinstance(contents, dict) else set()
+        out[name] = dict(contents) if isinstance(contents, dict) else {}
     return out
+
+
+def essential_names(value: Any) -> list[str]:
+    """essential entries in list (v1/v2) or map (v3) form, minus arch-limited ones."""
+    if isinstance(value, list):
+        return [e for e in value if isinstance(e, str)]
+    if isinstance(value, dict):
+        return [
+            k for k, v in value.items() if not (isinstance(v, dict) and "arch" in v)
+        ]
+    return []
+
+
+def reachable(doc: Any) -> dict[str, list[str]]:
+    """slice name -> itself, then every same-package slice its essentials pull in."""
+    slices = doc["slices"]
+    pkg = doc.get("package")
+
+    def same_package(value: Any) -> list[str]:
+        names = essential_names(value)
+        return [s for p, _, s in (n.partition("_") for n in names) if p == pkg]
+
+    everywhere = same_package(doc.get("essential"))
+    out: dict[str, list[str]] = {}
+    for start in slices:
+        order: list[str] = []
+        queue = [start, *everywhere]
+        while queue:
+            name = queue.pop(0)
+            if name in order or name not in slices:
+                continue
+            order.append(name)
+            body = slices[name]
+            if isinstance(body, dict):
+                queue += same_package(body.get("essential"))
+        out[start] = order
+    return out
+
+
+def arches(options: Any) -> set[str] | None:
+    """the arches a content entry is limited to; None when it has no limit."""
+    arch = options.get("arch") if isinstance(options, dict) else None
+    if isinstance(arch, str):
+        return {arch}
+    if isinstance(arch, list):
+        return {a for a in arch if isinstance(a, str)}
+    return None
+
+
+def dropped_after_mutate(options: Any) -> bool:
+    return isinstance(options, dict) and options.get("until") not in (None, "")
+
+
+def covers(old: Any, new: Any) -> bool:
+    """whether the new entry installs the path wherever the old one did."""
+    if dropped_after_mutate(new) and not dropped_after_mutate(old):
+        return False
+    new_arches, old_arches = arches(new), arches(old)
+    if new_arches is None:
+        return True
+    return old_arches is not None and old_arches <= new_arches
 
 
 def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, str]]:
@@ -63,13 +130,16 @@ def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, st
     old_doc = parse(old_text)
     if not isinstance(old_doc, dict) or not isinstance(old_doc.get("slices"), dict):
         raise SystemExit(f"error: {label}: base is not a parseable SDF")
-    old, new = slice_paths(old_doc), slice_paths(parse(new_text))
+    new_doc = parse(new_text)
+    old, new = slice_contents(old_doc), slice_contents(new_doc)
     if not old:
         return rows
-    if parse(new_text) is None or not new:
+    if new_doc is None or not new:
         # don't report every old slice as removed when the real defect is a
         # broken new file -- that misdirects the fix.
         return [("warn", label, "new file is not a parseable SDF -- fix that first")]
+    reach = reachable(new_doc)
+    pkg = new_doc.get("package")
     for sname in old:
         if sname not in new:
             rows.append(
@@ -80,13 +150,32 @@ def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, st
                 )
             )
             continue
-        gone = old[sname] - new[sname]
-        for path in sorted(gone):
+        for path in sorted(old[sname], key=str):
+            owner = next(
+                (
+                    o
+                    for o in reach[sname]
+                    if path in new[o] and covers(old[sname][path], new[o][path])
+                ),
+                None,
+            )
+            if owner == sname:
+                continue
+            if owner is not None:
+                rows.append(
+                    (
+                        "info",
+                        f"{label}: {sname}",
+                        f"path moved to {pkg}_{owner}, still installed via essential: {path}",
+                    )
+                )
+                continue
+            change = "narrowed in" if path in new[sname] else "removed from"
             rows.append(
                 (
                     "warn",
                     f"{label}: {sname}",
-                    f"path removed from published slice: {path} (append-only regression)",
+                    f"path {change} published slice: {path} (append-only regression)",
                 )
             )
     return rows
