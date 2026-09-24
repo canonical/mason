@@ -557,6 +557,298 @@ def test_check_diff() -> None:
         assert "ok:" in out, out
 
 
+SPLIT_BASE = """\
+package: foo
+essential:
+  foo_copyright:
+slices:
+  bins:
+    essential:
+      libc6_libs:
+    contents:
+      /usr/bin/foo:
+      /usr/bin/foo-helper:
+  copyright:
+    contents:
+      /usr/share/doc/foo/copyright:
+"""
+
+
+def split(bins_essential: str, extra_slices: str = "") -> str:
+    """SPLIT_BASE with /usr/bin/foo-helper gone from bins' own contents."""
+    return f"""\
+package: foo
+essential:
+  foo_copyright:
+slices:
+  bins:
+    essential:
+      libc6_libs:
+{bins_essential}    contents:
+      /usr/bin/foo:
+{extra_slices}  copyright:
+    contents:
+      /usr/share/doc/foo/copyright:
+"""
+
+
+HELPER = """\
+  helper:
+    contents:
+      /usr/bin/foo-helper:
+"""
+
+
+def diff_rows(tmp_path: Path, old: str, new: str) -> list[str]:
+    out = run(
+        "check-diff.py",
+        write(tmp_path, "old.yaml", old),
+        write(tmp_path, "new.yaml", new),
+    )
+    assert "Traceback" not in out, out
+    return out.splitlines()
+
+
+def warns(rows: list[str]) -> list[str]:
+    return [r for r in rows if r.startswith("warn")]
+
+
+def infos(rows: list[str]) -> list[str]:
+    return [r for r in rows if r.startswith("info")]
+
+
+# a path that moved into a slice the old one still depends on is still installed
+# by it: that is how a published slice gets subdivided, not a regression.
+@pytest.mark.parametrize(
+    ("new", "owner"),
+    [
+        pytest.param(split("      foo_helper:\n", HELPER), "foo_helper", id="subslice"),
+        pytest.param(
+            split(
+                "      foo_a:\n",
+                "  a:\n    essential:\n      foo_helper:\n" + HELPER,
+            ),
+            "foo_helper",
+            id="transitive",
+        ),
+        pytest.param(
+            split("").replace(
+                "      /usr/share/doc/foo/copyright:\n",
+                "      /usr/bin/foo-helper:\n      /usr/share/doc/foo/copyright:\n",
+            ),
+            "foo_copyright",
+            id="package-wide-essential",
+        ),
+        pytest.param(
+            split(
+                "      foo_a:\n",
+                "  a:\n    essential:\n      foo_b:\n"
+                "  b:\n    essential:\n      foo_a:\n"
+                "    contents:\n      /usr/bin/foo-helper:\n",
+            ),
+            "foo_b",
+            id="essential-cycle",
+        ),
+    ],
+)
+def test_check_diff_path_moved_to_essential(
+    tmp_path: Path, new: str, owner: str
+) -> None:
+    rows = diff_rows(tmp_path, SPLIT_BASE, new)
+    assert not warns(rows), rows
+    moved = [r for r in infos(rows) if "/usr/bin/foo-helper" in r]
+    assert len(moved) == 1 and "new.yaml: bins:" in moved[0], rows
+    assert owner in moved[0], rows
+
+
+def test_check_diff_path_moved_to_essential_list_form(tmp_path: Path) -> None:
+    # v1/v2 list-form essentials resolve the same way as v3's map
+    old = SPLIT_BASE.replace("  foo_copyright:", "  - foo_copyright").replace(
+        "      libc6_libs:", "      - libc6_libs"
+    )
+    new = (
+        split("      - foo_helper\n", HELPER)
+        .replace("  foo_copyright:", "  - foo_copyright")
+        .replace("      libc6_libs:", "      - libc6_libs")
+    )
+    rows = diff_rows(tmp_path, old, new)
+    assert not warns(rows), rows
+    assert any("/usr/bin/foo-helper" in r and "foo_helper" in r for r in infos(rows))
+
+
+# the path is no longer installed with the slice, on every arch or at all, or
+# only another package could still ship it: each stays a regression.
+@pytest.mark.parametrize(
+    "new",
+    [
+        pytest.param(split(""), id="dropped"),
+        pytest.param(split("", HELPER), id="sibling-not-depended-on"),
+        pytest.param(
+            split("      foo_helper: {arch: [amd64]}\n", HELPER),
+            id="arch-limited-essential",
+        ),
+        pytest.param(split("      bar_helper:\n"), id="other-package"),
+        pytest.param(split("      foo_typo:\n", HELPER), id="dangling-essential"),
+        pytest.param(
+            split(
+                "      foo_helper:\n",
+                HELPER.replace("foo-helper:", "foo-helper: {arch: [amd64]}"),
+            ),
+            id="arch-limited-content",
+        ),
+        pytest.param(
+            split(
+                "      foo_helper:\n",
+                HELPER.replace("foo-helper:", "foo-helper: {until: mutate}"),
+            ),
+            id="until-mutate",
+        ),
+    ],
+)
+def test_check_diff_path_removed(tmp_path: Path, new: str) -> None:
+    rows = diff_rows(tmp_path, SPLIT_BASE, new)
+    removed = [r for r in warns(rows) if "/usr/bin/foo-helper" in r]
+    assert len(removed) == 1 and "path removed" in removed[0], rows
+    assert not infos(rows), rows
+
+
+@pytest.mark.parametrize(
+    ("old_arch", "new_arch", "moved"),
+    [
+        pytest.param("[amd64]", "[amd64]", True, id="same-arches"),
+        pytest.param("amd64", "[amd64, arm64]", True, id="more-arches"),
+        pytest.param("[amd64, arm64]", "[amd64]", False, id="fewer-arches"),
+    ],
+)
+def test_check_diff_arch_limited_path_moved(
+    tmp_path: Path, old_arch: str, new_arch: str, moved: bool
+) -> None:
+    # an arch-limited path only has to stay installed on the arches it had
+    old = SPLIT_BASE.replace("foo-helper:", f"foo-helper: {{arch: {old_arch}}}")
+    new = split(
+        "      foo_helper:\n",
+        HELPER.replace("foo-helper:", f"foo-helper: {{arch: {new_arch}}}"),
+    )
+    rows = diff_rows(tmp_path, old, new)
+    if moved:
+        assert not warns(rows) and len(infos(rows)) == 1, rows
+    else:
+        assert len(warns(rows)) == 1 and not infos(rows), rows
+
+
+# a path kept in its slice can still stop being installed where it was
+@pytest.mark.parametrize(
+    ("old_opts", "new_opts", "narrowed"),
+    [
+        pytest.param("", " {arch: [amd64]}", True, id="arch-added"),
+        pytest.param(
+            " {arch: [amd64, arm64]}", " {arch: amd64}", True, id="arch-dropped"
+        ),
+        pytest.param("", " {until: mutate}", True, id="until-mutate-added"),
+        pytest.param(" {arch: [amd64]}", "", False, id="arch-lifted"),
+        pytest.param(" {arch: amd64}", " {arch: [amd64]}", False, id="arch-respelt"),
+        pytest.param(" {until: mutate}", " {until: mutate}", False, id="until-kept"),
+        pytest.param(" {until: mutate}", "", False, id="until-lifted"),
+        pytest.param("", ' {until: ""}', False, id="until-empty"),
+    ],
+)
+def test_check_diff_entry_narrowed_in_place(
+    tmp_path: Path, old_opts: str, new_opts: str, narrowed: bool
+) -> None:
+    old = SPLIT_BASE.replace("foo-helper:", f"foo-helper:{old_opts}")
+    new = SPLIT_BASE.replace("foo-helper:", f"foo-helper:{new_opts}")
+    rows = diff_rows(tmp_path, old, new)
+    if narrowed:
+        hits = [r for r in warns(rows) if "/usr/bin/foo-helper" in r]
+        assert len(hits) == 1 and "path narrowed" in hits[0], rows
+    else:
+        assert "ok:" in "\n".join(rows) and not warns(rows), rows
+
+
+def test_check_diff_entry_narrowed_but_covered_by_essential(tmp_path: Path) -> None:
+    # the arches bins stops shipping itself, a slice it depends on still does
+    new = split("      foo_helper:\n", HELPER).replace(
+        "      /usr/bin/foo:\n",
+        "      /usr/bin/foo:\n      /usr/bin/foo-helper: {arch: [amd64]}\n",
+    )
+    rows = diff_rows(tmp_path, SPLIT_BASE, new)
+    assert not warns(rows), rows
+    assert any("/usr/bin/foo-helper" in r and "foo_helper" in r for r in infos(rows))
+
+
+def test_check_diff_until_empty_still_covers(tmp_path: Path) -> None:
+    # until: "" is chisel's default, the path stays in the rootfs
+    new = split(
+        "      foo_helper:\n", HELPER.replace("foo-helper:", 'foo-helper: {until: ""}')
+    )
+    rows = diff_rows(tmp_path, SPLIT_BASE, new)
+    assert not warns(rows) and len(infos(rows)) == 1, rows
+
+
+def test_check_diff_base_mode(tmp_path: Path) -> None:
+    # --base reads the old SDF from git and the new one from the worktree
+    import os
+
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+    }
+
+    def git(*a: str) -> None:
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "commit.gpgsign=false",
+                *a,
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+
+    def check_diff() -> list[str]:
+        r = subprocess.run(
+            [sys.executable, str(SCRIPTS / "check-diff.py"), "--base", "HEAD"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0 and "Traceback" not in r.stderr, r.stderr
+        return r.stdout.splitlines()
+
+    sdf = tmp_path / "slices" / "foo.yaml"
+    sdf.parent.mkdir()
+    sdf.write_text(SPLIT_BASE, encoding="utf-8")
+    git("init", "-q")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+
+    sdf.write_text(split("      foo_helper:\n", HELPER), encoding="utf-8")
+    rows = check_diff()
+    assert not warns(rows), rows
+    assert any(
+        r.startswith("info") and "slices/foo.yaml: bins:" in r and "foo_helper" in r
+        for r in rows
+    ), rows
+
+    sdf.write_text(split(""), encoding="utf-8")
+    rows = check_diff()
+    assert any(
+        "slices/foo.yaml: bins:" in r and "path removed" in r for r in warns(rows)
+    ), rows
+
+
 def test_scaffold_test() -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
