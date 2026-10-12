@@ -11,6 +11,8 @@ guesses.
 
 The output is the YAML report described in common.py, so it reads as prose and
 parses as data. Every value is a fact read off the machine or the checkout.
+Discovery treats an interim release as expired once its 9 months of support
+have passed, even when its branch never recorded an end-of-life.
 
 Usage: orientation.py
 
@@ -136,6 +138,17 @@ def branch_manifest(url: str, revision: str) -> str:
         return r.read().decode("utf-8", errors="replace")
 
 
+def expired_interim(branch: str, today: str) -> bool:
+    """An interim release past its 9 months of support, allowing a month for it
+    to ship late in its release month. LTS releases (even-year .04) never qualify."""
+    m = re.fullmatch(r"ubuntu-(\d\d)\.(\d\d)", branch)
+    if not m or (m.group(2) == "04" and int(m.group(1)) % 2 == 0):
+        return False
+    months = (2000 + int(m.group(1))) * 12 + int(m.group(2)) - 1 + 9 + 1
+    end = _dt.date(months // 12, months % 12 + 1, 1)
+    return _dt.date.fromisoformat(today) >= end
+
+
 def live_releases(today: str, report: common.Report) -> None:
     """Which ubuntu-XX.XX branches exist, their manifest format, and whether they
     are still maintained. A branch EXISTING does not establish maintenance: EOL
@@ -177,7 +190,8 @@ def live_releases(today: str, report: common.Report) -> None:
         try:
             maintained = _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
         except ValueError:
-            problems.append(f"{b}: maintenance end-of-life missing or invalid")
+            if not expired_interim(b, today):
+                problems.append(f"{b}: maintenance end-of-life missing or invalid")
             continue
         if not maintained:
             continue

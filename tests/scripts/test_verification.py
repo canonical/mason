@@ -289,6 +289,22 @@ def test_successful_empty_discovery_is_distinct(monkeypatch):
     assert doc["live releases"] == {}
 
 
+def test_expired_interim_without_end_of_life_is_not_live(monkeypatch):
+    # interims get 9 months of support, so an old one with no maintenance
+    # section is past it -- nothing about the live list is left unknown
+    doc = discover(monkeypatch, {"ubuntu-40.04": LIVE, "ubuntu-22.10": "format: v1\n"})
+    assert doc["status"] == "passed", doc
+    assert list(doc["live releases"]) == ["ubuntu-40.04"]
+
+
+@pytest.mark.parametrize("branch", ["ubuntu-38.04", "ubuntu-39.10"])
+def test_unknown_end_of_life_is_unavailable(monkeypatch, branch):
+    # an LTS, or an interim still inside its support window, could be live
+    doc = discover(monkeypatch, {"ubuntu-40.04": LIVE, branch: "format: v3\n"})
+    assert doc["status"] == "unavailable", doc
+    assert branch in doc["unavailable"][0]["reason"]
+
+
 def test_missing_maintenance_is_unknown(tmp_path, monkeypatch):
     orientation = module(SHARED / "orientation.py")
     monkeypatch.chdir(tmp_path)
