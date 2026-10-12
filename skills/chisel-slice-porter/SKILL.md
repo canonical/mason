@@ -91,7 +91,7 @@ Run the target repository's applicable lint checks. Cut each independently usabl
 new or changed slice and run the affected spread tasks when tools/backends permit:
 
 ```bash
-"<skill-root>/scripts/_try-cut" --arch <arch> <pkg>_<slice>
+uv run "<skill-root>/scripts/_try-cut.py" --arch <arch> <pkg>_<slice>
 spread lxd:tests/spread/integration/<pkg>
 ```
 
@@ -99,9 +99,11 @@ For changes to published target SDFs, compare against the target base revision:
 
 ```bash
 uv run "<skill-root>/scripts/_check-diff.py" --base <target-base-ref>
+uv run "<skill-root>/scripts/_try-cut.py" --base <target-base-ref> --arch <arch>
 ```
 
-Investigate removed declarations using before/after cuts. A successful source
+The second runs the before/after cuts that investigate removed declarations.
+A successful source
 cut is not target verification. For retained rootfs inspection, use
 `kb/_chisel-cli.md`.
 

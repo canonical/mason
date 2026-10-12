@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import shutil
 import subprocess
 import sys
 import urllib.error
@@ -149,17 +148,93 @@ def test_inaccessible_sdf_is_unavailable(monkeypatch, tmp_path):
     assert not report.findings
 
 
-def test_cut_without_chisel_does_not_pass(tmp_path):
+def cut(tmp_path, *args, chisel=None):
+    """try-cut run from a scratch release dir, with PATH holding only a fake chisel."""
+    bin_dir, release = tmp_path / "bin", tmp_path / "release"
+    bin_dir.mkdir()
+    release.mkdir()
+    if chisel is not None:
+        fake = bin_dir / "chisel"
+        fake.write_text(f"#!{sys.executable}\n{chisel}")
+        fake.chmod(0o755)
     result = subprocess.run(
-        [shutil.which("bash"), str(SHARED / "try-cut"), "foo_bins"],
-        env={**os.environ, "PATH": str(tmp_path)},
+        [sys.executable, str(SHARED / "try-cut.py"), *args],
+        cwd=release,
+        env={**os.environ, "PATH": str(bin_dir)},
         capture_output=True,
         text=True,
         check=False,
     )
-    assert result.returncode == 2
-    assert "unavailable" in result.stderr
-    assert not list(tmp_path.iterdir())
+    assert not list(release.iterdir()), "the temp root is left behind"
+    return result.returncode, yaml.safe_load(result.stdout), result.stderr
+
+
+FAKE_CHISEL = """\
+import pathlib, sys
+args = sys.argv[1:]
+if "--help" in args:
+    print("--ignore=<what>  ignore release checks")
+    sys.exit(0)
+sys.stderr.write("fetching things...\\n")
+{body}
+"""
+
+
+def test_cut_without_chisel_is_unavailable(tmp_path):
+    code, doc, _ = cut(tmp_path, "foo_bins")
+    assert code == 3
+    assert doc["status"] == "unavailable"
+    assert doc["unavailable"][0]["check"] == "cut"
+
+
+def test_cut_reports_what_it_installed(tmp_path):
+    body = (
+        'root = pathlib.Path(args[args.index("--root") + 1])\n'
+        '(root / "usr/bin").mkdir(parents=True)\n'
+        '(root / "usr/bin/foo").write_text("x")\n'
+        'print(" ".join(args))\n'
+    )
+    code, doc, err = cut(
+        tmp_path, "--arch", "arm64", "foo_bins", chisel=FAKE_CHISEL.format(body=body)
+    )
+    assert code == 0, err
+    assert doc["status"] == "passed"
+    assert (doc["arch"], doc["slices"], doc["files"]) == ("arm64", ["foo_bins"], 1)
+    # chisel's own output goes to stderr, stdout is the report
+    assert "fetching things" in err and "--ignore=unstable" in err
+
+
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        ("slice foo_bins has conflicting paths", "failed"),
+        (
+            "cannot talk to archive: dial tcp: lookup archive.ubuntu.com: no such host",
+            "unavailable",
+        ),
+        (
+            "main/binary-amd64/Packages is missing from stonking main component digests",
+            "unavailable",
+        ),
+    ],
+)
+def test_cut_failure_is_classified(tmp_path, error, status):
+    body = f'sys.stderr.write("error: {error}\\n")\nsys.exit(1)\n'
+    code, doc, err = cut(tmp_path, "foo_bins", chisel=FAKE_CHISEL.format(body=body))
+    assert (code, doc["status"]) == ({"failed": 1, "unavailable": 3}[status], status), (
+        err
+    )
+    if status == "failed":
+        [finding] = doc["findings"]["foo_bins"]
+        reason = finding["error"]
+    else:
+        reason = doc["unavailable"][0]["reason"]
+    assert error in reason
+
+
+def test_cut_usage_error(tmp_path):
+    code, doc, err = cut(tmp_path)
+    assert code == 2 and doc is None and "usage" in err
 
 
 def discover(monkeypatch, branches, today="2040-01-01"):

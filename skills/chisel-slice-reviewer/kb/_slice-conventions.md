@@ -17,8 +17,9 @@ prompted its creation.
 Preserve the effective contents of published slices. When subdividing a slice,
 keep its original name and make it depend on the new subslices so existing
 consumers retain their files. Run `_check-diff.py` after changing published
-slices and verify effective contents with before/after cuts. A package
-leaving an archive requires archive evidence, not a failed lookup.
+slices, then `_try-cut.py --base` to confirm the effective contents with
+before/after cuts. A package leaving an archive requires archive evidence, not
+a failed lookup.
 
 ## Canonical Slice Names
 

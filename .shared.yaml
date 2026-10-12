@@ -26,8 +26,8 @@ shared:
       path: scripts/_deb-list.py
     file.py:
       path: scripts/_file.py
-    try-cut:
-      path: scripts/_try-cut
+    try-cut.py:
+      path: scripts/_try-cut.py
     scaffold-test.py:
       path: scripts/_scaffold-test.py
     check-slice.py:
@@ -100,8 +100,8 @@ shared:
       path: scripts/_deb-list.py
     file.py:
       path: scripts/_file.py
-    try-cut:
-      path: scripts/_try-cut
+    try-cut.py:
+      path: scripts/_try-cut.py
     scaffold-test.py:
       path: scripts/_scaffold-test.py
     check-slice.py:
