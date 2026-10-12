@@ -58,7 +58,10 @@ Beyond this table, packages freely coin their own names for functional subsets -
 Conventions on how a `contents:` path is written. Chisel accepts either form; reviewers do not.
 
 - **Multiarch lib glob**: `*-linux-*`, not explicit triples -- `/usr/lib/*-linux-*/libnghttp2.so.14*:`.
-- **Drop the trailing `*` for single-version sonames**: `libfoo.so.1:`, not `libfoo.so.1*:`.
+- **Soname glob follows the deb's layout**: `libfoo.so.1*:` when the deb ships the
+  `libfoo.so.1` symlink next to the versioned `libfoo.so.1.2.3` (the usual case);
+  bare `libfoo.so.1:` only when that is the one real file. The package listing
+  shows which.
 - **Version globs pin major.minor only**, never the patch: `/usr/src/rustc-1.93.*/**`, `/usr/lib/perl5/*/`. A patch-level pin breaks on the next package update.
 - **Keep globs narrow.** A broad `**` or a bare `*.pm` collides with other packages' paths. Add another path level to scope it (`.../perl5/*/auto/DBI/DBI.so:`). A path more than one package could own is a red flag -- grep the branch's `slices/` before declaring one.
 - **No explicit `symlink:` if the deb ships it.** Chisel preserves the deb's own symlinks. Write `symlink:` only for paths the deb does not ship, e.g. ones a maintainer script creates.
