@@ -1,25 +1,26 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pyyaml"]
+# ///
 """orientation: deterministic orientation for the slice-authoring agent -- run
 FIRST, every time. Reports where you are, which tools this machine actually
 has, the target release + manifest format parsed from ./chisel.yaml, and the
 live release landscape (discovered, never hardcoded). Work from this, not from
 guesses.
 
-The output is YAML, so it reads as prose and parses as data. Every value is a
-fact read off the machine or the checkout; nothing here is inferred.
+The output is the YAML report described in common.py, so it reads as prose and
+parses as data. Every value is a fact read off the machine or the checkout.
 
 Usage: orientation.py
 
-Exit 2 when release discovery or checkout access is unavailable; facts that
-could be established are still printed alongside the reasons.
-
-Stdlib only, so it runs before anything else is known to work.
+Unavailable when release discovery is incomplete or there is no checkout to
+read; the facts that could be established are still reported.
 """
 
 from __future__ import annotations
 
 import datetime as _dt
-import json
 import os
 import re
 import shutil
@@ -27,6 +28,11 @@ import subprocess
 import sys
 import urllib.request
 from pathlib import Path
+
+try:
+    import _common as common
+except ImportError:
+    import common
 
 TOOLS = ("chisel", "dpkg-deb", "file", "spread", "uv", "python3", "git")
 DEFAULT_URL = "https://github.com/canonical/chisel-releases.git"
@@ -38,14 +44,6 @@ _UBUNTU_VERSION = re.compile(r"^[ \t]+version:[ \t]*(.*)$", re.MULTILINE)
 _SUITES = re.compile(r"suites:[ \t]*(.*)$", re.MULTILINE)
 _COMPONENTS = re.compile(r"components:[ \t]*(.*)$", re.MULTILINE)
 _EOL = re.compile(r"^[ \t]*end-of-life:[ \t]*(.*)$", re.MULTILINE)
-
-
-def q(value: str | None) -> str:
-    """YAML-safe scalar: quoted, so a version or a date is not read as a float
-    or a timestamp, and an empty value comes back as null rather than nothing."""
-    if not value:
-        return "null"
-    return json.dumps(value)
 
 
 def run(cmd: list[str], timeout: int = 20, require_ok: bool = True) -> str | None:
@@ -65,59 +63,66 @@ def first(pattern: re.Pattern[str], text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def tools() -> list[str]:
+def tools() -> dict[str, common.Flow]:
     # --version only. a bare "<tool> version" fallback would be a real
     # invocation -- spread would read spread.yaml and treat it as a job filter --
     # and orientation must stay read-only.
-    out = ["tools:"]
+    out = {}
     for t in TOOLS:
         if not shutil.which(t):
-            out.append(f"  {t}: {{present: false, version: null}}")
+            out[t] = common.Flow(present=False, version=None)
             continue
         text = run([t, "--version"], timeout=10, require_ok=False) or ""
         m = _VERSION.search(text)
         # present but unversioned is a fact of its own: chisel prints "unknown"
         # on an unstamped build, spread has no version flag at all. null is
         # reserved for a tool that is not here to have a version.
-        out.append(
-            f"  {t}: {{present: true, version: {q(m.group(0) if m else 'unknown')}}}"
-        )
+        out[t] = common.Flow(present=True, version=m.group(0) if m else "unknown")
     return out
 
 
-def checkout(today: str) -> list[str]:
-    """Facts about ./chisel.yaml, or the release: null line when there is none."""
+def inline_list(value: str) -> list[str] | None:
+    """A flow list like [a, b] written on the key's own line, else None."""
+    m = re.fullmatch(r"\[(.*)\]", value.strip())
+    return [v.strip() for v in m.group(1).split(",") if v.strip()] if m else None
+
+
+def checkout(today: str, report: common.Report) -> None:
+    """Facts about ./chisel.yaml, or why there are none."""
     try:
         text = Path("chisel.yaml").read_text(encoding="utf-8", errors="replace")
     except FileNotFoundError:
-        return [
-            "release: null  # no ./chisel.yaml here; cd into a chisel-releases checkout first"
-        ]
+        report.mark_unavailable(
+            "checkout",
+            "no ./chisel.yaml here; cd into a chisel-releases checkout first",
+        )
+        return
     except OSError as e:
-        return [f"checkout error: {q(str(e))}"]
+        report.mark_unavailable("checkout", str(e))
+        return
 
     branch = (run(["git", "branch", "--show-current"]) or "").strip()
     eol = first(_EOL, text).strip("\"'")
     try:
-        maintained = str(
-            _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
-        ).lower()
+        maintained = _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
     except ValueError:
-        maintained = "null"
+        maintained = None
     try:
         n = len([f for f in os.listdir("slices") if not f.startswith(".")])
     except OSError:
         n = 0
-    return [
-        f"branch: {q(branch)}",
-        f"ubuntu version: {q(first(_UBUNTU_VERSION, text).replace(chr(39), ''))}",
-        f"manifest format: {q(first(_FORMAT, text))}",
-        f"suites: {first(_SUITES, text) or 'null'}",
-        f"components: {first(_COMPONENTS, text) or 'null'}",
-        f"end-of-life: {q(eol)}",
-        f"maintained: {maintained}",
-        f"existing slices: {n}",
-    ]
+    report.data.update(
+        {
+            "branch": branch or None,
+            "ubuntu version": first(_UBUNTU_VERSION, text).replace("'", "") or None,
+            "manifest format": first(_FORMAT, text) or None,
+            "suites": inline_list(first(_SUITES, text)),
+            "components": inline_list(first(_COMPONENTS, text)),
+            "end-of-life": eol or None,
+            "maintained": maintained,
+            "existing slices": n,
+        }
+    )
 
 
 def branch_manifest(url: str, revision: str) -> str:
@@ -131,12 +136,12 @@ def branch_manifest(url: str, revision: str) -> str:
         return r.read().decode("utf-8", errors="replace")
 
 
-def live_releases(today: str) -> tuple[list[str], bool]:
+def live_releases(today: str, report: common.Report) -> None:
     """Which ubuntu-XX.XX branches exist, their manifest format, and whether they
     are still maintained. A branch EXISTING does not establish maintenance: EOL
     branches stay in the repo, frozen. Report incomplete discovery explicitly."""
     url = os.environ.get("CHISEL_RELEASES_URL", DEFAULT_URL)
-    errors = []
+    problems = []
     refs = ""
     try:
         result = subprocess.run(
@@ -147,15 +152,15 @@ def live_releases(today: str) -> tuple[list[str], bool]:
             check=False,
         )
         if result.returncode:
-            errors.append(
+            problems.append(
                 f"{url}: {result.stderr.strip() or f'exit {result.returncode}'}"
             )
         else:
             refs = result.stdout
     except (OSError, subprocess.SubprocessError) as e:
-        errors.append(f"{url}: {e}")
+        problems.append(f"{url}: {e}")
 
-    entries = []
+    live = {}
     heads = (line.split() for line in refs.splitlines())
     for b, revision in sorted(
         (ref.removeprefix("refs/heads/"), rev) for rev, ref in heads
@@ -163,48 +168,35 @@ def live_releases(today: str) -> tuple[list[str], bool]:
         try:
             cy = branch_manifest(url, revision)
         except OSError as e:
-            errors.append(f"{b}: {e}")
+            problems.append(f"{b}: {e}")
             continue
         # normalise "v3" / "chisel-v1" / "1" -> "v1".."v3".
         digits = re.search(r"[0-9]+", first(_FORMAT, cy))
-        fmt = f"v{digits.group(0)}" if digits else ""
+        fmt = f"v{digits.group(0)}" if digits else None
         eol = first(_EOL, cy).strip("\"'")
         try:
             maintained = _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
         except ValueError:
-            errors.append(f"{b}: maintenance end-of-life missing or invalid")
+            problems.append(f"{b}: maintenance end-of-life missing or invalid")
             continue
         if not maintained:
             continue
         if not fmt:
-            errors.append(f"{b}: manifest format missing or invalid")
-        entries.append(f"  {b}: {{format: {q(fmt)}, end-of-life: {q(eol)}}}")
-    out = ["live releases:", *entries] if entries else ["live releases: {}"]
-    out += ["release discovery:", f"  status: {'unavailable' if errors else 'passed'}"]
-    if errors:
-        out += ["  reasons:", *(f"    - {q(e)}" for e in errors)]
-    return out, bool(errors)
+            problems.append(f"{b}: manifest format missing or invalid")
+        live[b] = common.Flow(format=fmt, **{"end-of-life": eol})
+    report.data["live releases"] = live
+    for problem in problems:
+        report.mark_unavailable("release discovery", problem)
 
 
 def main() -> int:
     today = _dt.datetime.now(tz=_dt.timezone.utc).astimezone().date().isoformat()
-    local = checkout(today)
-    discovery, unavailable = live_releases(today)
-    lines = [
-        f"working dir: {q(os.getcwd())}",
-        "",
-        *tools(),
-        "",
-        *local,
-        "",
-        *discovery,
-    ]
-    sys.stdout.write("\n".join(lines) + "\n")
-    return (
-        2
-        if unavailable or any(line.startswith("checkout error:") for line in local)
-        else 0
-    )
+    report = common.Report({})
+    report.data["working dir"] = os.getcwd()
+    report.data["tools"] = tools()
+    checkout(today, report)
+    live_releases(today, report)
+    return report.emit()
 
 
 if __name__ == "__main__":

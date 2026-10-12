@@ -3,24 +3,20 @@
 from __future__ import annotations
 
 import gzip
+import importlib.util
 import os
 import struct
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "_shared" / "file.py"
+MODULE = Path(__file__).resolve().parents[2] / "_shared" / "file.py"
 
 
 def describe(*paths: Path) -> list[str]:
-    r = subprocess.run(
-        [sys.executable, str(SCRIPT), "-bh", "--", *map(str, paths)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return r.stdout.splitlines()
+    spec = importlib.util.spec_from_file_location("file", MODULE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return [module.describe(str(p)) for p in paths]
 
 
 def elf64(e_type: int, machine: int, interp: bytes | None) -> bytes:
@@ -31,11 +27,26 @@ def elf64(e_type: int, machine: int, interp: bytes | None) -> bytes:
     interp_off = phoff + phentsize * phnum
     ident = b"\x7fELF" + bytes([2, 1, 1, 0]) + b"\0" * 8
     header = ident + struct.pack(
-        "<HHIQQQIHHHHHH", e_type, machine, 1, 0, phoff, 0, 0, 64, phentsize, phnum, 64, 0, 0
+        "<HHIQQQIHHHHHH",
+        e_type,
+        machine,
+        1,
+        0,
+        phoff,
+        0,
+        0,
+        64,
+        phentsize,
+        phnum,
+        64,
+        0,
+        0,
     )
     body = header
     if interp:
-        body += struct.pack("<IIQQQQQQ", 3, 4, interp_off, 0, 0, len(interp) + 1, len(interp) + 1, 1)
+        body += struct.pack(
+            "<IIQQQQQQ", 3, 4, interp_off, 0, 0, len(interp) + 1, len(interp) + 1, 1
+        )
         body += interp + b"\0"
     return body
 
@@ -56,7 +67,24 @@ def test_kinds() -> None:
         (d / "so").write_bytes(elf64(3, 0x3E, None))
         (d / "exe").write_bytes(elf64(2, 0x3E, b"/lib64/ld-linux-x86-64.so.2"))
         out = describe(
-            *(d / n for n in ("sh", "py", "ascii", "utf8", "empty", "gz", "bin", "link", "dir", "pie", "so", "exe", "missing"))
+            *(
+                d / n
+                for n in (
+                    "sh",
+                    "py",
+                    "ascii",
+                    "utf8",
+                    "empty",
+                    "gz",
+                    "bin",
+                    "link",
+                    "dir",
+                    "pie",
+                    "so",
+                    "exe",
+                    "missing",
+                )
+            )
         )
     assert out == [
         "POSIX shell script, ASCII text executable",
@@ -75,9 +103,6 @@ def test_kinds() -> None:
     ], out
 
 
-def test_prefix_without_brief() -> None:
-    with tempfile.TemporaryDirectory() as td:
-        p = Path(td) / "t"
-        p.write_bytes(b"x\n")
-        r = subprocess.run([sys.executable, str(SCRIPT), str(p)], capture_output=True, text=True, check=True)
-    assert r.stdout == f"{p}: ASCII text\n"
+def test_is_a_module() -> None:
+    # deb-list imports it; nothing runs it as a command
+    assert 'if __name__ == "__main__":' not in MODULE.read_text()

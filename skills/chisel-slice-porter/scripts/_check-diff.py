@@ -31,18 +31,33 @@ Usage:
 --base mode enumerates changed slices/*.yaml via git and compares each against
 <ref> (e.g. the release branch a PR targets). Default pathspec: slices/*.yaml.
 
-Output: one finding per line, `SEVERITY  where: message`. Exit 1 on error (git
-failure, unreadable revision), otherwise 0 (advisory); inspect `warn` to gate.
+Output: the YAML report described in common.py. Findings are advisory; a base
+that git cannot produce or that does not parse makes the check unavailable.
 """
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+try:
+    import _common as common
+except ImportError:
+    import common
+
+REJECTED = "reviewers reject it unless it left the archive"
+CODES = {
+    "sdf-removed": "removed-slices ci fails unless the package left the archive",
+    "sdf-renamed": "the old file name is gone: removed-slices ci fails unless the package left the archive",
+    "slice-removed": "removed-slices ci fails unless the package left the archive",
+    "removed": f"dropped from a published slice; {REJECTED}",
+    "narrowed": f"kept, but installed on fewer arches or dropped after mutate; {REJECTED}",
+    "moved": "still installed through an essential, i.e. a subdivided slice",
+    "unparseable": "the new file does not parse as an SDF; fix that first",
+}
 
 
 def parse(text: str) -> Any:
@@ -125,145 +140,113 @@ def covers(old: Any, new: Any) -> bool:
     return old_arches is not None and old_arches <= new_arches
 
 
-def compare(old_text: str, new_text: str, label: str) -> list[tuple[str, str, str]]:
-    rows: list[tuple[str, str, str]] = []
+def compare(old_text: str, new_text: str, label: str, report: common.Report) -> None:
     old_doc = parse(old_text)
     if not isinstance(old_doc, dict) or not isinstance(old_doc.get("slices"), dict):
-        raise SystemExit(f"error: {label}: base is not a parseable SDF")
+        report.mark_unavailable("base", f"{label}: base is not a parseable SDF")
+        return
     new_doc = parse(new_text)
     old, new = slice_contents(old_doc), slice_contents(new_doc)
     if not old:
-        return rows
+        return
     if new_doc is None or not new:
         # don't report every old slice as removed when the real defect is a
         # broken new file -- that misdirects the fix.
-        return [("warn", label, "new file is not a parseable SDF -- fix that first")]
+        report.add("warn", "unparseable", label)
+        return
     reach = reachable(new_doc)
     pkg = new_doc.get("package")
     for sname in old:
         if sname not in new:
-            rows.append(
-                (
-                    "warn",
-                    f"{label}: {sname}",
-                    "slice removed -- removed-slices CI fails unless the package left the archive",
-                )
-            )
+            report.add("warn", "slice-removed", label, slice=sname)
             continue
         for path in sorted(old[sname], key=str):
+            was = old[sname][path]
             owner = next(
                 (
                     o
                     for o in reach[sname]
-                    if path in new[o] and covers(old[sname][path], new[o][path])
+                    if path in new[o] and covers(was, new[o][path])
                 ),
                 None,
             )
             if owner == sname:
                 continue
+            at = {"slice": sname, "path": path}
             if owner is not None:
-                rows.append(
-                    (
-                        "info",
-                        f"{label}: {sname}",
-                        f"path moved to {pkg}_{owner}, still installed via essential: {path}",
-                    )
+                report.add("info", "moved", label, **at, to=f"{pkg}_{owner}")
+            elif path in new[sname]:
+                now = new[sname][path]
+                report.add(
+                    "warn", "narrowed", label, **at, was=was or {}, now=now or {}
                 )
-                continue
-            change = "narrowed in" if path in new[sname] else "removed from"
-            rows.append(
-                (
-                    "warn",
-                    f"{label}: {sname}",
-                    f"path {change} published slice: {path} (append-only regression)",
-                )
-            )
-    return rows
+            else:
+                report.add("warn", "removed", label, **at)
 
 
-def git(args: list[str]) -> str | None:
-    try:
-        r = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
-    except OSError:
-        return None
-    return r.stdout if r.returncode == 0 else None
-
-
-def run_base(base: str, pathspecs: list[str]) -> list[tuple[str, str, str]]:
+def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
     specs = pathspecs or ["slices/*.yaml"]
-    status = git(["diff", "--name-status", base, "--", *specs])
+    status = common.git(["diff", "--name-status", base, "--", *specs])
     if status is None:
-        raise SystemExit(
-            f"error: git diff against {base!r} failed -- is this a chisel-releases checkout, and is the ref present?"
+        report.mark_unavailable(
+            "base",
+            f"git diff against {base!r} failed; is this a chisel-releases checkout, and is the ref present?",
         )
-    rows: list[tuple[str, str, str]] = []
+        return
     for line in status.splitlines():
         parts = line.split("\t")
         if len(parts) < 2:
             continue
         code, path = parts[0], parts[-1]
         if code.startswith("D"):
-            rows.append(
-                (
-                    "warn",
-                    path,
-                    "SDF removed -- removed-slices CI fails unless the package left the archive",
-                )
-            )
+            report.add("warn", "sdf-removed", path)
         elif code.startswith("R") and len(parts) >= 3:
             # rename: old path is parts[1], new is parts[2]. the old filename is
             # gone (removed-slices CI fails on it, e.g. a soname bump), and the
             # rename may also drop slices/paths -- compare old vs new content.
             old_path, new_path = parts[1], parts[2]
-            rows.append(
-                (
-                    "warn",
-                    old_path,
-                    "SDF renamed away -- removed-slices CI fails unless the package left the archive",
-                )
-            )
-            old_text = git(["show", f"{base}:{old_path}"])
-            new = Path(new_path)
-            if old_text is not None and new.exists():
-                rows += compare(old_text, new.read_text(encoding="utf-8"), new_path)
-            else:
-                raise SystemExit(f"error: {new_path}: cannot read both revisions")
+            report.add("warn", "sdf-renamed", old_path, to=new_path)
+            compare_revisions(base, old_path, new_path, report)
         elif code.startswith("M"):
-            old_text = git(["show", f"{base}:{path}"])
-            new = Path(path)
-            if old_text is None or not new.exists():
-                raise SystemExit(f"error: {path}: cannot read both revisions")
-            rows += compare(old_text, new.read_text(encoding="utf-8"), path)
-    return rows
+            compare_revisions(base, path, path, report)
+
+
+def compare_revisions(
+    base: str, old_path: str, new_path: str, report: common.Report
+) -> None:
+    old_text = common.git(["show", f"{base}:{old_path}"])
+    try:
+        new_text = Path(new_path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        new_text = None
+    if old_text is None or new_text is None:
+        report.mark_unavailable("base", f"{new_path}: cannot read both revisions")
+        return
+    compare(old_text, new_text, new_path, report)
+
+
+USAGE = "usage: check-diff.py --base <ref> [<pathspec> ...] | <old.yaml> <new.yaml>"
 
 
 def main(argv: list[str]) -> int:
     if argv and argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
-    rows: list[tuple[str, str, str]]
+    report = common.Report(CODES)
     if argv and argv[0] == "--base":
         if len(argv) < 2:
-            print("usage: check-diff.py --base <ref> [<pathspec> ...]", file=sys.stderr)
-            return 2
-        rows = run_base(argv[1], argv[2:])
+            return common.usage(USAGE)
+        run_base(argv[1], argv[2:], report)
     elif len(argv) == 2:
-        old, new = Path(argv[0]), Path(argv[1])
-        rows = compare(
-            old.read_text(encoding="utf-8"), new.read_text(encoding="utf-8"), str(new)
-        )
+        try:
+            old, new = (Path(a).read_text(encoding="utf-8") for a in argv)
+        except (OSError, UnicodeError) as e:
+            report.mark_unavailable("read", str(e))
+        else:
+            compare(old, new, argv[1], report)
     else:
-        print(
-            "usage: check-diff.py --base <ref> [<pathspec> ...] | <old.yaml> <new.yaml>",
-            file=sys.stderr,
-        )
-        return 2
-
-    for sev, where, msg in rows:
-        print(f"{sev:5}  {where}: {msg}")
-    if not rows:
-        print("ok: no append-only regressions")
-    return 0
+        return common.usage(USAGE)
+    return report.emit()
 
 
 if __name__ == "__main__":

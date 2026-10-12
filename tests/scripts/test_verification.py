@@ -31,6 +31,9 @@ slices:
 
 
 def module(path):
+    # a helper imports its common module from its own directory
+    if str(path.parent) not in sys.path:
+        sys.path.insert(0, str(path.parent))
     spec = importlib.util.spec_from_file_location(path.stem, path)
     result = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(result)
@@ -57,17 +60,23 @@ def test_review_runs_installed_checkers(tmp_path, monkeypatch, capsys):
         return original(script, *args)
 
     monkeypatch.setattr(review, "run_check", run_check)
-    assert review.main(["--base", "base"]) == 0
-    assert "verdict: approve" in capsys.readouterr().out
+
+    def verdict() -> tuple[int, dict]:
+        code = review.main(["--base", "base"])
+        return code, yaml.safe_load(capsys.readouterr().out)
+
+    code, doc = verdict()
+    assert (code, doc["status"], doc["verdict"]) == (0, "passed", "approve"), doc
 
     (tmp_path / "foo.yaml").write_text(SDF.replace("package: foo", "package: bar"))
-    assert review.main(["--base", "base"]) == 1
-    assert "verdict: request-changes" in capsys.readouterr().out
+    code, doc = verdict()
+    assert (code, doc["status"], doc["verdict"]) == (1, "failed", "request-changes")
+    assert "package-mismatch" in {f["code"] for f in doc["findings"]["foo.yaml"]}
 
     (tmp_path / "foo.yaml").write_text(SDF)
     base.write_text("bad: [yaml")
-    assert review.main(["--base", "base"]) == 2
-    assert "verdict: incomplete" in capsys.readouterr().out
+    code, doc = verdict()
+    assert (code, doc["status"], doc["verdict"]) == (3, "unavailable", "incomplete")
 
 
 def test_review_missing_base_is_incomplete(tmp_path):
@@ -78,9 +87,9 @@ def test_review_missing_base_is_incomplete(tmp_path):
         text=True,
         check=False,
     )
-    assert result.returncode == 2
-    assert "unavailable" in result.stdout
-    assert "verdict: incomplete" in result.stdout
+    doc = yaml.safe_load(result.stdout)
+    assert result.returncode == 3
+    assert (doc["status"], doc["verdict"]) == ("unavailable", "incomplete")
 
 
 @pytest.mark.parametrize("kind", ["missing", "crash-after-warning"])
@@ -89,13 +98,14 @@ def test_checker_crash_is_unavailable(tmp_path, monkeypatch, kind):
     monkeypatch.setattr(review, "HERE", tmp_path)
     if kind == "crash-after-warning":
         (tmp_path / "checker.py").write_text(
-            'print("warn  example: existing finding")\nraise RuntimeError("broken")\n'
+            'print("status: passed")\nraise RuntimeError("broken")\n'
         )
-    findings = review.run_check("checker.py")
-    assert any(line.startswith("unavailable") for line in findings)
+    doc = review.run_check("checker.py")
+    assert doc["status"] == "unavailable"
+    assert doc["unavailable"][0]["check"] == "checker.py"
 
 
-def test_unknown_format_blocks(tmp_path):
+def test_unknown_format_is_unavailable(tmp_path):
     sdf = tmp_path / "foo.yaml"
     sdf.write_text(SDF)
     result = subprocess.run(
@@ -105,12 +115,13 @@ def test_unknown_format_blocks(tmp_path):
         text=True,
         check=False,
     )
-    assert result.returncode == 1
-    assert "block" in result.stdout
-    assert "ok:" not in result.stdout
+    doc = yaml.safe_load(result.stdout)
+    assert result.returncode == 3
+    assert doc["status"] == "unavailable"
+    assert [u["check"] for u in doc["unavailable"]] == ["format"]
 
 
-def test_diff_unreadable_base_is_an_error(tmp_path):
+def test_diff_unreadable_base_is_unavailable(tmp_path):
     old, new = tmp_path / "old.yaml", tmp_path / "new.yaml"
     old.write_text("bad: [yaml")
     new.write_text(SDF)
@@ -120,9 +131,10 @@ def test_diff_unreadable_base_is_an_error(tmp_path):
         text=True,
         check=False,
     )
-    assert result.returncode == 1
-    assert "error:" in result.stderr
-    assert "ok:" not in result.stdout
+    doc = yaml.safe_load(result.stdout)
+    assert result.returncode == 3
+    assert doc["status"] == "unavailable"
+    assert [u["check"] for u in doc["unavailable"]] == ["base"]
 
 
 def test_inaccessible_sdf_is_unavailable(monkeypatch, tmp_path):
@@ -132,8 +144,9 @@ def test_inaccessible_sdf_is_unavailable(monkeypatch, tmp_path):
         raise PermissionError("access denied")
 
     monkeypatch.setattr(Path, "read_text", denied)
-    rows = checker.check(tmp_path / "foo.yaml", None)
-    assert rows[0][0] == "unavailable"
+    report = checker.check(tmp_path / "foo.yaml", None)
+    assert report.status == "unavailable"
+    assert not report.findings
 
 
 def test_cut_without_chisel_does_not_pass(tmp_path):
@@ -149,50 +162,65 @@ def test_cut_without_chisel_does_not_pass(tmp_path):
     assert not list(tmp_path.iterdir())
 
 
-def test_partial_release_discovery_reports_access_refusal(monkeypatch):
+def discover(monkeypatch, branches, today="2040-01-01"):
+    """orientation's release discovery over fake branches: name -> chisel.yaml,
+    or an exception to raise when that branch's manifest is read."""
     orientation = module(SHARED / "orientation.py")
+    refs = "".join(
+        f"{n}{i}\trefs/heads/{b}\n"
+        for i, (b, n) in enumerate(zip(branches, "abcdefgh"))
+    )
     monkeypatch.setattr(
         orientation.subprocess,
         "run",
-        lambda *a, **kw: subprocess.CompletedProcess(
-            a, 0, "aaa\trefs/heads/ubuntu-40.04\nbbb\trefs/heads/ubuntu-40.10\n", ""
-        ),
+        lambda *a, **kw: subprocess.CompletedProcess(a, 0, refs, ""),
     )
+    by_rev = {
+        f"{n}{i}": v for i, (n, v) in enumerate(zip("abcdefgh", branches.values()))
+    }
 
     def manifest(url, revision):
-        if revision == "bbb":
-            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)
-        return "format: v3\nmaintenance:\n  end-of-life: 2999-01-01\n"
+        value = by_rev[revision]
+        if isinstance(value, Exception):
+            raise value
+        return value
 
     monkeypatch.setattr(orientation, "branch_manifest", manifest)
-    lines, unavailable = orientation.live_releases("2040-01-01")
-    doc = yaml.safe_load("\n".join(lines))
-    assert unavailable
+    report = module(SHARED / "common.py").Report({})
+    orientation.live_releases(today, report)
+    return report.document()
+
+
+LIVE = "format: v3\nmaintenance:\n  end-of-life: 2999-01-01\n"
+
+
+def test_partial_release_discovery_reports_access_refusal(monkeypatch):
+    doc = discover(
+        monkeypatch,
+        {
+            "ubuntu-40.04": LIVE,
+            "ubuntu-40.10": urllib.error.HTTPError("u", 403, "Forbidden", {}, None),
+        },
+    )
     assert "ubuntu-40.04" in doc["live releases"]
-    assert doc["release discovery"]["status"] == "unavailable"
-    assert "403" in doc["release discovery"]["reasons"][0]
+    assert doc["status"] == "unavailable"
+    [problem] = doc["unavailable"]
+    assert problem["check"] == "release discovery" and "403" in problem["reason"]
 
 
 def test_successful_empty_discovery_is_distinct(monkeypatch):
-    orientation = module(SHARED / "orientation.py")
-    monkeypatch.setattr(
-        orientation.subprocess,
-        "run",
-        lambda *a, **kw: subprocess.CompletedProcess(a, 0, "", ""),
-    )
-    lines, unavailable = orientation.live_releases("2040-01-01")
-    doc = yaml.safe_load("\n".join(lines))
-    assert not unavailable
+    doc = discover(monkeypatch, {})
+    assert doc["status"] == "passed"
     assert doc["live releases"] == {}
-    assert doc["release discovery"]["status"] == "passed"
 
 
 def test_missing_maintenance_is_unknown(tmp_path, monkeypatch):
     orientation = module(SHARED / "orientation.py")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "chisel.yaml").write_text("format: v3\n")
-    doc = yaml.safe_load("\n".join(orientation.checkout("2040-01-01")))
-    assert doc["maintained"] is None
+    report = module(SHARED / "common.py").Report({})
+    orientation.checkout("2040-01-01", report)
+    assert report.data["maintained"] is None
 
 
 def test_checkout_access_refusal_is_not_missing_checkout(tmp_path, monkeypatch):
@@ -203,9 +231,11 @@ def test_checkout_access_refusal_is_not_missing_checkout(tmp_path, monkeypatch):
         raise PermissionError("access denied")
 
     monkeypatch.setattr(Path, "read_text", denied)
-    doc = yaml.safe_load("\n".join(orientation.checkout("2040-01-01")))
-    assert doc["checkout error"] == "access denied"
-    assert "release" not in doc
+    report = module(SHARED / "common.py").Report({})
+    orientation.checkout("2040-01-01", report)
+    [problem] = report.unavailable
+    assert problem["check"] == "checkout" and "access denied" in problem["reason"]
+    assert "branch" not in report.data
 
 
 def test_inaccessible_task_is_not_a_test_defect(tmp_path, monkeypatch):
@@ -221,5 +251,27 @@ def test_inaccessible_task_is_not_a_test_defect(tmp_path, monkeypatch):
         raise PermissionError("access denied")
 
     monkeypatch.setattr(checker, "task_sources", denied)
-    rows = checker.check(sdf, None)
-    assert rows[0][0] == "unavailable"
+    report = checker.check(sdf, None)
+    assert report.status == "unavailable"
+    assert not report.findings
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["check-slice.py", "missing.yaml", "--format", "3"],
+        ["check-diff.py", "missing.yaml", "also-missing.yaml"],
+    ],
+)
+def test_missing_input_is_unavailable_not_a_defect(tmp_path, args):
+    # an input that cannot be read says nothing about the SDF under review
+    result = subprocess.run(
+        [sys.executable, str(SHARED / args[0]), *args[1:]],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    doc = yaml.safe_load(result.stdout)
+    assert (result.returncode, doc["status"]) == (3, "unavailable"), result.stdout
+    assert "findings" not in doc

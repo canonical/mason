@@ -16,8 +16,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "_shared"
+EXIT = {"passed": 0, "failed": 1, "unavailable": 3}
 
 
 def run(script: str, *args: str) -> str:
@@ -28,6 +30,43 @@ def run(script: str, *args: str) -> str:
         check=False,
     )
     return r.stdout + r.stderr
+
+
+def report(script: str, *args: str, **kwargs) -> tuple[int, dict]:
+    """Run a helper and return its exit code and its document, checked against
+    the output contract in _shared/common.py."""
+    r = subprocess.run(
+        [sys.executable, str(SCRIPTS / script), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        **kwargs,
+    )
+    assert "Traceback" not in r.stderr, r.stderr
+    doc = yaml.safe_load(r.stdout)
+    assert isinstance(doc, dict) and doc.get("status") in EXIT, r.stdout + r.stderr
+    assert r.returncode == EXIT[doc["status"]], (r.returncode, r.stdout)
+    for items in (doc.get("findings") or {}).values():
+        for item in items:
+            assert item["sev"] in ("block", "warn", "info"), item
+            assert item["code"] in doc["codes"], item
+    if doc["status"] == "unavailable":
+        assert doc["unavailable"], doc
+    return r.returncode, doc
+
+
+def found(doc: dict, sev: str | None = None) -> list[dict]:
+    """Every finding, with its file folded in, optionally of one severity."""
+    return [
+        {"file": file, **item}
+        for file, items in (doc.get("findings") or {}).items()
+        for item in items
+        if sev in (None, item["sev"])
+    ]
+
+
+def codes(doc: dict, sev: str | None = None) -> set[str]:
+    return {f["code"] for f in found(doc, sev)}
 
 
 def write(d: Path, name: str, text: str) -> str:
@@ -91,26 +130,30 @@ slices:
 def test_check_slice() -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
+
+        def lint(text: str, fmt: str, name: str = "foo.yaml") -> dict:
+            return report("check-slice.py", write(d, name, text), "--format", fmt)[1]
+
         # list-form essential is the v1/v2 shape; the map form is v3's.
-        out = run("check-slice.py", write(d, "foo.yaml", CLEAN), "--format", "1")
-        assert "ok:" in out and "block" not in out, out
-        out = run("check-slice.py", write(d, "foo.yaml", CLEAN_V3), "--format", "3")
-        assert "ok:" in out and "block" not in out, out
+        for text, fmt in ((CLEAN, "1"), (CLEAN_V3, "3")):
+            doc = lint(text, fmt)
+            assert doc["status"] == "passed" and not found(doc), doc
         # COVER: shape-vs-format gates both ways -- list on v3 and map on v1 are
         # chisel parse errors the linter must block.
-        out = run("check-slice.py", write(d, "foo.yaml", CLEAN), "--format", "3")
-        assert "essential must be a map on v3" in out, out
-        out = run("check-slice.py", write(d, "foo.yaml", CLEAN_V3), "--format", "1")
-        assert "essential-as-map is v3+ only" in out, out
+        assert "essential-list" in codes(lint(CLEAN, "3"), "block")
+        assert "essential-map" in codes(lint(CLEAN_V3, "1"), "block")
 
-        out = run("check-slice.py", write(d, "foo.yaml", DIRTY), "--format", "1")
-        assert "contents paths not sorted" in out, out
-        assert "essential entries not sorted" in out, out
-        assert "man pages" in out, out
+        doc = lint(DIRTY, "1")
+        unsorted = {f["field"] for f in found(doc, "block") if f["code"] == "unsorted"}
+        assert unsorted == {"contents", "essential"}, doc
+        assert any(
+            f["code"] == "clutter" and f["path"] == "/usr/share/man/man1/foo.1"
+            for f in found(doc, "warn")
+        ), doc
         # chisel does not gate hint: on format -- it is branch convention, so a
         # v1 branch gets a warning, never a block.
-        assert "hint: is a v3+ branch convention" in out, out
-        assert "block" not in out.split("bins.hint")[1].split("\n")[0], out
+        assert "hint-format" in codes(doc, "warn"), doc
+        assert not any(f.get("field") == "hint" for f in found(doc, "block")), doc
 
         # COVER: the path-shape rules chisel enforces at parse time. each is a
         # block on its own, and none of them fire on a well-formed path.
@@ -122,22 +165,16 @@ def test_check_slice() -> None:
             )
 
         for entry, expected in [
-            ("/usr/bin/*: {mode: 0755}", "wildcard path cannot set"),
-            ("/usr/lib/foo: {make: true}", "make: true requires the path to end in /"),
+            ("/usr/bin/*: {mode: 0755}", "glob-options"),
+            ("/usr/lib/foo: {make: true}", "make-path"),
             (
                 "/var/lib/chisel/**: {generate: manifest, until: mutate}",
-                "only arch: is allowed",
+                "generate-options",
             ),
-            (
-                "/var/lib/chisel/*/**: {generate: manifest}",
-                "must end in /** and hold no other wildcard",
-            ),
-            ("/x: {prefer: foo}", "names its own package"),
+            ("/var/lib/chisel/*/**: {generate: manifest}", "generate-path"),
+            ("/x: {prefer: foo}", "prefer-self"),
         ]:
-            out = run(
-                "check-slice.py", write(d, "foo.yaml", path_sdf(entry)), "--format", "3"
-            )
-            assert expected in out, (entry, out)
+            assert expected in codes(lint(path_sdf(entry), "3"), "block"), entry
 
         for entry in [
             "/usr/bin/*: {arch: [amd64]}",
@@ -145,10 +182,7 @@ def test_check_slice() -> None:
             "/var/lib/chisel/**: {generate: manifest}",
             "/x: {prefer: otherpkg}",
         ]:
-            out = run(
-                "check-slice.py", write(d, "foo.yaml", path_sdf(entry)), "--format", "3"
-            )
-            assert "block" not in out, (entry, out)
+            assert not found(lint(path_sdf(entry), "3"), "block"), entry
 
         # base-files really does own bin/ and lib/ -- exempt from the name warning.
         bf = (
@@ -156,44 +190,34 @@ def test_check_slice() -> None:
             "  bin:\n    contents:\n      /bin:\n"
             "  copyright:\n    contents:\n      /usr/share/doc/base-files/copyright:\n"
         )
-        out = run("check-slice.py", write(d, "base-files.yaml", bf), "--format", "3")
-        assert "use 'bins'" not in out, out
+        assert "slice-name" not in codes(lint(bf, "3", "base-files.yaml"))
 
         # filename must match package.
-        out = run("check-slice.py", write(d, "bar.yaml", CLEAN), "--format", "3")
-        assert "!= filename stem" in out, out
+        mismatch = [
+            f
+            for f in found(lint(CLEAN, "3", "bar.yaml"), "block")
+            if f["code"] == "package-mismatch"
+        ]
+        assert mismatch and mismatch[0]["package"] == "foo", mismatch
+        assert mismatch[0]["file-stem"] == "bar", mismatch
 
         # hint validation (v3): a good hint is clean; length/style are checked.
         def hint_sdf(h):
             return f"package: foo\nessential:\n  foo_copyright:\nslices:\n  bins:\n    hint: {h}\n    contents:\n      /usr/bin/foo:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
 
-        out = run(
-            "check-slice.py",
-            write(d, "foo.yaml", hint_sdf("System log viewer")),
-            "--format",
-            "3",
-        )
-        assert "hint" not in out, out  # valid hint, no findings
-        out = run(
-            "check-slice.py",
-            write(
-                d,
-                "foo.yaml",
-                hint_sdf("The tool that manages absolutely everything here."),
-            ),
-            "--format",
-            "3",
-        )
-        assert "caps it at 40" in out, out  # length is a parse-error block
-        assert "start with an article" in out, out  # style warn
+        assert not found(lint(hint_sdf("System log viewer"), "3"))
+        doc = lint(hint_sdf("The tool that manages absolutely everything here."), "3")
+        assert "hint-too-long" in codes(doc, "block"), doc  # a parse error
+        assert any(
+            f["code"] == "hint-style" and f["rule"] == "article"
+            for f in found(doc, "warn")
+        ), doc
 
         # v3-essential is a v1/v2 backport; a chisel parse error on v3.
         v3e = "package: foo\nslices:\n  bins:\n    v3-essential:\n      libc6_libs: {arch: [amd64]}\n    contents:\n      /usr/bin/foo:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
-        out = run("check-slice.py", write(d, "foo.yaml", v3e), "--format", "3")
-        assert "v3-essential is rejected on v3" in out, out
+        assert "v3-essential" in codes(lint(v3e, "3"), "block")
         # ...but fine on v1 (no finding).
-        out = run("check-slice.py", write(d, "foo.yaml", v3e), "--format", "1")
-        assert "v3-essential" not in out, out
+        assert "v3-essential" not in codes(lint(v3e, "1"))
 
 
 def test_branch_format_from_git() -> None:
@@ -237,31 +261,18 @@ def test_branch_format_from_git() -> None:
         git("add", "-A")
         git("commit", "-qm", "base")
 
-        def lint(branch: str) -> str:
-            r = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPTS / "check-slice.py"),
-                    "foo.yaml",
-                    "--branch",
-                    branch,
-                ],
-                cwd=str(d),
-                capture_output=True,
-                text=True,
-                env=env,
-                check=False,
-            )
-            return r.stdout + r.stderr
+        def lint(branch: str) -> dict:
+            return report(
+                "check-slice.py", "foo.yaml", "--branch", branch, cwd=str(d), env=env
+            )[1]
 
         # v3 resolved from the committed chisel.yaml -> list-form essential blocks.
-        assert "essential must be a map on v3" in lint("ubuntu-99.10"), lint(
-            "ubuntu-99.10"
-        )
-        # an unknown ref resolves to no format -> gated checks cannot run: block.
-        out = lint("ubuntu-00.00")
-        assert "essential must be a map on v3" not in out, out
-        assert "block" in out and "format unknown" in out, out
+        assert "essential-list" in codes(lint("ubuntu-99.10"), "block")
+        # an unknown ref resolves to no format -> the gated checks cannot run.
+        doc = lint("ubuntu-00.00")
+        assert "essential-list" not in codes(doc), doc
+        assert doc["status"] == "unavailable", doc
+        assert [u["check"] for u in doc["unavailable"]] == ["format"], doc
 
 
 def test_branch_format_origin_fallback() -> None:
@@ -330,23 +341,16 @@ def test_branch_format_origin_fallback() -> None:
         )
         assert rb.returncode != 0, "expected ubuntu-88.04 to be remote-only"
 
-        r = subprocess.run(
-            [
-                sys.executable,
-                str(SCRIPTS / "check-slice.py"),
-                "foo.yaml",
-                "--branch",
-                "ubuntu-88.04",
-            ],
+        _, doc = report(
+            "check-slice.py",
+            "foo.yaml",
+            "--branch",
+            "ubuntu-88.04",
             cwd=str(clone),
-            capture_output=True,
-            text=True,
             env=env,
-            check=False,
         )
-        out = r.stdout + r.stderr
         # v3 resolved via origin/ubuntu-88.04 -> list-form essential blocks.
-        assert "essential must be a map on v3" in out, out
+        assert "essential-list" in codes(doc, "block"), doc
 
 
 def test_orientation_release_discovery() -> None:
@@ -431,7 +435,7 @@ def test_orientation_release_discovery() -> None:
         assert doc["end-of-life"] == "2999-01-01", out
         assert doc["manifest format"] == "v3", out
         assert doc["tools"]["git"]["present"] is True, out
-        assert doc["release discovery"]["status"] == "passed", out
+        assert doc["status"] == "passed", out
         # discovery table: live branches only, formats normalised. a branch whose
         # end-of-life has passed is not listed at all -- nor is one that declares
         # no end-of-life, since it cannot be shown to be live.
@@ -451,13 +455,13 @@ def test_check_test() -> None:
             "task.yaml",
             'summary: x\nexecute: |\n  rootfs="$(install-slices foo_bins)"\n  chroot "$rootfs" foo --version\n',
         )
-        out = run("check-test.py", sdf, exercised)
-        assert "ok:" in out, out
+        _, doc = report("check-test.py", sdf, exercised)
+        assert doc["status"] == "passed" and not found(doc), doc
 
         # a test that touches none of the binaries is the red flag (warn).
         missing = write(d, "empty.yaml", "summary: x\nexecute: |\n  true\n")
-        out = run("check-test.py", sdf, missing)
-        assert "warn" in out and "references none" in out, out
+        _, doc = report("check-test.py", sdf, missing)
+        assert "untested" in codes(doc, "warn"), doc
 
         # partial coverage is advisory (info), not a warn: two bins, one tested.
         two = "package: foo\nessential:\n  - foo_copyright\nslices:\n  bins:\n    contents:\n      /usr/bin/foo:\n      /usr/bin/zzz:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
@@ -465,9 +469,11 @@ def test_check_test() -> None:
         one = write(
             d, "one.yaml", 'summary: x\nexecute: |\n  chroot "$r" foo --version\n'
         )
-        out = run("check-test.py", sdf2, one)
-        assert "info" in out and "1/2 binaries referenced" in out and "zzz" in out, out
-        assert "warn" not in out, out
+        _, doc = report("check-test.py", sdf2, one)
+        partial = [f for f in found(doc, "info") if f["code"] == "partly-tested"]
+        assert partial and partial[0]["unreferenced"] == ["zzz"], doc
+        assert (partial[0]["referenced"], partial[0]["declared"]) == (1, 2), doc
+        assert not found(doc, "warn"), doc
 
 
 @pytest.mark.parametrize(
@@ -477,8 +483,8 @@ def test_check_test_requires_task_without_explicit_binaries(
     tmp_path: Path, contents: str
 ) -> None:
     sdf = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
-    out = run("check-test.py", sdf, str(tmp_path / "missing.yaml"))
-    assert "warn" in out and "no spread test found" in out, out
+    _, doc = report("check-test.py", sdf, str(tmp_path / "missing.yaml"))
+    assert "no-test" in codes(doc, "warn"), doc
 
 
 @pytest.mark.parametrize(
@@ -494,9 +500,8 @@ def test_check_test_requires_task_without_explicit_binaries(
 )
 def test_check_test_rejects_malformed_task(tmp_path: Path, task: str) -> None:
     sdf = write(tmp_path, "foo.yaml", CLEAN)
-    out = run("check-test.py", sdf, write(tmp_path, "task.yaml", task))
-    assert "warn" in out and "cannot validate spread task" in out, out
-    assert "Traceback" not in out, out
+    _, doc = report("check-test.py", sdf, write(tmp_path, "task.yaml", task))
+    assert "task-invalid" in codes(doc, "warn"), doc
 
 
 def test_check_test_ignores_metadata_and_comments(tmp_path: Path) -> None:
@@ -509,13 +514,12 @@ def test_check_test_ignores_metadata_and_comments(tmp_path: Path) -> None:
             "  # foo --version\n  true  # foo\n"
         ),
     )
-    out = run("check-test.py", sdf, task)
-    assert "warn" in out and "references none" in out, out
+    assert "untested" in codes(report("check-test.py", sdf, task)[1], "warn")
     write(tmp_path, "test.sh", "# foo\ntrue # foo\n")
-    assert "references none" in run("check-test.py", sdf, task)
+    assert "untested" in codes(report("check-test.py", sdf, task)[1], "warn")
     write(tmp_path, "test.sh", 'chroot "$rootfs" /usr/bin/foo --version\n')
     task = write(tmp_path, "task.yaml", "summary: x\nexecute: ./test.sh\n")
-    assert "ok:" in run("check-test.py", sdf, task)
+    assert not found(report("check-test.py", sdf, task)[1])
 
 
 def test_check_test_accepts_data_assertions(tmp_path: Path) -> None:
@@ -530,17 +534,17 @@ def test_check_test_accepts_data_assertions(tmp_path: Path) -> None:
             '  chroot "$rootfs" consumer /usr/share/foo/data | grep -Fiq expected\n'
         ),
     )
-    out = run("check-test.py", sdf, task)
-    assert "info" in out and "review slice assertions manually" in out, out
-    assert "warn" not in out, out
+    _, doc = report("check-test.py", sdf, task)
+    assert "no-binaries" in codes(doc, "info"), doc
+    assert not found(doc, "warn"), doc
 
 
 def test_check_test_reports_unreadable_helper(tmp_path: Path) -> None:
     sdf = write(tmp_path, "foo.yaml", CLEAN)
     task = write(tmp_path, "task.yaml", "summary: x\nexecute: ./test.sh\n")
     (tmp_path / "test.sh").write_bytes(b"\xff")
-    out = run("check-test.py", sdf, task)
-    assert "warn" in out and "Traceback" not in out, out
+    _, doc = report("check-test.py", sdf, task)
+    assert "task-invalid" in codes(doc, "warn"), doc
 
 
 def test_check_diff() -> None:
@@ -550,11 +554,11 @@ def test_check_diff() -> None:
         # drop the whole bins slice -> both slice-removed and path-removed shapes.
         shrunk = "package: foo\nessential:\n  - foo_copyright\nslices:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
         new = write(d, "new.yaml", shrunk)
-        out = run("check-diff.py", old, new)
-        assert "slice removed" in out, out
+        _, doc = report("check-diff.py", old, new)
+        assert "slice-removed" in codes(doc, "warn"), doc
 
-        out = run("check-diff.py", old, old)
-        assert "ok:" in out, out
+        _, doc = report("check-diff.py", old, old)
+        assert doc["status"] == "passed" and not found(doc), doc
 
 
 SPLIT_BASE = """\
@@ -599,22 +603,12 @@ HELPER = """\
 """
 
 
-def diff_rows(tmp_path: Path, old: str, new: str) -> list[str]:
-    out = run(
+def diff(tmp_path: Path, old: str, new: str) -> dict:
+    return report(
         "check-diff.py",
         write(tmp_path, "old.yaml", old),
         write(tmp_path, "new.yaml", new),
-    )
-    assert "Traceback" not in out, out
-    return out.splitlines()
-
-
-def warns(rows: list[str]) -> list[str]:
-    return [r for r in rows if r.startswith("warn")]
-
-
-def infos(rows: list[str]) -> list[str]:
-    return [r for r in rows if r.startswith("info")]
+    )[1]
 
 
 # a path that moved into a slice the old one still depends on is still installed
@@ -654,11 +648,15 @@ def infos(rows: list[str]) -> list[str]:
 def test_check_diff_path_moved_to_essential(
     tmp_path: Path, new: str, owner: str
 ) -> None:
-    rows = diff_rows(tmp_path, SPLIT_BASE, new)
-    assert not warns(rows), rows
-    moved = [r for r in infos(rows) if "/usr/bin/foo-helper" in r]
-    assert len(moved) == 1 and "new.yaml: bins:" in moved[0], rows
-    assert owner in moved[0], rows
+    doc = diff(tmp_path, SPLIT_BASE, new)
+    assert not found(doc, "warn"), doc
+    [moved] = found(doc, "info")
+    assert moved["code"] == "moved" and moved["file"].endswith("new.yaml"), doc
+    assert (moved["slice"], moved["path"], moved["to"]) == (
+        "bins",
+        "/usr/bin/foo-helper",
+        owner,
+    ), doc
 
 
 def test_check_diff_path_moved_to_essential_list_form(tmp_path: Path) -> None:
@@ -671,9 +669,11 @@ def test_check_diff_path_moved_to_essential_list_form(tmp_path: Path) -> None:
         .replace("  foo_copyright:", "  - foo_copyright")
         .replace("      libc6_libs:", "      - libc6_libs")
     )
-    rows = diff_rows(tmp_path, old, new)
-    assert not warns(rows), rows
-    assert any("/usr/bin/foo-helper" in r and "foo_helper" in r for r in infos(rows))
+    doc = diff(tmp_path, old, new)
+    assert not found(doc, "warn"), doc
+    assert [(f["code"], f["to"]) for f in found(doc, "info")] == [
+        ("moved", "foo_helper")
+    ]
 
 
 # the path is no longer installed with the slice, on every arch or at all, or
@@ -706,10 +706,10 @@ def test_check_diff_path_moved_to_essential_list_form(tmp_path: Path) -> None:
     ],
 )
 def test_check_diff_path_removed(tmp_path: Path, new: str) -> None:
-    rows = diff_rows(tmp_path, SPLIT_BASE, new)
-    removed = [r for r in warns(rows) if "/usr/bin/foo-helper" in r]
-    assert len(removed) == 1 and "path removed" in removed[0], rows
-    assert not infos(rows), rows
+    doc = diff(tmp_path, SPLIT_BASE, new)
+    [removed] = found(doc, "warn")
+    assert (removed["code"], removed["path"]) == ("removed", "/usr/bin/foo-helper"), doc
+    assert not found(doc, "info"), doc
 
 
 @pytest.mark.parametrize(
@@ -729,11 +729,11 @@ def test_check_diff_arch_limited_path_moved(
         "      foo_helper:\n",
         HELPER.replace("foo-helper:", f"foo-helper: {{arch: {new_arch}}}"),
     )
-    rows = diff_rows(tmp_path, old, new)
+    doc = diff(tmp_path, old, new)
     if moved:
-        assert not warns(rows) and len(infos(rows)) == 1, rows
+        assert codes(doc) == {"moved"} and len(found(doc)) == 1, doc
     else:
-        assert len(warns(rows)) == 1 and not infos(rows), rows
+        assert codes(doc) == {"removed"} and len(found(doc)) == 1, doc
 
 
 # a path kept in its slice can still stop being installed where it was
@@ -757,12 +757,14 @@ def test_check_diff_entry_narrowed_in_place(
 ) -> None:
     old = SPLIT_BASE.replace("foo-helper:", f"foo-helper:{old_opts}")
     new = SPLIT_BASE.replace("foo-helper:", f"foo-helper:{new_opts}")
-    rows = diff_rows(tmp_path, old, new)
+    doc = diff(tmp_path, old, new)
     if narrowed:
-        hits = [r for r in warns(rows) if "/usr/bin/foo-helper" in r]
-        assert len(hits) == 1 and "path narrowed" in hits[0], rows
+        [hit] = found(doc, "warn")
+        assert (hit["code"], hit["path"]) == ("narrowed", "/usr/bin/foo-helper"), doc
+        assert hit["was"] == (yaml.safe_load(old_opts) or {}), doc
+        assert hit["now"] == (yaml.safe_load(new_opts) or {}), doc
     else:
-        assert "ok:" in "\n".join(rows) and not warns(rows), rows
+        assert doc["status"] == "passed" and not found(doc), doc
 
 
 def test_check_diff_entry_narrowed_but_covered_by_essential(tmp_path: Path) -> None:
@@ -771,9 +773,11 @@ def test_check_diff_entry_narrowed_but_covered_by_essential(tmp_path: Path) -> N
         "      /usr/bin/foo:\n",
         "      /usr/bin/foo:\n      /usr/bin/foo-helper: {arch: [amd64]}\n",
     )
-    rows = diff_rows(tmp_path, SPLIT_BASE, new)
-    assert not warns(rows), rows
-    assert any("/usr/bin/foo-helper" in r and "foo_helper" in r for r in infos(rows))
+    doc = diff(tmp_path, SPLIT_BASE, new)
+    assert not found(doc, "warn"), doc
+    assert [(f["code"], f["to"]) for f in found(doc, "info")] == [
+        ("moved", "foo_helper")
+    ]
 
 
 def test_check_diff_until_empty_still_covers(tmp_path: Path) -> None:
@@ -781,8 +785,8 @@ def test_check_diff_until_empty_still_covers(tmp_path: Path) -> None:
     new = split(
         "      foo_helper:\n", HELPER.replace("foo-helper:", 'foo-helper: {until: ""}')
     )
-    rows = diff_rows(tmp_path, SPLIT_BASE, new)
-    assert not warns(rows) and len(infos(rows)) == 1, rows
+    doc = diff(tmp_path, SPLIT_BASE, new)
+    assert codes(doc) == {"moved"} and len(found(doc)) == 1, doc
 
 
 def test_check_diff_base_mode(tmp_path: Path) -> None:
@@ -815,17 +819,8 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
             env=env,
         )
 
-    def check_diff() -> list[str]:
-        r = subprocess.run(
-            [sys.executable, str(SCRIPTS / "check-diff.py"), "--base", "HEAD"],
-            cwd=tmp_path,
-            capture_output=True,
-            text=True,
-            check=False,
-            env=env,
-        )
-        assert r.returncode == 0 and "Traceback" not in r.stderr, r.stderr
-        return r.stdout.splitlines()
+    def check_diff() -> dict:
+        return report("check-diff.py", "--base", "HEAD", cwd=tmp_path, env=env)[1]
 
     sdf = tmp_path / "slices" / "foo.yaml"
     sdf.parent.mkdir()
@@ -835,18 +830,17 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
     git("commit", "-qm", "base")
 
     sdf.write_text(split("      foo_helper:\n", HELPER), encoding="utf-8")
-    rows = check_diff()
-    assert not warns(rows), rows
-    assert any(
-        r.startswith("info") and "slices/foo.yaml: bins:" in r and "foo_helper" in r
-        for r in rows
-    ), rows
+    doc = check_diff()
+    assert not found(doc, "warn"), doc
+    assert [(f["file"], f["slice"], f["to"]) for f in found(doc, "info")] == [
+        ("slices/foo.yaml", "bins", "foo_helper")
+    ], doc
 
     sdf.write_text(split(""), encoding="utf-8")
-    rows = check_diff()
-    assert any(
-        "slices/foo.yaml: bins:" in r and "path removed" in r for r in warns(rows)
-    ), rows
+    doc = check_diff()
+    assert [(f["file"], f["slice"], f["code"]) for f in found(doc, "warn")] == [
+        ("slices/foo.yaml", "bins", "removed")
+    ], doc
 
 
 def test_scaffold_test() -> None:
@@ -858,8 +852,8 @@ def test_scaffold_test() -> None:
             "install-slices foo_bins" in out and 'chroot "$rootfs" /usr/bin/foo' in out
         ), out
         task = write(d, "task.yaml", out)
-        ct = run("check-test.py", str(sdf), str(task))
-        assert "warn" in ct and "unfinished scaffold" in ct, ct
+        _, doc = report("check-test.py", str(sdf), str(task))
+        assert "scaffold" in codes(doc, "warn"), doc
 
 
 @pytest.mark.parametrize("contents", ["/usr/share/foo/data", "/usr/bin/*"])
@@ -870,8 +864,8 @@ def test_scaffold_marks_non_explicit_binary_tests(
     scaffold = run("scaffold-test.py", sdf)
     task = write(tmp_path, "task.yaml", scaffold)
     assert "install-slices foo_bins" in scaffold, scaffold
-    out = run("check-test.py", sdf, task)
-    assert "warn" in out and "unfinished scaffold" in out, out
+    _, doc = report("check-test.py", sdf, task)
+    assert "scaffold" in codes(doc, "warn"), doc
 
 
 def test_scaffold_keeps_helpers_and_mixed_slices(tmp_path: Path) -> None:
@@ -903,10 +897,14 @@ def test_robustness() -> None:
     }
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
+        clean = write(d, "foo.yaml", CLEAN)
         for name, text in cases.items():
-            for tool in ("check-slice.py", "check-test.py", "scaffold-test.py"):
-                out = run(tool, write(d, name, text))
-                assert "Traceback" not in out, f"{tool} crashed on {name}: {out}"
+            path = write(d, name, text)
+            for tool in ("check-slice.py", "check-test.py"):
+                report(tool, path)  # checks the contract, tracebacks included
+            report("check-diff.py", clean, path)
+            out = run("scaffold-test.py", path)
+            assert "Traceback" not in out, f"scaffold-test.py crashed on {name}: {out}"
 
 
 def test_orientation_edge_cases() -> None:
@@ -939,10 +937,10 @@ def test_orientation_edge_cases() -> None:
             check=False,
         )
         out = r.stdout + r.stderr
-        assert r.returncode == 2, out
-        doc = yaml.safe_load(out)
-        assert doc["release discovery"]["status"] == "unavailable", out
-        assert doc["release discovery"]["reasons"], out
+        assert r.returncode == 3, out
+        doc = yaml.safe_load(r.stdout)
+        assert doc["status"] == "unavailable", out
+        assert {u["check"] for u in doc["unavailable"]} == {"release discovery"}, out
         assert doc["working dir"].endswith('q"d'), out
         assert doc["suites"] is None, out  # block list: nothing on the key's own line
         assert doc["ubuntu version"] == "44.04", out

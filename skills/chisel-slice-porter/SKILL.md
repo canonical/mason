@@ -14,7 +14,7 @@ Adapt the source slices and tests to the user's target release checkout.
 
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; run helpers with the checkout as working directory.
-- Run `python3 "<skill-root>/scripts/_orientation.py"` first. If no checkout is
+- Run `uv run "<skill-root>/scripts/_orientation.py"` first. If no checkout is
   present, ask where it is; do not clone or guess one.
 - Confirm the checkout's release is the requested target. Work on its current
   branch and preserve unrelated changes. Read source branches with `git show`
@@ -51,7 +51,7 @@ Read `kb/_cross-release-porting.md` for packaging differences and
 affected target package and architecture:
 
 ```bash
-python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
+uv run "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
 ```
 
 Compare target contents, dependencies and maintainer scripts with the source
@@ -75,7 +75,7 @@ Apply the same policy to any dependency package authored during the port.
 
 ```bash
 mkdir -p tests/spread/integration/<pkg>
-"<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
+uv run "<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
 ```
 
 ## 4. verify the target
@@ -83,8 +83,8 @@ mkdir -p tests/spread/integration/<pkg>
 For every new or modified SDF:
 
 ```bash
-"<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
-"<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
 ```
 
 Run the target repository's applicable lint checks. Cut each independently usable
@@ -98,7 +98,7 @@ spread lxd:tests/spread/integration/<pkg>
 For changes to published target SDFs, compare against the target base revision:
 
 ```bash
-"<skill-root>/scripts/_check-diff.py" --base <target-base-ref>
+uv run "<skill-root>/scripts/_check-diff.py" --base <target-base-ref>
 ```
 
 Investigate removed declarations using before/after cuts. A successful source

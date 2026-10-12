@@ -36,6 +36,8 @@ shared:
       path: scripts/_check-test.py
     check-diff.py:
       path: scripts/_check-diff.py
+    common.py:
+      path: scripts/_common.py
   chisel-slice-reviewer:
     verification.md:
       path: kb/_verification.md
@@ -67,6 +69,8 @@ shared:
       path: scripts/_check-test.py
     check-diff.py:
       path: scripts/_check-diff.py
+    common.py:
+      path: scripts/_common.py
   chisel-slice-porter:
     verification.md:
       path: kb/_verification.md
@@ -106,3 +110,5 @@ shared:
       path: scripts/_check-test.py
     check-diff.py:
       path: scripts/_check-diff.py
+    common.py:
+      path: scripts/_common.py

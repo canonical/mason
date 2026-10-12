@@ -20,12 +20,10 @@ Usage:
 With no task.yaml, it looks for tests/spread/integration/<pkg>/task.yaml under
 the cwd, and folds in any sibling *.sh helper files.
 
-Output: one finding per line, `SEVERITY  where: message`.
-  warn   missing/malformed task, unfinished scaffold, or no binary references.
-  info   partial coverage (lists the untested binaries to review), or nothing
-         to check (the SDF declares no explicit binaries).
-  unavailable   an input could not be accessed.
-Exit 2 for unavailable checks, otherwise 0 (advisory); inspect `warn` to gate.
+Output: the YAML report described in common.py. Findings are advisory: warn
+for a missing or malformed task, an unfinished scaffold or no binary
+references, info for partial coverage or nothing to check. An input that
+cannot be read makes the check unavailable.
 """
 
 from __future__ import annotations
@@ -37,6 +35,22 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+try:
+    import _common as common
+except ImportError:
+    import common
+
+CODES = {
+    "sdf-unreadable": "the SDF does not read or parse, so its binaries are unknown",
+    "no-test": "every package needs tests/spread/integration/<pkg>/task.yaml",
+    "task-invalid": "a spread task is a mapping with non-empty summary and execute strings",
+    "scaffold": "the scaffold's TODO(author) placeholders are still there",
+    "no-binaries": "the SDF declares no explicit binaries; review the slice assertions by hand",
+    "unscannable": "the shell does not tokenise; review coverage by hand",
+    "untested": "the spread test references none of the declared binaries",
+    "partly-tested": "some declared binaries are never referenced; review whether they need a test",
+}
 
 BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
 
@@ -76,15 +90,16 @@ def task_sources(task: Path) -> list[str]:
     ]
 
 
-def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
-    rows: list[tuple[str, str, str]] = []
+def check(sdf: Path, task_arg: str | None) -> common.Report:
+    report = common.Report(CODES)
     try:
         doc = yaml.safe_load(sdf.read_text(encoding="utf-8"))
     except (FileNotFoundError, UnicodeError, yaml.YAMLError) as e:
-        rows.append(("warn", str(sdf), f"cannot read SDF: {e}"))
-        return rows
+        report.add("warn", "sdf-unreadable", sdf, error=str(e).splitlines()[0])
+        return report
     except OSError as e:
-        return [("unavailable", str(sdf), f"cannot read SDF: {e}")]
+        report.mark_unavailable("read", f"{sdf}: {e}")
+        return report
 
     bins = declared_binaries(doc)
     task = (
@@ -93,51 +108,29 @@ def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
         else (Path("tests/spread/integration") / sdf.stem / "task.yaml")
     )
     if not task.exists():
-        rows.append(
-            (
-                "warn",
-                str(sdf),
-                "no spread test found -- every package needs a task.yaml",
-            )
-        )
-        return rows
+        report.add("warn", "no-test", sdf, expected=str(task))
+        return report
 
     try:
         sources = task_sources(task)
     except (UnicodeError, TypeError, ValueError, yaml.YAMLError) as e:
-        return [("warn", str(task), f"cannot validate spread task: {e}")]
+        report.add("warn", "task-invalid", task, error=str(e).splitlines()[0])
+        return report
     except OSError as e:
-        return [("unavailable", str(task), f"cannot read spread sources: {e}")]
+        report.mark_unavailable("read", f"{task}: {e}")
+        return report
     if any("TODO(author):" in source for source in sources):
-        rows.append(
-            (
-                "warn",
-                str(task),
-                "unfinished scaffold -- replace TODO(author) placeholders",
-            )
-        )
+        report.add("warn", "scaffold", task)
     if not bins:
-        rows.append(
-            (
-                "info",
-                str(sdf),
-                "no explicit binaries to scan; review slice assertions manually",
-            )
-        )
-        return rows
+        report.add("info", "no-binaries", sdf)
+        return report
     try:
         text = "\n".join(
             " ".join(shlex.split(source, comments=True)) for source in sources
         )
     except ValueError as e:
-        rows.append(
-            (
-                "info",
-                str(task),
-                f"cannot scan shell references: {e}; review coverage manually",
-            )
-        )
-        return rows
+        report.add("info", "unscannable", task, error=str(e))
+        return report
 
     # lookarounds, not \b: \b needs a word char adjacent, so names ending in
     # non-word chars (c++, g++, [) never match. exclude name-continuation
@@ -147,25 +140,17 @@ def check(sdf: Path, task_arg: str | None) -> list[tuple[str, str, str]]:
     }
     unreferenced = sorted(set(bins) - referenced)
     if not referenced:
-        rows.append(
-            (
-                "warn",
-                str(task),
-                f"spread test references none of the {len(bins)} declared binaries",
-            )
-        )
+        report.add("warn", "untested", task, declared=len(bins))
     elif unreferenced:
-        shown = ", ".join(unreferenced[:12]) + (
-            f", +{len(unreferenced) - 12} more" if len(unreferenced) > 12 else ""
+        report.add(
+            "info",
+            "partly-tested",
+            task,
+            referenced=len(referenced),
+            declared=len(bins),
+            unreferenced=unreferenced,
         )
-        rows.append(
-            (
-                "info",
-                str(task),
-                f"{len(referenced)}/{len(bins)} binaries referenced; unreferenced: {shown}",
-            )
-        )
-    return rows
+    return report
 
 
 def main(argv: list[str]) -> int:
@@ -174,18 +159,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0
     if not args:
-        print("usage: check-test.py <slices/pkg.yaml> [<task.yaml>]", file=sys.stderr)
-        return 2
-    sdf = Path(args[0])
-    task_arg = args[1] if len(args) > 1 else None
-    rows = check(sdf, task_arg)
-    for sev, where, msg in rows:
-        print(f"{sev:5}  {where}: {msg}")
-    if not rows:
-        print(
-            f"ok: {sdf} task shape valid; all explicit binaries referenced (not runtime proof)"
-        )
-    return 2 if any(sev == "unavailable" for sev, _, _ in rows) else 0
+        return common.usage("usage: check-test.py <slices/pkg.yaml> [<task.yaml>]")
+    return check(Path(args[0]), args[1] if len(args) > 1 else None).emit()
 
 
 if __name__ == "__main__":

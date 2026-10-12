@@ -12,8 +12,9 @@ changed SDFs and runs the three checkers over them:
   - check-test    binary test coverage
   - check-diff    append-only regressions (removed SDF / slice / path)
 
-then prints one report grouped by severity, with a verdict, and exits non-zero
-if anything `block`s (1) or a check is unavailable (2).
+then merges their reports into one, adds a verdict, and prints it as the YAML
+report described in _common.py (failed when anything blocks, unavailable when a
+check could not run).
 
 Usage:
   review-diff.py --base <ref>
@@ -29,19 +30,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+import _common as common
+import yaml
+
 HERE = Path(__file__).resolve().parent
-SEVERITIES = ("block", "warn", "info", "unavailable")
 
 
-def git(args: list[str]) -> str | None:
-    try:
-        r = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
-    except OSError:
-        return None
-    return r.stdout if r.returncode == 0 else None
-
-
-def run_check(script: str, *args: str) -> list[str]:
+def run_check(script: str, *args: str) -> dict:
+    """A checker's parsed report; unavailable when it crashes or breaks the contract."""
     try:
         r = subprocess.run(
             [sys.executable, str(HERE / script), *args],
@@ -50,29 +46,31 @@ def run_check(script: str, *args: str) -> list[str]:
             check=False,
         )
     except OSError as e:
-        return [f"unavailable  {script}: cannot run checker ({e})"]
-    lines = (r.stdout + r.stderr).splitlines()
-    findings = [ln for ln in lines if ln.split() and ln.split()[0] in SEVERITIES]
-    unavailable = any(ln.startswith("unavailable") for ln in findings)
-    expected_failure = r.returncode == 1 and any(
-        ln.startswith("block") for ln in findings
-    )
-    if "Traceback" in r.stderr or (
-        r.returncode != 0 and not unavailable and not expected_failure
-    ):
+        return unavailable(script, f"cannot run checker ({e})")
+    try:
+        doc = yaml.safe_load(r.stdout)
+    except yaml.YAMLError:
+        doc = None
+    status = doc.get("status") if isinstance(doc, dict) else None
+    if "Traceback" in r.stderr or common.EXIT.get(status) != r.returncode:
         tail = (
             r.stderr.strip().splitlines()[-1]
             if r.stderr.strip()
             else f"exit {r.returncode}"
         )
-        findings.append(
-            f"unavailable  {script} {' '.join(args)}: checker did not complete ({tail})"
-        )
-    return findings
+        return unavailable(script, f"{' '.join(args)}: did not complete ({tail})")
+    return doc
+
+
+def unavailable(check: str, reason: str) -> dict:
+    return {
+        "status": common.UNAVAILABLE,
+        "unavailable": [{"check": check, "reason": reason}],
+    }
 
 
 def changed_slices(base: str) -> list[str] | None:
-    status = git(["diff", "--name-status", base, "--", "slices/*.yaml"])
+    status = common.git(["diff", "--name-status", base, "--", "slices/*.yaml"])
     if status is None:
         return None
     out = []
@@ -88,54 +86,37 @@ def changed_slices(base: str) -> list[str] | None:
     return out
 
 
+def verdict(report: common.Report) -> str:
+    if report.count("block"):
+        return "request-changes"
+    if report.unavailable:
+        return "incomplete"
+    return "comment" if report.count("warn") else "approve"
+
+
 def main(argv: list[str]) -> int:
     if argv and argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
     if len(argv) < 2 or argv[0] != "--base":
-        print("usage: review-diff.py --base <ref>", file=sys.stderr)
-        return 2
+        return common.usage("usage: review-diff.py --base <ref>")
     base = argv[1]
 
+    report = common.Report({})
     changed = changed_slices(base)
     if changed is None:
-        print(
-            f"unavailable  {base}: git diff failed -- is this a checkout, and is the ref present?"
+        report.mark_unavailable(
+            "base",
+            f"git diff against {base!r} failed; is this a checkout, and is the ref present?",
         )
-        print("verdict: incomplete")
-        return 2
-
-    findings: list[str] = []
-    if changed:
-        findings += run_check("_check-slice.py", *changed)
-        for sdf in changed:
-            findings += run_check("_check-test.py", sdf)
-    findings += run_check("_check-diff.py", "--base", base)
-
-    rank = {s: i for i, s in enumerate(SEVERITIES)}
-    findings.sort(key=lambda ln: rank.get(ln.split()[0], 9))
-    blocks = sum(ln.startswith("block") for ln in findings)
-    warns = sum(ln.startswith("warn") for ln in findings)
-    unavailable = sum(ln.startswith("unavailable") for ln in findings)
-    infos = sum(ln.startswith("info") for ln in findings)
-
-    print(
-        f"reviewed {len(changed)} changed SDF(s) against {base}: "
-        f"{blocks} block, {warns} warn, {infos} info, {unavailable} unavailable"
-    )
-    for ln in findings:
-        print(ln)
-    verdict = (
-        "request-changes"
-        if blocks
-        else "incomplete"
-        if unavailable
-        else "comment"
-        if warns
-        else "approve"
-    )
-    print(f"verdict: {verdict}")
-    return 2 if unavailable else 1 if blocks else 0
+    else:
+        if changed:
+            report.merge(run_check("_check-slice.py", *changed))
+            for sdf in changed:
+                report.merge(run_check("_check-test.py", sdf))
+        report.merge(run_check("_check-diff.py", "--base", base))
+    report.data.update(base=base, changed=changed or [], verdict=verdict(report))
+    return report.emit()
 
 
 if __name__ == "__main__":

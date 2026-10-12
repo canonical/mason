@@ -15,7 +15,7 @@ State the scope and any assumption needed to interpret the request.
 
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; keep the checkout as working directory.
-- Run `python3 "<skill-root>/scripts/_orientation.py"` first. If no checkout is
+- Run `uv run "<skill-root>/scripts/_orientation.py"` first. If no checkout is
   present, ask where it is; do not clone or guess one.
 - Confirm that the files and manifest being checked match the review's revision
   and target release. Use read-only git and upstream reads; do not switch branches
@@ -30,14 +30,14 @@ State the scope and any assumption needed to interpret the request.
 For a branch or PR represented by the working tree:
 
 ```bash
-"<skill-root>/scripts/review-diff.py" --base <target-base-ref>
+uv run "<skill-root>/scripts/review-diff.py" --base <target-base-ref>
 ```
 
 For a single SDF:
 
 ```bash
-"<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
-"<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
 ```
 
 Fold findings into the review under `kb/_verification.md`, then assess design
@@ -57,7 +57,7 @@ Read the references relevant to the changed slices:
 Inspect actual target package contents where needed:
 
 ```bash
-python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
+uv run "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
 ```
 
 Trace the retained dependencies and compare against the files actually supplied

@@ -20,4 +20,4 @@ tests/spread/lib/                              # shared spread helpers
 
 Active branches accumulate hundreds of SDFs and keep growing; count a checkout with `ls slices/ | wc -l` (`orientation` prints this).
 
-Live release list: run `scripts/_orientation.py` -- it discovers the branches, their `format:`, and which are still maintained (end-of-life vs today) -- or the repo [README.md](https://github.com/canonical/chisel-releases/blob/main/README.md).
+Live release list: run `uv run scripts/_orientation.py` -- it discovers the branches, their `format:`, and which are still maintained (end-of-life vs today) -- or the repo [README.md](https://github.com/canonical/chisel-releases/blob/main/README.md).

@@ -25,13 +25,10 @@ essential-as-map): --format wins, else --branch reads that branch's own
 chisel.yaml from the local git object store, else the format: field of
 ./chisel.yaml, else unknown (gated checks are skipped, noted).
 
-Output: one finding per line, `SEVERITY  file: where: message`.
-  block  hard gate -- chisel won't parse it, or CI/lint fails. exit code 1.
-  warn   reviewers reliably reject this. exit code stays 0.
-  info   nit.
-
-Exit code is 1 if any block finding, else 0. Stdlib + pyyaml only; runs under
-`uv run` (per the shebang) or `python3 check-slice.py` if pyyaml is importable.
+Output: the YAML report described in common.py. A block finding is a hard
+gate -- chisel won't parse it, or CI/lint fails -- and fails the check; a warn
+one is something reviewers reliably reject; an info one is a nit. An unknown
+format makes the check unavailable, since the version-gated checks cannot run.
 """
 
 from __future__ import annotations
@@ -43,6 +40,46 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+try:
+    import _common as common
+except ImportError:
+    import common
+
+CODES = {
+    "yml-extension": "chisel reads only .yaml files and silently ignores this one",
+    "bad-filename": "chisel rejects the whole release when an SDF name breaks its rule",
+    "no-package": "an SDF needs a top-level package: field",
+    "package-mismatch": "package: must match the file name",
+    "unsorted": "entries must be in bytewise order; ci lints slice essentials and contents",
+    "no-slices": "not a slice definition file: there is no slices: map",
+    "no-copyright-slice": "reviewers expect every SDF to ship a copyright slice",
+    "no-copyright": "the copyright slice ships neither the copyright file nor a shared-copyright doc dir",
+    "copyright-not-essential": "the package-wide essential should hold <pkg>_copyright, so every slice ships it",
+    "bad-slice-name": "chisel rejects slice names that break its rule (parse error)",
+    "slice-name": "reviewers reject this slice name; use the suggested one",
+    "hint-format": "hint: is a v3+ branch convention; chisel parses it but v1/v2 branches do not use it",
+    "hint-too-long": "chisel caps hint: at 40 characters (parse error)",
+    "hint-unprintable": "hint: must be one line of printable characters (parse error)",
+    "hint-style": "validate-hints ci: sentence case, no leading article, no trailing punctuation, single spaces, letters, digits and . , ; ( ) only",
+    "clutter": "a minimal rootfs ships no man pages, shell completions or doc metadata",
+    "doc-clutter": "ship only copyright, notice and licence files from /usr/share/doc",
+    "relative-path": "content paths must be absolute",
+    "generate-value": "generate: takes only the value manifest (parse error)",
+    "generate-path": "a generate: path ends in /** and holds no other wildcard (parse error)",
+    "generate-options": "a generate: path takes no option but arch: (parse error)",
+    "glob-options": "a wildcard path takes only until: and arch: (parse error); name the path instead",
+    "make-path": "make: true needs a path ending in / (parse error)",
+    "prefer-self": "prefer: must name another package (parse error)",
+    "prefer-format": "prefer: is a v2+ branch convention; chisel older than 1.2.0 ignores it silently",
+    "bad-arch": "arch names are Debian ones: amd64 arm64 armhf i386 ppc64el riscv64 s390x (parse error)",
+    "v3-essential": "v3-essential is rejected on v3 (parse error); fold it into the essential: map",
+    "essential-map": "map-form essential needs format v3 (parse error)",
+    "essential-list": "v3 needs map-form essential (parse error: 'essential expects a map')",
+    "not-utf8": "the file is not valid UTF-8",
+    "yaml-error": "the file does not parse as YAML",
+    "not-a-mapping": "the top level of an SDF must be a mapping",
+}
 
 # known-bad slice names reviewers reject, mapped to the right one. by-function
 # and per-binary names (e.g. printing-text, ls-bin, journal) are legitimate, so
@@ -106,21 +143,17 @@ def is_legal_doc(basename: str) -> bool:
 
 
 class Findings:
-    def __init__(self, file: str) -> None:
+    """One file's findings, added to the report shared by every file checked."""
+
+    def __init__(self, report: common.Report, file: str) -> None:
+        self.report = report
         self.file = file
-        self.rows: list[tuple[str, str, str]] = []
 
-    def add(self, sev: str, where: str, msg: str) -> None:
-        self.rows.append((sev, where, msg))
+    def block(self, code: str, **fields: Any) -> None:
+        self.report.add("block", code, self.file, **fields)
 
-    def block(self, where: str, msg: str) -> None:
-        self.add("block", where, msg)
-
-    def warn(self, where: str, msg: str) -> None:
-        self.add("warn", where, msg)
-
-    def info(self, where: str, msg: str) -> None:
-        self.add("info", where, msg)
+    def warn(self, code: str, **fields: Any) -> None:
+        self.report.add("warn", code, self.file, **fields)
 
 
 def slices_of(doc: Any) -> dict:
@@ -135,20 +168,15 @@ def is_sorted(keys: list) -> bool:
 
 def check_filename(doc: Any, path: Path, f: Findings) -> None:
     if path.name.endswith(".yml"):
-        f.block(
-            "filename", "chisel silently ignores non-.yaml files -- rename to .yaml"
-        )
+        f.block("yml-extension")
     elif not FNAME_RE.match(path.name):
-        f.block(
-            "filename",
-            f"'{path.name}' fails chisel's filename rule {FNAME_RE.pattern} (whole-release parse error)",
-        )
+        f.block("bad-filename", rule=FNAME_RE.pattern)
     stem = path.name[:-5] if path.name.endswith(".yaml") else path.stem
     pkg = doc.get("package") if isinstance(doc, dict) else None
     if not isinstance(pkg, str) or not pkg:
-        f.block("package:", "missing top-level package: field")
+        f.block("no-package")
     elif pkg != stem:
-        f.block("package:", f"package: '{pkg}' != filename stem '{stem}'")
+        f.block("package-mismatch", package=pkg, **{"file-stem": stem})
 
 
 def check_essential_sorted(doc: Any, f: Findings) -> None:
@@ -156,19 +184,20 @@ def check_essential_sorted(doc: Any, f: Findings) -> None:
     # sort -C). the top-level essential is not CI-gated, but keep it sorted for
     # consistency -- so warn, don't block.
     if isinstance(doc.get("essential"), list) and not is_sorted(doc["essential"]):
-        f.warn("essential:", "global essential entries not sorted")
+        f.warn("unsorted", field="essential")
     for name, body in slices_of(doc).items():
         ess = body.get("essential") if isinstance(body, dict) else None
-        if isinstance(ess, list) and not is_sorted(ess):
-            f.block(f"{name}.essential", "essential entries not sorted")
-        elif isinstance(ess, dict) and not is_sorted(list(ess.keys())):
-            f.block(f"{name}.essential", "essential map keys not sorted")
+        keys = (
+            ess if isinstance(ess, list) else list(ess) if isinstance(ess, dict) else []
+        )
+        if not is_sorted(keys):
+            f.block("unsorted", slice=name, field="essential")
 
 
 def check_slices(doc: Any, fmt: int | None, f: Findings) -> None:
     slices = slices_of(doc)
     if not slices:
-        f.block("slices:", "no slices: map -- not a slice definition file")
+        f.block("no-slices")
         return
     pkg = doc.get("package") if isinstance(doc.get("package"), str) else ""
 
@@ -177,36 +206,25 @@ def check_slices(doc: Any, fmt: int | None, f: Findings) -> None:
     # directly, or the doc dir as a symlink to another package's (shared).
     cp = slices.get("copyright")
     if not isinstance(cp, dict):
-        f.warn(
-            "slices:", "no copyright slice -- reviewers expect every SDF to ship one"
-        )
+        f.warn("no-copyright-slice")
     elif pkg:
         contents = cp.get("contents") if isinstance(cp.get("contents"), dict) else {}
         docdir = f"/usr/share/doc/{pkg}"
         if not any(
             k in contents for k in (f"{docdir}/copyright", docdir, docdir + "/")
         ):
-            f.warn(
-                "copyright",
-                f"ships no copyright ({docdir}/copyright, or the doc dir as a shared-copyright symlink)",
-            )
+            f.warn("no-copyright", slice="copyright", expected=f"{docdir}/copyright")
     ess = doc.get("essential")
     if (
         pkg
         and not (isinstance(ess, list) and f"{pkg}_copyright" in ess)
         and not (isinstance(ess, dict) and f"{pkg}_copyright" in ess)
     ):
-        f.warn(
-            "essential:",
-            f"{pkg}_copyright not in global essential (so not every slice ships it)",
-        )
+        f.warn("copyright-not-essential", expected=f"{pkg}_copyright")
 
     for name, body in slices.items():
         if not isinstance(name, str) or not SNAME_RE.match(name):
-            f.block(
-                f"slices.{name}",
-                f"slice name must match {SNAME_RE.pattern} (chisel parse error)",
-            )
+            f.block("bad-slice-name", slice=name, rule=SNAME_RE.pattern)
         if not isinstance(body, dict):
             continue
         check_slice_body(name, body, pkg, fmt, f)
@@ -222,49 +240,37 @@ _HINT_ALLOWED = set(
 def check_hint(name: str, hint: Any, f: Findings) -> None:
     if not isinstance(hint, str):
         return
-    where = f"{name}.hint"
+    at = {"slice": name, "field": "hint"}
     # chisel core (parse errors):
     if len(hint) > 40:
-        f.block(
-            where, f"hint is {len(hint)} chars -- chisel caps it at 40 (parse error)"
-        )
+        f.block("hint-too-long", **at, length=len(hint))
     if "\n" in hint or any(not c.isprintable() for c in hint):
-        f.block(where, "hint must be a single line of printable chars (parse error)")
+        f.block("hint-unprintable", **at)
     # validate-hints CI style (noun phrase; the finite-verb rule needs NLP, skipped):
     if hint[:1].islower():
-        f.warn(where, "hint should be sentence case (capitalise the first letter)")
+        f.warn("hint-style", **at, rule="case")
     if re.match(r"(?i)^(a|an|the)\b", hint):
-        f.warn(where, "hint should not start with an article (a/an/the)")
+        f.warn("hint-style", **at, rule="article")
     if hint[-1:] in {".", ",", ";", ":", "!", "?", " "}:
-        f.warn(
-            where,
-            "hint should not end with punctuation or a space (a closing ')' is fine)",
-        )
+        f.warn("hint-style", **at, rule="punctuation")
     if "  " in hint or hint != hint.strip():
-        f.warn(where, "hint should have no double, leading, or trailing spaces")
+        f.warn("hint-style", **at, rule="spacing")
     stray = sorted(set(hint) - _HINT_ALLOWED - {"\n"})
     if stray:
-        f.warn(
-            where,
-            f"hint has chars outside validate-hints' set {stray}; allowed: letters, digits, space, . , ; ( )",
-        )
+        f.warn("hint-style", **at, rule="chars", chars=stray)
 
 
 def check_slice_body(
     name: str, body: dict, pkg: str, fmt: int | None, f: Findings
 ) -> None:
     if name in BAD_SLICE_NAMES and name not in BAD_NAME_EXEMPT.get(pkg, ()):
-        f.warn(f"slices.{name}", f"use '{BAD_SLICE_NAMES[name]}' not '{name}'")
+        f.warn("slice-name", slice=name, use=BAD_SLICE_NAMES[name])
 
     if "hint" in body:
         # chisel validates hint under every format -- the v3+ rule is branch
         # convention, not a parse error, so warn rather than block.
         if fmt is not None and fmt < 3:
-            f.warn(
-                f"{name}.hint",
-                f"hint: is a v3+ branch convention (format is v{fmt}); "
-                "chisel parses it but no v1/v2 branch uses it",
-            )
+            f.warn("hint-format", slice=name, field="hint", format=f"v{fmt}")
         check_hint(name, body["hint"], f)
 
     contents = body.get("contents")
@@ -272,7 +278,7 @@ def check_slice_body(
         return
     keys = list(contents.keys())
     if not is_sorted(keys):
-        f.block(f"{name}.contents", "contents paths not sorted (bytewise/ASCII)")
+        f.block("unsorted", slice=name, field="contents")
     for path, entry in contents.items():
         check_path(name, path, entry, pkg, fmt, f)
 
@@ -287,56 +293,42 @@ GENERATE_INCOMPATIBLE = GLOB_INCOMPATIBLE + ("until",)
 
 def check_path_kind(sname: str, path: str, entry: dict, f: Findings) -> None:
     """The three path-shape rules chisel enforces at parse time."""
-    where = f"{sname}: {path}"
+    at = {"slice": sname, "path": path}
     if entry.get("generate") is not None:
         if entry.get("generate") != "manifest":
-            f.block(
-                where, "generate: only takes the value 'manifest' (chisel parse error)"
-            )
+            f.block("generate-value", **at)
         if not path.endswith("/**") or "*" in path[:-3] or "?" in path:
-            f.block(
-                where,
-                "generate: path must end in /** and hold no other wildcard (chisel parse error)",
-            )
+            f.block("generate-path", **at)
         bad = [k for k in GENERATE_INCOMPATIBLE if k in entry]
         if bad:
-            f.block(
-                where,
-                f"generate: path cannot also set {bad} -- only arch: is allowed (chisel parse error)",
-            )
+            f.block("generate-options", **at, options=bad)
         return
 
     if "*" in path or "?" in path:
         bad = [k for k in GLOB_INCOMPATIBLE if k in entry]
         if bad:
-            f.block(
-                where,
-                f"wildcard path cannot set {bad} -- globs take only until: and arch: "
-                "(chisel parse error). Name the path explicitly instead",
-            )
+            f.block("glob-options", **at, options=bad)
 
     if entry.get("make") and not path.endswith("/"):
-        f.block(where, "make: true requires the path to end in / (chisel parse error)")
+        f.block("make-path", **at)
 
 
 def check_path(
     sname: str, path: Any, entry: Any, pkg: str, fmt: int | None, f: Findings
 ) -> None:
+    at = {"slice": sname, "path": path}
     if not isinstance(path, str) or not path.startswith("/"):
-        f.block(f"{sname}: {path}", "path must be absolute (start with /)")
+        f.block("relative-path", **at)
         return
     for label, prefixes in CLUTTER.items():
         if any(path.startswith(p) for p in prefixes):
-            f.warn(f"{sname}: {path}", f"{label} not shipped in minimal rootfs")
+            f.warn("clutter", **at, kind=label)
     if path.startswith("/usr/share/doc/"):
         docdir = f"/usr/share/doc/{pkg}"
         base = path.rstrip("/").rsplit("/", 1)[-1]
         # exempt the package's own doc dir (shared-copyright symlink) and legal files.
         if pkg and path.rstrip("/") != docdir and not is_legal_doc(base):
-            f.warn(
-                f"{sname}: {path}",
-                "doc clutter: ship only the copyright/notice/licence files",
-            )
+            f.warn("doc-clutter", **at)
 
     if not isinstance(entry, dict):
         return
@@ -347,16 +339,9 @@ def check_path(
     if prefer is not None:
         # not format-gated in chisel; naming your own package is a parse error.
         if prefer == pkg:
-            f.block(
-                f"{sname}: {path}",
-                f"prefer: names its own package '{pkg}' -- must name another (chisel parse error)",
-            )
+            f.block("prefer-self", **at)
         if fmt is not None and fmt < 2:
-            f.warn(
-                f"{sname}: {path}",
-                f"prefer: is a v2+ branch convention (format is v{fmt}); "
-                "a chisel older than 1.2.0 ignores it silently",
-            )
+            f.warn("prefer-format", **at, format=f"v{fmt}")
     arch = entry.get("arch")
     archs = (
         [arch] if isinstance(arch, str) else arch if isinstance(arch, list) else None
@@ -364,10 +349,7 @@ def check_path(
     if archs is not None:
         bad = [a for a in archs if a not in VALID_ARCHES]
         if bad:
-            f.block(
-                f"{sname}: {path}",
-                f"invalid arch name(s) {bad}: use Debian names {sorted(VALID_ARCHES)} (chisel parse error)",
-            )
+            f.block("bad-arch", **at, arch=bad)
 
 
 def check_v3_essential(doc: Any, fmt: int | None, f: Findings) -> None:
@@ -377,36 +359,19 @@ def check_v3_essential(doc: Any, fmt: int | None, f: Findings) -> None:
     # error on v3 (top-level or per-slice).
     if fmt is None:
         return
-    if "v3-essential" in doc and fmt >= 3:
-        f.block(
-            "v3-essential:",
-            f"v3-essential is rejected on v3 (chisel parse error) -- fold into the essential: map (format is v{fmt})",
-        )
-    if isinstance(doc.get("essential"), dict) and fmt < 3:
-        f.block("essential:", f"essential-as-map is v3+ only (format is v{fmt})")
-    if isinstance(doc.get("essential"), list) and fmt >= 3:
-        f.block(
-            "essential:",
-            f"essential must be a map on v3 (chisel parse error: 'essential expects a map'; format is v{fmt})",
-        )
-    for name, body in slices_of(doc).items():
-        if not isinstance(body, dict):
-            continue
+    version = f"v{fmt}"
+    bodies = [({}, doc)]
+    bodies += [
+        ({"slice": n}, b) for n, b in slices_of(doc).items() if isinstance(b, dict)
+    ]
+    for at, body in bodies:
         if "v3-essential" in body and fmt >= 3:
-            f.block(
-                f"{name}.v3-essential",
-                f"v3-essential is rejected on v3 (chisel parse error) -- fold into the essential: map (format is v{fmt})",
-            )
+            f.block("v3-essential", **at, field="v3-essential", format=version)
         ess = body.get("essential")
         if isinstance(ess, dict) and fmt < 3:
-            f.block(
-                f"{name}.essential", f"essential-as-map is v3+ only (format is v{fmt})"
-            )
+            f.block("essential-map", **at, field="essential", format=version)
         elif isinstance(ess, list) and fmt >= 3:
-            f.block(
-                f"{name}.essential",
-                f"essential must be a map on v3 (chisel parse error: 'essential expects a map'; format is v{fmt})",
-            )
+            f.block("essential-list", **at, field="essential", format=version)
 
 
 def format_of_branch(branch: str) -> int | None:
@@ -475,31 +440,31 @@ _StrictLoader.add_constructor(
 )
 
 
-def check_file(path: Path, fmt: int | None) -> Findings:
-    f = Findings(str(path))
+def check_file(path: Path, fmt: int | None, report: common.Report) -> None:
+    f = Findings(report, str(path))
     try:
         text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as e:
-        f.block("", f"cannot read: {e}")
-        return f
+    except UnicodeError:
+        f.block("not-utf8")
+        return
+    except OSError as e:
+        report.mark_unavailable("read", f"{path}: {e}")
+        return
     try:
         doc = yaml.load(text, Loader=_StrictLoader)
     except yaml.YAMLError as e:
-        f.block("", f"YAML parse error: {str(e).splitlines()[0]}")
-        return f
+        f.block("yaml-error", error=str(e).splitlines()[0])
+        return
     if not isinstance(doc, dict):
-        f.block("", "top level is not a mapping")
-        return f
+        f.block("not-a-mapping")
+        return
     check_filename(doc, path, f)
     check_essential_sorted(doc, f)
     check_slices(doc, fmt, f)
     check_v3_essential(doc, fmt, f)
-    if fmt is None:
-        f.block(
-            "",
-            "format unknown: version-gated checks (hint/prefer/v3-essential/essential-map) skipped -- run inside the target checkout, or pass --format N",
-        )
-    return f
+
+
+USAGE = "usage: check-slice.py <slice.yaml> [...] [--format N | --branch NAME]"
 
 
 def main(argv: list[str]) -> int:
@@ -512,11 +477,7 @@ def main(argv: list[str]) -> int:
         m = re.search(r"(\d+)", value)
         if not m:
             print(f"check-slice.py: bad --format value {value!r}", file=sys.stderr)
-            print(
-                "usage: check-slice.py <slice.yaml> [...] [--format N | --branch NAME]",
-                file=sys.stderr,
-            )
-            raise SystemExit(2)
+            raise SystemExit(common.usage(USAGE))
         return int(m.group(1))
 
     it = iter(argv)
@@ -525,7 +486,7 @@ def main(argv: list[str]) -> int:
             value = next(it, None)
             if value is None:
                 print(f"check-slice.py: {a} needs a value", file=sys.stderr)
-                return 2
+                return common.usage(USAGE)
             if a == "--format":
                 fmt_arg = parse_fmt(value)
             else:
@@ -540,25 +501,19 @@ def main(argv: list[str]) -> int:
         else:
             files.append(a)
     if not files:
-        print(
-            "usage: check-slice.py <slice.yaml> [...] [--format N | --branch NAME]",
-            file=sys.stderr,
-        )
-        return 2
+        return common.usage(USAGE)
 
     fmt = detect_format(fmt_arg, branch_arg)
-    had_block = False
-    total = 0
+    report = common.Report(CODES)
+    if fmt is None:
+        report.mark_unavailable(
+            "format",
+            "unknown, so hint/prefer/v3-essential/essential-shape checks were skipped; "
+            "run inside the target checkout or pass --format N",
+        )
     for name in files:
-        f = check_file(Path(name), fmt)
-        for sev, where, msg in f.rows:
-            total += 1
-            had_block = had_block or sev == "block"
-            loc = f"{f.file}: {where}: " if where else f"{f.file}: "
-            print(f"{sev:5}  {loc}{msg}")
-    if total == 0:
-        print(f"ok: {len(files)} file(s) clean" + (f" (format v{fmt})" if fmt else ""))
-    return 1 if had_block else 0
+        check_file(Path(name), fmt, report)
+    return report.emit()
 
 
 if __name__ == "__main__":

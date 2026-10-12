@@ -1,21 +1,16 @@
-#!/usr/bin/env python3
 """A reduced file(1): describe what each path is, from its bytes.
 
-Usage: file.py [-b] [-h] [--] PATH...
-
-Stand-in for file(1) where it is not installed. Prints one line per path in
-file(1)'s own vocabulary for the cases slice authoring cares about -- ELF
-executables and shared objects (class, endianness, machine, interpreter), scripts
-by shebang, symbolic links with their target, compressed data, text -- and
-"data" for everything else. Symbolic links are described, never followed.
--b drops the "path: " prefix; -h is accepted for command-line compatibility.
+deb-list imports it when file(1) is not installed. describe() returns file(1)'s
+own brief line for the cases slice authoring cares about -- ELF executables and
+shared objects (class, endianness, machine, interpreter), scripts by shebang,
+symbolic links with their target, compressed data, text -- and "data" for
+everything else. Symbolic links are described, never followed.
 """
 
 from __future__ import annotations
 
 import os
 import struct
-import sys
 
 MACHINES = {
     0x03: "Intel 80386",
@@ -85,25 +80,25 @@ def elf_interp(path: str, head: bytes, is64: bool, order: str) -> str | None:
     rather than a shared library."""
     try:
         if is64:
-            e_phoff, = struct.unpack_from(order + "Q", head, 32)
+            (e_phoff,) = struct.unpack_from(order + "Q", head, 32)
             e_phentsize, e_phnum = struct.unpack_from(order + "HH", head, 54)
         else:
-            e_phoff, = struct.unpack_from(order + "I", head, 28)
+            (e_phoff,) = struct.unpack_from(order + "I", head, 28)
             e_phentsize, e_phnum = struct.unpack_from(order + "HH", head, 42)
         with open(path, "rb") as f:
             f.seek(e_phoff)
             table = f.read(e_phentsize * e_phnum)
             for i in range(e_phnum):
                 off = i * e_phentsize
-                p_type, = struct.unpack_from(order + "I", table, off)
+                (p_type,) = struct.unpack_from(order + "I", table, off)
                 if p_type != 3:  # PT_INTERP
                     continue
                 if is64:
-                    p_offset, = struct.unpack_from(order + "Q", table, off + 8)
-                    p_filesz, = struct.unpack_from(order + "Q", table, off + 32)
+                    (p_offset,) = struct.unpack_from(order + "Q", table, off + 8)
+                    (p_filesz,) = struct.unpack_from(order + "Q", table, off + 32)
                 else:
-                    p_offset, = struct.unpack_from(order + "I", table, off + 4)
-                    p_filesz, = struct.unpack_from(order + "I", table, off + 16)
+                    (p_offset,) = struct.unpack_from(order + "I", table, off + 4)
+                    (p_filesz,) = struct.unpack_from(order + "I", table, off + 16)
                 f.seek(p_offset)
                 return f.read(p_filesz).rstrip(b"\0").decode("ascii", "replace")
     except (OSError, struct.error):
@@ -132,7 +127,9 @@ def shebang(head: bytes) -> str | None:
         return "script"
     interp = os.path.basename(words[0])
     if interp == "env" and len(words) > 1:
-        interp = os.path.basename(next((w for w in words[1:] if not w.startswith("-")), words[1]))
+        interp = os.path.basename(
+            next((w for w in words[1:] if not w.startswith("-")), words[1])
+        )
     base = interp.rstrip("0123456789.") or interp
     for names, kind in SHEBANG_KINDS:
         if interp in names or base in names:
@@ -165,38 +162,3 @@ def describe(path: str) -> str:
     if script:
         return script
     return text_kind(head)
-
-
-def main(argv: list[str]) -> int:
-    brief = False
-    paths: list[str] = []
-    it = iter(argv)
-    for a in it:
-        if paths or a == "--":
-            paths.extend([a] if a != "--" else [])
-            paths.extend(it)
-            break
-        if a in ("-b", "--brief"):
-            brief = True
-        elif a in ("-h", "--no-dereference"):
-            pass
-        elif a.startswith("-") and len(a) > 1:
-            for ch in a[1:]:
-                if ch == "b":
-                    brief = True
-                elif ch != "h":
-                    print(f"file.py: unknown option -{ch}", file=sys.stderr)
-                    return 2
-        else:
-            paths.append(a)
-    if not paths:
-        print("usage: file.py [-b] [-h] [--] PATH...", file=sys.stderr)
-        return 2
-    for p in paths:
-        line = describe(p)
-        print(line if brief else f"{p}: {line}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))

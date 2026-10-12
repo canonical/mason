@@ -18,7 +18,7 @@ Author slices against the user's `canonical/chisel-releases` checkout.
   the working directory. For example:
 
   ```bash
-  python3 "/absolute/path/to/chisel-slicer/scripts/_orientation.py"
+  uv run "/absolute/path/to/chisel-slicer/scripts/_orientation.py"
   ```
 
   In the remaining commands, replace `<skill-root>` with that absolute path.
@@ -33,7 +33,7 @@ Author slices against the user's `canonical/chisel-releases` checkout.
   `kb/_contributing.md`.
 - For changes to published slices, apply the preservation policy in
   `kb/_slice-conventions.md` and run
-  `"<skill-root>/scripts/_check-diff.py" --base <target-base-ref>`.
+  `uv run "<skill-root>/scripts/_check-diff.py" --base <target-base-ref>`.
 
 ## 1. validate the target
 
@@ -44,7 +44,7 @@ Check release-discovery status before drawing conclusions about other releases.
 Read `kb/_dependency-policy.md` for package inspection.
 
 ```bash
-python3 "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
+uv run "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
 ```
 
 Keep the output as evidence for the design and stop the affected package work
@@ -90,7 +90,7 @@ SDFs for shared paths before declaring them; check conflicts with an actual cut.
 For every new or modified SDF:
 
 ```bash
-"<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
 ```
 
 Resolve findings under `kb/_verification.md`. Review layout and path style
@@ -103,7 +103,7 @@ new test file; preserve existing tests:
 
 ```bash
 mkdir -p tests/spread/integration/<pkg>
-"<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
+uv run "<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
 ```
 
 Replace the scaffold's author placeholders with checks that satisfy the testing
@@ -112,7 +112,7 @@ written: spread not being runnable here is reported at the gate as an
 unavailable run, never as a reason to leave the file out. Then run:
 
 ```bash
-"<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
 ```
 
 Run a cut for each independently usable new or changed slice when chisel is available:

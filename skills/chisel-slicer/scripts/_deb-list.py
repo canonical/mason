@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pyyaml"]
+# ///
 """
 List files and maintainer scripts inside a debian package to aid chisel slice authoring.
 
@@ -7,28 +11,28 @@ Usage: deb-list.py <package> [arch]
   arch       target architecture (default: host arch; fallback amd64)
              valid values: amd64 arm64 armhf i386 ppc64el riscv64 s390x
 
-Output:
-  - package header (name, version, arch)
-  - Depends: and Pre-Depends: candidates for runtime dependency inspection
-  - non-directory files, lexicographically sorted: octal mode, owner and path,
-    then what file(1) makes of it on the next line (ELF binary, shell script,
+Output: the YAML report described in common.py, then the package:
+  - package, version, arch and the suite searched
+  - depends and pre-depends, for runtime dependency inspection
+  - files: every non-directory entry, lexicographically sorted, with its octal
+    mode, owner and what file(1) makes of it (ELF binary, shell script,
     symbolic link to <target>, gzip data, ASCII text, ...)
-  - the postinst script in full, if the package has one -- chisel never runs
-    it, so whatever it does is yours to reproduce or drop
+  - postinst: the script in full, or null -- chisel never runs it, so whatever
+    it does is yours to reproduce or drop
 
-Requirements: dpkg-deb, python3, and network access to the ubuntu mirror. file(1)
-gives the per-file type line; without it the bundled file.py stands in with
-less detail (no ELF version/BuildID, no timestamps) and the header says so.
-(archive.ubuntu.com / ports.ubuntu.com). No sudo, no apt, no populated apt
-cache: the .deb is fetched straight from the mirror's Packages index.
-Only public mirrors are supported, not authenticated Ubuntu Pro archives or
+A package missing from every public index checked fails; a lookup that cannot
+establish either answer is unavailable.
+
+Requirements: dpkg-deb and network access to the ubuntu mirror
+(archive.ubuntu.com / ports.ubuntu.com). file(1) gives the file types; without
+it the bundled file.py stands in with less detail (no ELF version/BuildID, no
+timestamps) and an info finding says so. No sudo, no apt, no populated apt
+cache: the .deb is fetched straight from the mirror's Packages index. Only
+public mirrors are supported, not authenticated Ubuntu Pro archives or
 arbitrary manifest archive configuration. The first matching package in the
 updates/security/base search is inspected; this is not chisel's version resolver.
 Note: the release suite is read from ./chisel.yaml -- run from a chisel-releases
       checkout (or a dir whose chisel.yaml names the suite).
-
-Exit codes: 0 listed; 1 absent from all public indexes checked; 2 verification
-unavailable or failed (tools, manifest, network, indexes or extraction).
 """
 
 import gzip
@@ -41,6 +45,18 @@ import tempfile
 import urllib.request
 import zlib
 from pathlib import Path
+
+try:
+    import _common as common
+    import _file as filetype
+except ImportError:
+    import common
+    import file as filetype
+
+CODES = {
+    "absent": "not in the public ubuntu indexes for this suite and arch; ubuntu pro archives are not checked",
+    "file-fallback": "file(1) is not installed, so the bundled classifier gave the file types, with less detail",
+}
 
 
 class ArchiveError(Exception):
@@ -224,104 +240,82 @@ def deb_postinst(deb_path, workdir):
     return path.read_text() if path.exists() else None
 
 
-def file_command():
-    """file(1) if installed, else the bundled reduced-capacity file.py next to
-    this script (synced into a skill as _file.py, kept as file.py in _shared)."""
-    if shutil.which("file"):
-        return ["file"]
-    here = Path(__file__).resolve().parent
-    for name in ("_file.py", "file.py"):
-        if (here / name).exists():
-            return [sys.executable, str(here / name)]
-    return None
-
-
-def file_descriptions(deb_path, workdir, paths, file_cmd):
-    """file(1)-style line for each path, in order. Symlinks are described, not followed."""
-    root = Path(workdir) / "root"
-    root.mkdir()
-    run(["dpkg-deb", "-x", str(deb_path), str(root)], capture=True)
+def classify(paths):
+    """file(1)'s brief line for each path, or the bundled classifier's without it.
+    Symlinks are described, not followed."""
+    if not shutil.which("file"):
+        return [filetype.describe(p) for p in paths]
     out = []
     # chunked: a big package (python3.x, perl) runs past ARG_MAX in one go.
     for i in range(0, len(paths), 500):
-        chunk = [str(root) + p for p in paths[i : i + 500]]
-        result = run([*file_cmd, "-bh", "--", *chunk], capture=True)
+        result = run(["file", "-bh", "--", *paths[i : i + 500]], capture=True)
         out += result.stdout.splitlines()
     return out
 
 
-def main():
-    args = sys.argv[1:]
+def file_descriptions(deb_path, workdir, paths):
+    root = Path(workdir) / "root"
+    root.mkdir()
+    run(["dpkg-deb", "-x", str(deb_path), str(root)], capture=True)
+    return classify([str(root) + p for p in paths])
 
+
+def main(report):
+    args = sys.argv[1:]
     if len(args) not in (1, 2):
-        print("usage: deb-list.py <package> [arch]", file=sys.stderr)
-        return 2
+        return common.usage("usage: deb-list.py <package> [arch]")
 
     if not shutil.which("dpkg-deb"):
-        print("error: verification unavailable; missing tools: dpkg-deb", file=sys.stderr)
-        return 2
-    file_cmd = file_command()
-    if not file_cmd:
-        print("error: verification unavailable; neither file(1) nor the bundled file.py found", file=sys.stderr)
-        return 2
+        report.mark_unavailable("tools", "dpkg-deb is not installed")
+        return report.emit()
 
     pkg = args[0]
     arch = args[1] if len(args) > 1 else host_arch()
-
     suite = read_suite()
     if not suite:
-        print(
-            "error: could not read the release suite from ./chisel.yaml",
-            file=sys.stderr,
+        report.mark_unavailable(
+            "release",
+            "could not read the release suite from ./chisel.yaml; run from a chisel-releases checkout",
         )
-        print("hint:  run deb-list.py from a chisel-releases checkout", file=sys.stderr)
-        return 2
+        return report.emit()
 
+    report.data.update(package=pkg, arch=arch, suite=suite)
     with tempfile.TemporaryDirectory() as workdir:
         deb = download_deb(pkg, arch, suite, workdir)
         if not deb:
-            print(
-                f"error: {pkg} (arch {arch}) absent from checked public indexes for suite {suite}",
-                file=sys.stderr,
-            )
-            print(
-                "hint:  check the package name + arch; Ubuntu Pro archives were not checked",
-                file=sys.stderr,
-            )
-            return 1
+            report.add("block", "absent", pkg, arch=arch, suite=suite)
+            return report.emit()
 
-        version = deb_field(deb, "Version")
-
-        print(f"package: {pkg}  version: {version}  arch: {arch}")
-        if file_cmd[0] != "file":
-            print("file types: bundled file.py fallback (file(1) not installed; reduced detail)")
-        print()
-
+        report.data["version"] = deb_field(deb, "Version")
         for field in ("Depends", "Pre-Depends"):
             value = deb_field(deb, field)
             if value:
-                print(f"{field}: {value}\n")
-
+                report.data[field.lower()] = value
+        if not shutil.which("file"):
+            report.add("info", "file-fallback", pkg)
         entries = deb_contents(deb)
-        kinds = file_descriptions(deb, workdir, [e[0] for e in entries], file_cmd)
-        print("files (lexicographic):")
-        for (path, perms, owner), kind in zip(entries, kinds):
-            print(f"  {perms} {owner}  {path}")
-            print(f"      {kind}")
-
-        postinst = deb_postinst(deb, workdir)
-        print("\npostinst:" + ("" if postinst else " none"))
-        if postinst:
-            print(postinst.rstrip())
-    return 0
+        kinds = file_descriptions(deb, workdir, [e[0] for e in entries])
+        report.data["files"] = [
+            common.Flow(path=path, mode=perms, owner=owner, type=kind)
+            for (path, perms, owner), kind in zip(entries, kinds)
+        ]
+        report.data["postinst"] = deb_postinst(deb, workdir)
+    return report.emit()
 
 
 def cli():
+    report = common.Report(CODES)
     try:
-        return main()
-    except (ArchiveError, OSError, UnicodeError, subprocess.SubprocessError) as e:
-        print(f"error: package verification failed: {e}", file=sys.stderr)
-        return 2
+        return main(report)
+    except ArchiveError as e:
+        report.mark_unavailable("archive", str(e))
+    except subprocess.CalledProcessError as e:
+        report.mark_unavailable(
+            "package", f"{' '.join(e.cmd[:2])} failed: exit {e.returncode}"
+        )
+    except (OSError, UnicodeError, subprocess.SubprocessError) as e:
+        report.mark_unavailable("package", f"verification failed: {e}")
+    return report.emit()
 
 
 if __name__ == "__main__":

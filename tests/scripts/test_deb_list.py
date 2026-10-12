@@ -10,6 +10,7 @@ import urllib.error
 from pathlib import Path
 
 import pytest
+import yaml
 
 SCRIPT = Path(__file__).resolve().parents[2] / "_shared/deb-list.py"
 OTHER_INDEX = gzip.compress(b"Package: other\nFilename: pool/other.deb\n\n")
@@ -18,6 +19,7 @@ FOUND_INDEX = gzip.compress(b"Package: foo\nFilename: pool/foo.deb\n\n")
 
 @pytest.fixture
 def deb_list(monkeypatch, tmp_path):
+    monkeypatch.syspath_prepend(str(SCRIPT.parent))
     spec = importlib.util.spec_from_file_location("deb_list", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -28,12 +30,28 @@ def deb_list(monkeypatch, tmp_path):
     return module
 
 
+def listed(deb_list, capsys) -> tuple[int, dict]:
+    code = deb_list.cli()
+    return code, yaml.safe_load(capsys.readouterr().out)
+
+
+def unavailable(deb_list, capsys) -> str:
+    code, doc = listed(deb_list, capsys)
+    assert (code, doc["status"]) == (3, "unavailable"), doc
+    return " ".join(u["reason"] for u in doc["unavailable"])
+
+
 def test_absence_requires_successful_indexes(deb_list, monkeypatch, capsys):
     monkeypatch.setattr(deb_list, "_fetch", lambda url: OTHER_INDEX)
-    assert deb_list.cli() == 1
-    error = capsys.readouterr().err
-    assert "absent from checked public indexes" in error
-    assert "Ubuntu Pro archives were not checked" in error
+    code, doc = listed(deb_list, capsys)
+    assert (code, doc["status"]) == (1, "failed")
+    [absent] = doc["findings"]["foo"]
+    assert (absent["code"], absent["arch"], absent["suite"]) == (
+        "absent",
+        "amd64",
+        "noble",
+    )
+    assert "ubuntu pro archives are not checked" in doc["codes"]["absent"]
 
 
 def test_partial_lookup_does_not_establish_absence(deb_list, monkeypatch, capsys):
@@ -43,10 +61,9 @@ def test_partial_lookup_does_not_establish_absence(deb_list, monkeypatch, capsys
         return OTHER_INDEX
 
     monkeypatch.setattr(deb_list, "_fetch", fetch)
-    assert deb_list.cli() == 2
-    error = capsys.readouterr().err
-    assert "package absence not established" in error
-    assert "connection timed out" in error
+    reason = unavailable(deb_list, capsys)
+    assert "package absence not established" in reason
+    assert "connection timed out" in reason
 
 
 @pytest.mark.parametrize(
@@ -67,8 +84,7 @@ def test_fetch_failure_is_verification_error(deb_list, monkeypatch, capsys, erro
         raise error
 
     monkeypatch.setattr(deb_list.urllib.request, "urlopen", fail)
-    assert deb_list.cli() == 2
-    assert "package absence not established" in capsys.readouterr().err
+    assert "package absence not established" in unavailable(deb_list, capsys)
 
 
 @pytest.mark.parametrize(
@@ -82,8 +98,7 @@ def test_fetch_failure_is_verification_error(deb_list, monkeypatch, capsys, erro
 )
 def test_bad_index_is_not_absence(deb_list, monkeypatch, capsys, data):
     monkeypatch.setattr(deb_list, "_fetch", lambda url: data)
-    assert deb_list.cli() == 2
-    assert "package absence not established" in capsys.readouterr().err
+    assert "package absence not established" in unavailable(deb_list, capsys)
 
 
 def test_download_failure_is_not_absence(deb_list, monkeypatch, capsys):
@@ -93,8 +108,7 @@ def test_download_failure_is_not_absence(deb_list, monkeypatch, capsys):
         return FOUND_INDEX
 
     monkeypatch.setattr(deb_list, "_fetch", fetch)
-    assert deb_list.cli() == 2
-    assert "deb download failed" in capsys.readouterr().err
+    assert "deb download failed" in unavailable(deb_list, capsys)
 
 
 def test_missing_tools_are_reported_before_lookup(deb_list, monkeypatch, capsys):
@@ -102,38 +116,47 @@ def test_missing_tools_are_reported_before_lookup(deb_list, monkeypatch, capsys)
     monkeypatch.setattr(
         deb_list, "_fetch", lambda url: pytest.fail("unexpected lookup")
     )
-    assert deb_list.cli() == 2
-    assert "missing tools: dpkg-deb" in capsys.readouterr().err
+    assert "dpkg-deb" in unavailable(deb_list, capsys)
 
 
-def test_file_falls_back_to_bundled_classifier(deb_list, monkeypatch):
-    # file(1) is optional: without it the sibling file.py (synced as _file.py)
-    # is used, invoked through the running interpreter.
-    assert deb_list.file_command() == ["file"]
-    monkeypatch.setattr(deb_list.shutil, "which", lambda tool: None if tool == "file" else f"/bin/{tool}")
-    cmd = deb_list.file_command()
-    assert cmd[0] == deb_list.sys.executable
-    assert cmd[1].endswith(("file.py", "_file.py")), cmd
+def test_file_falls_back_to_bundled_classifier(deb_list, monkeypatch, tmp_path):
+    # file(1) is optional: without it the bundled file.py (synced as _file.py)
+    # describes each path instead.
+    text = tmp_path / "text"
+    text.write_text("plain\n")
+    monkeypatch.setattr(deb_list.shutil, "which", lambda tool: None)
+    assert deb_list.classify([str(text)]) == ["ASCII text"]
 
 
 def test_missing_manifest_is_not_absence(deb_list, tmp_path, capsys):
     (tmp_path / "chisel.yaml").unlink()
-    assert deb_list.cli() == 2
-    assert "could not read the release suite" in capsys.readouterr().err
+    assert "could not read the release suite" in unavailable(deb_list, capsys)
 
 
 def test_listing_includes_pre_depends(deb_list, monkeypatch, capsys):
     monkeypatch.setattr(
         deb_list, "_fetch", lambda url: b"deb" if url.endswith(".deb") else FOUND_INDEX
     )
-    fields = {"Version": "1.0", "Depends": "libfoo", "Pre-Depends": "libc6"}
+    fields = {"Version": "1.10", "Depends": "libfoo", "Pre-Depends": "libc6"}
     monkeypatch.setattr(deb_list, "deb_field", lambda deb, field: fields[field])
-    monkeypatch.setattr(deb_list, "deb_contents", lambda deb: [])
-    monkeypatch.setattr(deb_list, "file_descriptions", lambda *args: [])
-    monkeypatch.setattr(deb_list, "deb_postinst", lambda *args: None)
-    assert deb_list.cli() == 0
-    out = capsys.readouterr().out
-    assert "Depends: libfoo" in out and "Pre-Depends: libc6" in out
+    monkeypatch.setattr(
+        deb_list, "deb_contents", lambda deb: [("/usr/bin/foo", "0755", "root/root")]
+    )
+    monkeypatch.setattr(deb_list, "file_descriptions", lambda *args: ["ELF 64-bit"])
+    monkeypatch.setattr(deb_list, "deb_postinst", lambda *args: "#!/bin/sh\nexit 0\n")
+    code, doc = listed(deb_list, capsys)
+    assert (code, doc["status"]) == (0, "passed"), doc
+    assert (doc["package"], doc["version"], doc["arch"]) == ("foo", "1.10", "amd64")
+    assert (doc["depends"], doc["pre-depends"]) == ("libfoo", "libc6")
+    assert doc["files"] == [
+        {
+            "path": "/usr/bin/foo",
+            "mode": "0755",
+            "owner": "root/root",
+            "type": "ELF 64-bit",
+        }
+    ]
+    assert doc["postinst"] == "#!/bin/sh\nexit 0\n"
 
 
 def test_extraction_failure_is_not_absence(deb_list, monkeypatch, capsys):
@@ -145,5 +168,4 @@ def test_extraction_failure_is_not_absence(deb_list, monkeypatch, capsys):
         raise subprocess.CalledProcessError(2, ["dpkg-deb", "-f"])
 
     monkeypatch.setattr(deb_list, "deb_field", fail)
-    assert deb_list.cli() == 2
-    assert "package verification failed" in capsys.readouterr().err
+    assert "dpkg-deb" in unavailable(deb_list, capsys)

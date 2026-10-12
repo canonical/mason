@@ -24,9 +24,8 @@ RUN apt-get update && \
         dpkg-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# uv: the pyyaml-dependent helpers (check-slice, check-test, scaffold-test,
-# check-diff) run as `uv run --script`; python3-yaml above is the fallback for
-# invoking them with plain python3.
+# uv: the skills run every helper as `uv run <script>`, which reads the
+# script's inline metadata and pulls in its dependencies (pyyaml).
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 ARG CLAUDE_CLI_VERSION=latest
