@@ -98,8 +98,8 @@ spread lxd:tests/spread/integration/<pkg>
 For changes to published target SDFs, compare against the target base revision:
 
 ```bash
-uv run "<skill-root>/scripts/_check-diff.py" --base <target-base-ref>
-uv run "<skill-root>/scripts/_try-cut.py" --base <target-base-ref> --arch <arch>
+uv run "<skill-root>/scripts/_check-diff.py"
+uv run "<skill-root>/scripts/_try-cut.py" --base --arch <arch>
 ```
 
 The second runs the before/after cuts that investigate removed declarations.

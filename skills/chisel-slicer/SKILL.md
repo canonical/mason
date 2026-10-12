@@ -33,8 +33,10 @@ Author slices against the user's `canonical/chisel-releases` checkout.
   `kb/_contributing.md`.
 - For changes to published slices, apply the preservation policy in
   `kb/_slice-conventions.md` and run
-  `uv run "<skill-root>/scripts/_check-diff.py" --base <target-base-ref>`, then
-  `uv run "<skill-root>/scripts/_try-cut.py" --base <target-base-ref> --arch <arch>`.
+  `uv run "<skill-root>/scripts/_check-diff.py"`, then
+  `uv run "<skill-root>/scripts/_try-cut.py" --base --arch <arch>`. Both derive
+  the target base from `chisel.yaml`; orientation reports it and whether it
+  is fetched.
 
 ## 1. validate the target
 

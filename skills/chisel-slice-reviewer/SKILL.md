@@ -35,10 +35,11 @@ uv run "<skill-root>/scripts/_check-diff.py"
 ```
 
 The target base is the release branch named by `chisel.yaml`; orientation
-reports it as `target base` and whether it is fetched. Pass `--base <ref>` only
+reports it as `target base` and whether it is fetched. Pass `--base=<ref>` only
 to review against something else.
 
-Then check every changed SDF, and any single SDF under review, on its own:
+Then run the single-file checkers on each SDF `_check-diff.py` lists, or on the
+one SDF under review:
 
 ```bash
 uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
