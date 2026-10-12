@@ -24,6 +24,11 @@ RUN apt-get update && \
         dpkg-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# git protocol v1: `ls-remote` then reads the refs from info/refs alone, which
+# the egress policy allows, instead of posting to git-upload-pack, which it
+# denies as the fetch a clone needs.
+RUN git config --system protocol.version 1
+
 # uv: the skills run every helper as `uv run <script>`, which reads the
 # script's inline metadata and pulls in its dependencies (pyyaml).
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh

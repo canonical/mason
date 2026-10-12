@@ -27,6 +27,8 @@ sandboxes:
       default: deny
       allow:
         - .ubuntu.com # apt mirrors (archive/ports/security) for deb-list
+        - pypi.org # `uv run <helper>` resolves the helpers' pyyaml from here
+        - files.pythonhosted.org
         - github.com
         - raw.githubusercontent.com
         - codeload.github.com
@@ -41,8 +43,10 @@ sandboxes:
         - lwn.net
       # the git refs advertisement (info/refs) stays reachable: orientation's
       # `git ls-remote` reads branch names only, and a denial there would be
-      # routine noise in the cheat detector. the pack fetch a clone needs
-      # (git-upload-pack), the web ui, raw files and archives stay denied.
+      # routine noise in the cheat detector. that holds under git protocol v1,
+      # which the image pins; v2 posts the ref listing to git-upload-pack too.
+      # the pack fetch a clone needs (git-upload-pack), the web ui, raw files
+      # and archives stay denied.
       deny-urls:
         - "github.com/*/chisel-releases"
         - "github.com/*/chisel-releases/*"

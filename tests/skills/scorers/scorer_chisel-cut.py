@@ -30,6 +30,16 @@ from _lib import *
 # substrings in chisel-cut output that mean the cut failed (case-insensitive).
 _FAIL = ("error:", "no content at", "cannot find", "not found", "panic", "usage:")
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# try-cut's report: its status line decides, since chisel's own log in the same
+# output has lines like 'credentials not found' for an archive it then ignores.
+_STATUS = re.compile(r"^status: (passed|failed|unavailable)\s*$", re.MULTILINE)
+
+
+def _cut_ok(is_err: bool, text: str) -> bool:
+    m = _STATUS.search(text)
+    if m:
+        return m.group(1) == "passed"
+    return not is_err and not any(m in text.lower() for m in _FAIL)
 
 
 def _is_cut_cmd(cmd: str) -> bool:
@@ -85,7 +95,7 @@ def _score_claude() -> float | None:
         if r is None:
             continue
         is_err, text = r
-        if not is_err and not any(m in text.lower() for m in _FAIL):
+        if _cut_ok(is_err, text):
             return 1.0
     return 0.5
 
@@ -116,7 +126,7 @@ def _score_opencode() -> float | None:
     if not cuts:
         return 0.0
     for is_err, text in cuts:
-        if not is_err and not any(m in text.lower() for m in _FAIL):
+        if _cut_ok(is_err, text):
             return 1.0
     return 0.5
 
@@ -145,7 +155,7 @@ def _score_codex() -> float | None:
     if not cuts:
         return 0.0
     for is_err, text in cuts:
-        if not is_err and not any(m in text.lower() for m in _FAIL):
+        if _cut_ok(is_err, text):
             return 1.0
     return 0.5
 
@@ -184,8 +194,7 @@ def _score_text() -> float:
     if not cut_blocks:
         return 0.0
     for _, out in cut_blocks:
-        out_text = "\n".join(out).lower()
-        if not any(m in out_text for m in _FAIL):
+        if _cut_ok(False, "\n".join(out)):
             return 1.0
     return 0.5
 
