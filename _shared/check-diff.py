@@ -250,6 +250,8 @@ def main(argv: list[str]) -> int:
         if not base:
             return common.usage(USAGE)
         run_base(base, argv[1:], report)
+    elif argv and argv[0] == "--base":
+        return common.usage(USAGE)
     elif not argv:
         base = common.derived_base(report)
         if base is not None:

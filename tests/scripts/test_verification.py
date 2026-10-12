@@ -426,6 +426,12 @@ def test_diff_without_a_merge_base_compares_the_tip(tmp_path):
     assert "tip of ubuntu-26.04" in doc["caveat"]
 
 
+def test_diff_base_without_a_ref_is_a_usage_error(tmp_path):
+    release_checkout(tmp_path)
+    code, doc = check_diff(tmp_path, "--base", "other")
+    assert (code, doc) == (2, None)
+
+
 def test_diff_explicit_base_wins(tmp_path):
     run = release_checkout(tmp_path)
     run("branch", "other", "ubuntu-26.04")
