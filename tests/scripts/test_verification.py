@@ -14,7 +14,6 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SHARED = ROOT / "_shared"
-REVIEW = ROOT / "skills/chisel-slice-reviewer/scripts/review-diff.py"
 SDF = """\
 package: foo
 essential:
@@ -39,69 +38,17 @@ def module(path):
     return result
 
 
-def test_review_runs_installed_checkers(tmp_path, monkeypatch, capsys):
-    review = module(REVIEW)
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "chisel.yaml").write_text("format: v1\n")
-    (tmp_path / "foo.yaml").write_text(SDF)
-    task = tmp_path / "tests/spread/integration/foo/task.yaml"
-    task.parent.mkdir(parents=True)
-    task.write_text('summary: foo test\nexecute: chroot "$rootfs" foo --version\n')
-    monkeypatch.setattr(review, "changed_slices", lambda base: ["foo.yaml"])
-    original = review.run_check
-
-    base = tmp_path / "base.yaml"
-    base.write_text(SDF)
-
-    def run_check(script, *args):
-        if script == "_check-diff.py":
-            return original(script, "base.yaml", "foo.yaml")
-        return original(script, *args)
-
-    monkeypatch.setattr(review, "run_check", run_check)
-
-    def verdict() -> tuple[int, dict]:
-        code = review.main(["--base", "base"])
-        return code, yaml.safe_load(capsys.readouterr().out)
-
-    code, doc = verdict()
-    assert (code, doc["status"], doc["verdict"]) == (0, "passed", "approve"), doc
-
-    (tmp_path / "foo.yaml").write_text(SDF.replace("package: foo", "package: bar"))
-    code, doc = verdict()
-    assert (code, doc["status"], doc["verdict"]) == (1, "failed", "request-changes")
-    assert "package-mismatch" in {f["code"] for f in doc["findings"]["foo.yaml"]}
-
-    (tmp_path / "foo.yaml").write_text(SDF)
-    base.write_text("bad: [yaml")
-    code, doc = verdict()
-    assert (code, doc["status"], doc["verdict"]) == (3, "unavailable", "incomplete")
-
-
-def test_review_missing_base_is_incomplete(tmp_path):
+def test_missing_base_is_unavailable(tmp_path):
     result = subprocess.run(
-        [sys.executable, str(REVIEW), "--base", "missing"],
+        [sys.executable, str(SHARED / "check-diff.py"), "--base", "missing"],
         cwd=tmp_path,
         capture_output=True,
         text=True,
         check=False,
     )
     doc = yaml.safe_load(result.stdout)
-    assert result.returncode == 3
-    assert (doc["status"], doc["verdict"]) == ("unavailable", "incomplete")
-
-
-@pytest.mark.parametrize("kind", ["missing", "crash-after-warning"])
-def test_checker_crash_is_unavailable(tmp_path, monkeypatch, kind):
-    review = module(REVIEW)
-    monkeypatch.setattr(review, "HERE", tmp_path)
-    if kind == "crash-after-warning":
-        (tmp_path / "checker.py").write_text(
-            'print("status: passed")\nraise RuntimeError("broken")\n'
-        )
-    doc = review.run_check("checker.py")
-    assert doc["status"] == "unavailable"
-    assert doc["unavailable"][0]["check"] == "checker.py"
+    assert (result.returncode, doc["status"]) == (3, "unavailable")
+    assert [u["check"] for u in doc["unavailable"]] == ["base"]
 
 
 def test_unknown_format_is_unavailable(tmp_path):
@@ -366,3 +313,106 @@ def test_missing_input_is_unavailable_not_a_defect(tmp_path, args):
     doc = yaml.safe_load(result.stdout)
     assert (result.returncode, doc["status"]) == (3, "unavailable"), result.stdout
     assert "findings" not in doc
+
+
+MANIFEST = "format: v3\narchives:\n  ubuntu:\n    version: 26.04\n"
+
+
+def release_checkout(path, branch="ubuntu-26.04"):
+    """A chisel-releases-like repo: the manifest committed on `branch`, the
+    worktree detached on a commit that adds slices/foo.yaml."""
+    env = {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "HOME": str(path),
+        "PATH": os.environ["PATH"],
+    }
+
+    def run(*args):
+        subprocess.run(
+            ["git", *args], cwd=path, env=env, check=True, capture_output=True
+        )
+
+    run("init", "-q", "-b", branch)
+    (path / "chisel.yaml").write_text(MANIFEST)
+    run("add", "chisel.yaml")
+    run("commit", "-q", "-m", "manifest")
+    run("checkout", "-q", "--detach")
+    (path / "slices").mkdir()
+    (path / "slices/foo.yaml").write_text(SDF)
+    run("add", "slices/foo.yaml")
+    run("commit", "-q", "-m", "foo")
+    return run
+
+
+def check_diff(cwd, *args):
+    result = subprocess.run(
+        [sys.executable, str(SHARED / "check-diff.py"), *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode, yaml.safe_load(result.stdout)
+
+
+def test_diff_derives_the_base_from_the_manifest(tmp_path):
+    release_checkout(tmp_path)
+    code, doc = check_diff(tmp_path)
+    assert (code, doc["status"]) == (0, "passed"), doc
+    assert doc["base"] == "ubuntu-26.04"
+    assert doc["changed"] == ["slices/foo.yaml"]
+
+
+def test_diff_prefers_the_remote_tracking_base(tmp_path):
+    run = release_checkout(tmp_path)
+    run("update-ref", "refs/remotes/origin/ubuntu-26.04", "ubuntu-26.04")
+    _, doc = check_diff(tmp_path)
+    assert doc["base"] == "origin/ubuntu-26.04", doc
+
+
+def test_diff_unfetched_base_is_unavailable(tmp_path):
+    run = release_checkout(tmp_path)
+    run("branch", "-D", "ubuntu-26.04")
+    code, doc = check_diff(tmp_path)
+    assert (code, doc["status"]) == (3, "unavailable")
+    [problem] = doc["unavailable"]
+    assert problem["check"] == "base"
+    assert "git fetch --depth=1 origin ubuntu-26.04" in problem["reason"]
+    assert "base" not in doc
+
+
+def test_diff_without_manifest_needs_an_explicit_base(tmp_path):
+    code, doc = check_diff(tmp_path)
+    assert (code, doc["status"]) == (3, "unavailable")
+    assert "--base" in doc["unavailable"][0]["reason"]
+
+
+def test_diff_explicit_base_wins(tmp_path):
+    run = release_checkout(tmp_path)
+    run("branch", "other", "ubuntu-26.04")
+    _, doc = check_diff(tmp_path, "--base", "other")
+    assert doc["base"] == "other"
+
+
+def test_orientation_reports_the_target_base(tmp_path, monkeypatch):
+    orientation = module(SHARED / "orientation.py")
+    run = release_checkout(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    report = module(SHARED / "common.py").Report({})
+    orientation.checkout("2040-01-01", report)
+    assert (report.data["target base"], report.data["base ref"]) == (
+        "ubuntu-26.04",
+        "ubuntu-26.04",
+    )
+    assert report.data["branch"] is None
+    assert not report.unavailable
+
+    run("branch", "-D", "ubuntu-26.04")
+    report = module(SHARED / "common.py").Report({})
+    orientation.checkout("2040-01-01", report)
+    # a fact to act on, not a failure of orientation: check-diff says what to fetch
+    assert report.data["base ref"] is None
+    assert not report.unavailable

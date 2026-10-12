@@ -25,11 +25,15 @@ slice, not a regression, and is reported as info. Only same-package essentials
 that apply on every arch count; paths moved to another package still warn.
 
 Usage:
+  check-diff.py                                 # git: the target base vs worktree
   check-diff.py --base <ref> [<pathspec> ...]   # git: compare <ref> vs worktree
   check-diff.py <old.yaml> <new.yaml>           # compare two files directly
 
---base mode enumerates changed slices/*.yaml via git and compares each against
-<ref> (e.g. the release branch a PR targets). Default pathspec: slices/*.yaml.
+git mode enumerates changed slices/*.yaml and compares each against the base.
+Without --base that is the release branch chisel.yaml names, ubuntu-<version>,
+as origin/<branch> or <branch>, whichever this checkout has; a branch that is
+not fetched is an unavailable check. The report lists the changed SDFs under
+`changed`, for the single-file checkers to take from there.
 
 Output: the YAML report described in common.py. Findings are advisory; a base
 that git cannot produce or that does not parse makes the check unavailable.
@@ -186,6 +190,7 @@ def compare(old_text: str, new_text: str, label: str, report: common.Report) -> 
 
 def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
     specs = pathspecs or ["slices/*.yaml"]
+    report.data["base"] = base
     status = common.git(["diff", "--name-status", base, "--", *specs])
     if status is None:
         report.mark_unavailable(
@@ -193,6 +198,7 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
             f"git diff against {base!r} failed; is this a chisel-releases checkout, and is the ref present?",
         )
         return
+    changed = []
     for line in status.splitlines():
         parts = line.split("\t")
         if len(parts) < 2:
@@ -200,7 +206,8 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
         code, path = parts[0], parts[-1]
         if code.startswith("D"):
             report.add("warn", "sdf-removed", path)
-        elif code.startswith("R") and len(parts) >= 3:
+            continue
+        if code.startswith("R") and len(parts) >= 3:
             # rename: old path is parts[1], new is parts[2]. the old filename is
             # gone (removed-slices CI fails on it, e.g. a soname bump), and the
             # rename may also drop slices/paths -- compare old vs new content.
@@ -209,6 +216,22 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
             compare_revisions(base, old_path, new_path, report)
         elif code.startswith("M"):
             compare_revisions(base, path, path, report)
+        if Path(path).exists():
+            changed.append(path)
+    report.data["changed"] = changed
+
+
+def derived_base(report: common.Report) -> str | None:
+    target = common.target_base()
+    if target is None:
+        report.mark_unavailable(
+            "base", "no ./chisel.yaml names the target base; pass --base <ref>"
+        )
+        return None
+    ref = common.base_ref(target)
+    if ref is None:
+        report.mark_unavailable("base", common.fetch_hint(target))
+    return ref
 
 
 def compare_revisions(
@@ -225,7 +248,7 @@ def compare_revisions(
     compare(old_text, new_text, new_path, report)
 
 
-USAGE = "usage: check-diff.py --base <ref> [<pathspec> ...] | <old.yaml> <new.yaml>"
+USAGE = "usage: check-diff.py [--base <ref> [<pathspec> ...]] | <old.yaml> <new.yaml>"
 
 
 def main(argv: list[str]) -> int:
@@ -237,6 +260,10 @@ def main(argv: list[str]) -> int:
         if len(argv) < 2:
             return common.usage(USAGE)
         run_base(argv[1], argv[2:], report)
+    elif not argv:
+        base = derived_base(report)
+        if base is not None:
+            run_base(base, [], report)
     elif len(argv) == 2:
         try:
             old, new = (Path(a).read_text(encoding="utf-8") for a in argv)

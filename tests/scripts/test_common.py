@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -167,8 +169,6 @@ def test_usage_goes_to_stderr(common, capsys) -> None:
 
 def test_imports_as_either_name(tmp_path) -> None:
     # a skill ships the copy as _common.py, the _shared source is common.py
-    import subprocess
-
     (tmp_path / "_common.py").write_text((SHARED / "common.py").read_text())
     (tmp_path / "tool.py").write_text(
         "import sys\nsys.path.insert(0, sys.argv[1])\nimport _common\nprint(_common.EXIT)\n"
@@ -196,3 +196,64 @@ def test_multiline_text_is_a_literal_block(common, capsys) -> None:
     _, out, doc = emitted(report, capsys)
     assert "postinst: |" in out, out
     assert doc["postinst"] == script
+
+
+@pytest.mark.parametrize(
+    "manifest, base",
+    [
+        ("format: v3\narchives:\n  ubuntu:\n    version: 26.04\n", "ubuntu-26.04"),
+        ("format: v1\narchives:\n  ubuntu:\n    version: '24.04'\n", "ubuntu-24.04"),
+        (
+            "format: chisel-v1\narchives:\n    ubuntu:\n        version: 22.10\n",
+            "ubuntu-22.10",
+        ),
+        ("format: v3\n", None),
+    ],
+)
+def test_target_base_is_the_manifest_release(common, tmp_path, manifest, base) -> None:
+    (tmp_path / "chisel.yaml").write_text(manifest)
+    assert common.target_base(tmp_path / "chisel.yaml") == base
+
+
+def test_no_manifest_has_no_target_base(common, tmp_path) -> None:
+    assert common.target_base(tmp_path / "chisel.yaml") is None
+
+
+def git_repo(path):
+    """A repo on branch `work` with the 26.04 manifest committed."""
+    env = {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "HOME": str(path),
+        "PATH": os.environ["PATH"],
+    }
+
+    def run(*args):
+        subprocess.run(
+            ["git", *args], cwd=path, env=env, check=True, capture_output=True
+        )
+
+    run("init", "-q", "-b", "work")
+    (path / "chisel.yaml").write_text(
+        "format: v3\narchives:\n  ubuntu:\n    version: 26.04\n"
+    )
+    run("add", "chisel.yaml")
+    run("commit", "-q", "-m", "manifest")
+    return run
+
+
+def test_base_ref_prefers_remote_tracking(common, tmp_path, monkeypatch) -> None:
+    run = git_repo(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert common.base_ref("ubuntu-26.04") is None
+    run("branch", "ubuntu-26.04")
+    assert common.base_ref("ubuntu-26.04") == "ubuntu-26.04"
+    run("update-ref", "refs/remotes/origin/ubuntu-26.04", "HEAD")
+    assert common.base_ref("ubuntu-26.04") == "origin/ubuntu-26.04"
+
+
+def test_base_ref_outside_git_is_none(common, tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert common.base_ref("ubuntu-26.04") is None

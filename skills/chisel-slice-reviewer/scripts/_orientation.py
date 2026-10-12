@@ -104,6 +104,12 @@ def checkout(today: str, report: common.Report) -> None:
         return
 
     branch = (run(["git", "branch", "--show-current"]) or "").strip()
+    # the base a review or cut compares against is a fact of the manifest, not
+    # of what is checked out, which may be a feature branch or detached. A base
+    # that is not fetched is reported here and becomes unavailable in the
+    # helper that needs it.
+    base = common.target_base()
+    ref = common.base_ref(base) if base else None
     eol = first(_EOL, text).strip("\"'")
     try:
         maintained = _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
@@ -116,6 +122,8 @@ def checkout(today: str, report: common.Report) -> None:
     report.data.update(
         {
             "branch": branch or None,
+            "target base": base,
+            "base ref": ref,
             "ubuntu version": first(_UBUNTU_VERSION, text).replace("'", "") or None,
             "manifest format": first(_FORMAT, text) or None,
             "suites": inline_list(first(_SUITES, text)),

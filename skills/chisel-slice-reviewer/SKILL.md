@@ -27,13 +27,18 @@ State the scope and any assumption needed to interpret the request.
 
 ## 1. run static checks
 
-For a branch or PR represented by the working tree:
+For a branch or PR represented by the working tree, find what changed against
+the target base and check it for append-only regressions:
 
 ```bash
-uv run "<skill-root>/scripts/review-diff.py" --base <target-base-ref>
+uv run "<skill-root>/scripts/_check-diff.py"
 ```
 
-For a single SDF:
+The target base is the release branch named by `chisel.yaml`; orientation
+reports it as `target base` and whether it is fetched. Pass `--base <ref>` only
+to review against something else.
+
+Then check every changed SDF, and any single SDF under review, on its own:
 
 ```bash
 uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml

@@ -27,8 +27,10 @@ it as common.py, so a helper imports whichever of the two is beside it.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -152,3 +154,33 @@ def git(args: list[str]) -> str | None:
     except OSError:
         return None
     return r.stdout if r.returncode == 0 else None
+
+
+_UBUNTU_VERSION = re.compile(
+    r"^[ \t]+version:[ \t]*['\"]?([0-9]+\.[0-9]+)", re.MULTILINE
+)
+
+
+def target_base(manifest: str | Path = "chisel.yaml") -> str | None:
+    """The branch this checkout's work targets: ubuntu-<version>, the archive
+    version read off the manifest. None without a readable manifest, which in
+    chisel-releases means a branch with no slices on it."""
+    try:
+        text = Path(manifest).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    m = _UBUNTU_VERSION.search(text)
+    return f"ubuntu-{m.group(1)}" if m else None
+
+
+def base_ref(base: str) -> str | None:
+    """The spelling of `base` this checkout resolves, remote-tracking first:
+    origin/<base>, then <base>. None when neither is here to diff against."""
+    for ref in (f"origin/{base}", base):
+        if git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]) is not None:
+            return ref
+    return None
+
+
+def fetch_hint(base: str) -> str:
+    return f"{base} is not fetched; git fetch --depth=1 origin {base} brings it"
