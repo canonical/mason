@@ -23,8 +23,8 @@
       "max_score": 9
     },
     {
-      "name": "no trailing * on sonames",
-      "description": "Soname paths in chisel-releases/slices/libreadline8t64.yaml carry no trailing wildcard: 'libreadline.so.8:' not 'libreadline.so.8*:'",
+      "name": "soname glob covers the versioned file",
+      "description": "Soname paths in chisel-releases/slices/libreadline8t64.yaml carry the trailing wildcard that picks up the versioned file behind the symlink, as upstream does: 'libreadline.so.8*:' (and 'libhistory.so.8*:'), not the bare 'libreadline.so.8:' which ships a dangling symlink",
       "max_score": 8
     },
     {
