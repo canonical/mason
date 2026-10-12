@@ -21,6 +21,9 @@ Checkers report findings grouped by file, worst first, one line each:
 explains, once, each code that occurs. Reporters put their facts under keys of
 their own after the contract keys.
 
+The git-aware helpers also take from here the target base a checkout's
+manifest names and the revision a change is compared against.
+
 A skill ships this file as _common.py next to its helpers, while _shared/ keeps
 it as common.py, so a helper imports whichever of the two is beside it.
 """
@@ -161,6 +164,12 @@ _UBUNTU_VERSION = re.compile(
 )
 
 
+def ubuntu_version(manifest_text: str) -> str | None:
+    """The archive version a chisel.yaml names, e.g. 24.04."""
+    m = _UBUNTU_VERSION.search(manifest_text)
+    return m.group(1) if m else None
+
+
 def target_base(manifest: str | Path = "chisel.yaml") -> str | None:
     """The branch this checkout's work targets: ubuntu-<version>, the archive
     version read off the manifest. None without a readable manifest, which in
@@ -169,8 +178,23 @@ def target_base(manifest: str | Path = "chisel.yaml") -> str | None:
         text = Path(manifest).read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    m = _UBUNTU_VERSION.search(text)
-    return f"ubuntu-{m.group(1)}" if m else None
+    version = ubuntu_version(text)
+    return f"ubuntu-{version}" if version else None
+
+
+def derived_base(report: Report) -> str | None:
+    """The target base resolved for a git-mode helper, or None with the report
+    marked unavailable: no manifest names one, or it is not fetched."""
+    target = target_base()
+    if target is None:
+        report.mark_unavailable(
+            "base", "no ./chisel.yaml names the target base; pass --base=<ref>"
+        )
+        return None
+    ref = base_ref(target)
+    if ref is None:
+        report.mark_unavailable("base", fetch_hint(target))
+    return ref
 
 
 def base_ref(base: str) -> str | None:

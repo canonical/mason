@@ -42,7 +42,6 @@ RAW = "https://raw.githubusercontent.com/canonical/chisel-releases"
 
 _VERSION = re.compile(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?")
 _FORMAT = re.compile(r"^format:[ \t]*(.*)$", re.MULTILINE)
-_UBUNTU_VERSION = re.compile(r"^[ \t]+version:[ \t]*(.*)$", re.MULTILINE)
 _SUITES = re.compile(r"suites:[ \t]*(.*)$", re.MULTILINE)
 _COMPONENTS = re.compile(r"components:[ \t]*(.*)$", re.MULTILINE)
 _EOL = re.compile(r"^[ \t]*end-of-life:[ \t]*(.*)$", re.MULTILINE)
@@ -104,10 +103,7 @@ def checkout(today: str, report: common.Report) -> None:
         return
 
     branch = (run(["git", "branch", "--show-current"]) or "").strip()
-    # the base a review or cut compares against is a fact of the manifest, not
-    # of what is checked out, which may be a feature branch or detached. A base
-    # that is not fetched is reported here and becomes unavailable in the
-    # helper that needs it.
+    # the base is a fact of the manifest, not of whatever branch is checked out
     base = common.target_base()
     ref = common.base_ref(base) if base else None
     eol = first(_EOL, text).strip("\"'")
@@ -124,7 +120,7 @@ def checkout(today: str, report: common.Report) -> None:
             "branch": branch or None,
             "target base": base,
             "base ref": ref,
-            "ubuntu version": first(_UBUNTU_VERSION, text).replace("'", "") or None,
+            "ubuntu version": common.ubuntu_version(text),
             "manifest format": first(_FORMAT, text) or None,
             "suites": inline_list(first(_SUITES, text)),
             "components": inline_list(first(_COMPONENTS, text)),

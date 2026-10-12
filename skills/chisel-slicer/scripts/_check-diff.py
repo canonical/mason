@@ -26,7 +26,7 @@ that apply on every arch count; paths moved to another package still warn.
 
 Usage:
   check-diff.py                                 # git: the target base vs worktree
-  check-diff.py --base <ref> [<pathspec> ...]   # git: compare <ref> vs worktree
+  check-diff.py --base=<ref> [<pathspec> ...]   # git: compare <ref> vs worktree
   check-diff.py <old.yaml> <new.yaml>           # compare two files directly
 
 git mode enumerates changed slices/*.yaml and compares each against the base.
@@ -223,19 +223,6 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
     report.data["changed"] = changed
 
 
-def derived_base(report: common.Report) -> str | None:
-    target = common.target_base()
-    if target is None:
-        report.mark_unavailable(
-            "base", "no ./chisel.yaml names the target base; pass --base <ref>"
-        )
-        return None
-    ref = common.base_ref(target)
-    if ref is None:
-        report.mark_unavailable("base", common.fetch_hint(target))
-    return ref
-
-
 def compare_revisions(
     base: str, old_path: str, new_path: str, report: common.Report
 ) -> None:
@@ -250,7 +237,7 @@ def compare_revisions(
     compare(old_text, new_text, new_path, report)
 
 
-USAGE = "usage: check-diff.py [--base <ref> [<pathspec> ...]] | <old.yaml> <new.yaml>"
+USAGE = "usage: check-diff.py [--base=<ref> [<pathspec> ...]] | <old.yaml> <new.yaml>"
 
 
 def main(argv: list[str]) -> int:
@@ -258,12 +245,13 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 0
     report = common.Report(CODES)
-    if argv and argv[0] == "--base":
-        if len(argv) < 2:
+    if argv and argv[0].startswith("--base="):
+        base = argv[0].partition("=")[2]
+        if not base:
             return common.usage(USAGE)
-        run_base(argv[1], argv[2:], report)
+        run_base(base, argv[1:], report)
     elif not argv:
-        base = derived_base(report)
+        base = common.derived_base(report)
         if base is not None:
             run_base(base, [], report)
     elif len(argv) == 2:

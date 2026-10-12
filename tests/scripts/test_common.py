@@ -266,7 +266,9 @@ def test_fetch_hint_creates_the_tracking_ref(common, tmp_path, monkeypatch) -> N
     )
     run("remote", "add", "canonical", "https://example.invalid/chisel-releases")
     hint = common.fetch_hint("ubuntu-26.04")
-    assert "git fetch canonical ubuntu-26.04:refs/remotes/canonical/ubuntu-26.04" in hint
+    assert (
+        "git fetch canonical ubuntu-26.04:refs/remotes/canonical/ubuntu-26.04" in hint
+    )
     run("remote", "add", "origin", "https://example.invalid/fork")
     assert "git fetch origin ubuntu-26.04:refs/remotes/origin/" in common.fetch_hint(
         "ubuntu-26.04"

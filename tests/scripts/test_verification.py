@@ -40,7 +40,7 @@ def module(path):
 
 def test_missing_base_is_unavailable(tmp_path):
     result = subprocess.run(
-        [sys.executable, str(SHARED / "check-diff.py"), "--base", "missing"],
+        [sys.executable, str(SHARED / "check-diff.py"), "--base=missing"],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -429,7 +429,7 @@ def test_diff_without_a_merge_base_compares_the_tip(tmp_path):
 def test_diff_explicit_base_wins(tmp_path):
     run = release_checkout(tmp_path)
     run("branch", "other", "ubuntu-26.04")
-    _, doc = check_diff(tmp_path, "--base", "other")
+    _, doc = check_diff(tmp_path, "--base=other")
     assert doc["base"] == "other"
 
 

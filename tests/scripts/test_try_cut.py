@@ -100,9 +100,11 @@ def checkout(tmp_path):
 
 
 def cut(checkout, *args, base="HEAD") -> tuple[int, dict]:
+    """try-cut --base=<base> on the checkout; base=None is the bare --base."""
     repo, env = checkout
+    flag = "--base" if base is None else f"--base={base}"
     r = subprocess.run(
-        [sys.executable, str(SCRIPT), "--base", base, *args],
+        [sys.executable, str(SCRIPT), flag, *args],
         cwd=repo,
         env=env,
         capture_output=True,
@@ -203,10 +205,36 @@ def test_base_cut_uses_the_merge_base(checkout) -> None:
     assert list(doc["findings"]) == ["slices/foo.yaml"]
 
 
+def test_bare_base_is_the_manifest_release(checkout) -> None:
+    repo, env = checkout
+    (repo / "chisel.yaml").write_text(
+        "format: v3\narchives:\n  ubuntu:\n    version: 26.04\n"
+    )
+    subprocess.run(
+        ["git", "branch", "ubuntu-26.04"],
+        cwd=repo,
+        env=env,
+        check=True,
+        capture_output=True,
+    )
+    (repo / "slices/foo.yaml").write_text(
+        BASE.replace("      /usr/bin/foo-helper:\n", "")
+    )
+    code, doc = cut(checkout, base=None)
+    assert (code, doc["status"], doc["base"]) == (0, "passed", "ubuntu-26.04"), doc
+    assert list(doc["findings"]) == ["slices/foo.yaml"]
+
+
+def test_bare_base_without_a_manifest_release_is_unavailable(checkout) -> None:
+    code, doc = cut(checkout, base=None)
+    assert (code, doc["status"]) == (3, "unavailable"), doc
+    assert "--base=<ref>" in doc["unavailable"][0]["reason"]
+
+
 def test_unknown_base_is_unavailable(checkout) -> None:
     repo, env = checkout
     r = subprocess.run(
-        [sys.executable, str(SCRIPT), "--base", "no-such-ref"],
+        [sys.executable, str(SCRIPT), "--base=no-such-ref"],
         cwd=repo,
         env=env,
         capture_output=True,

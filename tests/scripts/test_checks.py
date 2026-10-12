@@ -820,7 +820,7 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
         )
 
     def check_diff() -> dict:
-        return report("check-diff.py", "--base", "HEAD", cwd=tmp_path, env=env)[1]
+        return report("check-diff.py", "--base=HEAD", cwd=tmp_path, env=env)[1]
 
     sdf = tmp_path / "slices" / "foo.yaml"
     sdf.parent.mkdir()

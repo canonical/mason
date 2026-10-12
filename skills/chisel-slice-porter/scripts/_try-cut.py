@@ -7,12 +7,13 @@
 
 Usage:
   try-cut.py [--arch ARCH] <pkg>_<slice> [<pkg>_<slice> ...]
-  try-cut.py --base <ref> [--arch ARCH] [<pkg>_<slice> ...]
+  try-cut.py --base[=REF] [--arch ARCH] [<pkg>_<slice> ...]
 
   --arch ARCH   package architecture (passed through to chisel cut)
-  --base REF    cut every slice of each SDF changed since REF (or the slices
+  --base[=REF]  cut every slice of each SDF changed since REF (or the slices
                 named) twice, from REF and from the worktree, and report each
-                path the worktree's cut no longer installs
+                path the worktree's cut no longer installs. REF defaults to
+                the target base chisel.yaml names, resolved as check-diff does
 
 Temp roots, and REF's release for --base, are created in the current directory
 (chisel snap compat) and removed on exit. chisel's own output goes to stderr;
@@ -43,7 +44,7 @@ except ImportError:
 
 USAGE = (
     "usage: try-cut.py [--arch ARCH] <pkg>_<slice> [...]\n"
-    "       try-cut.py --base <ref> [--arch ARCH] [<pkg>_<slice> ...]"
+    "       try-cut.py --base[=REF] [--arch ARCH] [<pkg>_<slice> ...]"
 )
 
 CODES = {
@@ -206,18 +207,18 @@ def main(argv: list[str]) -> int:
     slices: list[str] = []
     it = iter(argv)
     for a in it:
-        if a in ("--arch", "--base"):
-            value = next(it, "")
-            if not value:
+        if a == "--arch":
+            arch = next(it, "")
+            if not arch:
                 return common.usage(USAGE)
-            if a == "--arch":
-                arch = value
-            else:
-                base = value
         elif a.startswith("--arch="):
             arch = a.split("=", 1)[1]
+        elif a == "--base":
+            base = ""  # derived from the manifest once there is a report
         elif a.startswith("--base="):
             base = a.split("=", 1)[1]
+            if not base:
+                return common.usage(USAGE)
         elif a in ("-h", "--help"):
             print(__doc__)
             return 0
@@ -230,8 +231,11 @@ def main(argv: list[str]) -> int:
 
     report = common.Report(CODES)
     report.data.update(arch=arch or None, slices=slices)
+    if base == "":
+        base = common.derived_base(report)
     if not shutil.which("chisel"):
         report.mark_unavailable("cut", "chisel is not installed")
+    if report.unavailable:
         return report.emit()
     try:
         if base is None:
