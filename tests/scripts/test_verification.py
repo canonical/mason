@@ -380,7 +380,10 @@ def test_diff_unfetched_base_is_unavailable(tmp_path):
     assert (code, doc["status"]) == (3, "unavailable")
     [problem] = doc["unavailable"]
     assert problem["check"] == "base"
-    assert "git fetch --depth=1 origin ubuntu-26.04" in problem["reason"]
+    assert (
+        "git fetch origin ubuntu-26.04:refs/remotes/origin/ubuntu-26.04"
+        in problem["reason"]
+    )
     assert "base" not in doc
 
 

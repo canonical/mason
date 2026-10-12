@@ -250,8 +250,27 @@ def test_base_ref_prefers_remote_tracking(common, tmp_path, monkeypatch) -> None
     assert common.base_ref("ubuntu-26.04") is None
     run("branch", "ubuntu-26.04")
     assert common.base_ref("ubuntu-26.04") == "ubuntu-26.04"
+    # whatever the remote is called: a clone need not name it origin
+    run("update-ref", "refs/remotes/canonical/ubuntu-26.04", "HEAD")
+    assert common.base_ref("ubuntu-26.04") == "canonical/ubuntu-26.04"
     run("update-ref", "refs/remotes/origin/ubuntu-26.04", "HEAD")
     assert common.base_ref("ubuntu-26.04") == "origin/ubuntu-26.04"
+
+
+def test_fetch_hint_creates_the_tracking_ref(common, tmp_path, monkeypatch) -> None:
+    run = git_repo(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    # no remote yet: origin is the conventional guess
+    assert "git fetch origin ubuntu-26.04:refs/remotes/origin/ubuntu-26.04" in (
+        common.fetch_hint("ubuntu-26.04")
+    )
+    run("remote", "add", "canonical", "https://example.invalid/chisel-releases")
+    hint = common.fetch_hint("ubuntu-26.04")
+    assert "git fetch canonical ubuntu-26.04:refs/remotes/canonical/ubuntu-26.04" in hint
+    run("remote", "add", "origin", "https://example.invalid/fork")
+    assert "git fetch origin ubuntu-26.04:refs/remotes/origin/" in common.fetch_hint(
+        "ubuntu-26.04"
+    )
 
 
 def test_base_ref_outside_git_is_none(common, tmp_path, monkeypatch) -> None:

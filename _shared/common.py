@@ -174,13 +174,27 @@ def target_base(manifest: str | Path = "chisel.yaml") -> str | None:
 
 
 def base_ref(base: str) -> str | None:
-    """The spelling of `base` this checkout resolves, remote-tracking first:
-    origin/<base>, then <base>. None when neither is here to diff against."""
-    for ref in (f"origin/{base}", base):
+    """The spelling of `base` this checkout resolves: its remote-tracking ref
+    on any remote (origin first), else the local branch. None when nothing
+    here can be diffed against."""
+    tracking = (
+        git(["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{base}"])
+        or ""
+    ).split()
+    tracking.sort(key=lambda ref: (not ref.startswith("origin/"), ref))
+    for ref in [*tracking, base]:
         if git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]) is not None:
             return ref
     return None
 
 
 def fetch_hint(base: str) -> str:
-    return f"{base} is not fetched; git fetch --depth=1 origin {base} brings it"
+    """The fetch that makes base_ref resolve. The explicit refspec matters: a
+    checkout whose remote tracks one branch only, as CI checkouts do, would
+    otherwise fetch into FETCH_HEAD and leave no ref behind."""
+    remotes = (git(["remote"]) or "").split()
+    remote = "origin" if "origin" in remotes or not remotes else remotes[0]
+    return (
+        f"{base} is not fetched; "
+        f"git fetch {remote} {base}:refs/remotes/{remote}/{base} brings it"
+    )
