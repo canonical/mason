@@ -99,10 +99,10 @@ def checkout(tmp_path):
     return repo, env
 
 
-def cut(checkout, *args) -> tuple[int, dict]:
+def cut(checkout, *args, base="HEAD") -> tuple[int, dict]:
     repo, env = checkout
     r = subprocess.run(
-        [sys.executable, str(SCRIPT), "--base", "HEAD", *args],
+        [sys.executable, str(SCRIPT), "--base", base, *args],
         cwd=repo,
         env=env,
         capture_output=True,
@@ -173,6 +173,34 @@ def test_new_cut_failure_fails(checkout) -> None:
     code, doc = cut(checkout)
     assert (code, doc["status"]) == (1, "failed"), doc
     assert {f["code"] for f in doc["findings"]["slices/foo.yaml"]} == {"cut-failed"}
+
+
+def test_base_cut_uses_the_merge_base(checkout) -> None:
+    # a slice added on the base after branching is neither cut nor compared
+    repo, env = checkout
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+
+    def run(*cmd):
+        return subprocess.run(
+            [*git, *cmd], cwd=repo, env=env, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    run("branch", "base")
+    run("checkout", "-q", "--detach")
+    (repo / "slices/foo.yaml").write_text(
+        BASE.replace("      /usr/bin/foo-helper:\n", "")
+    )
+    run("commit", "-qam", "drop the helper")
+    work = run("rev-parse", "HEAD")
+    run("checkout", "-q", "base")
+    (repo / "slices/bar.yaml").write_text(BAR + "  extra:\n    contents:\n      /x:\n")
+    run("commit", "-qam", "bar grows on the base")
+    run("checkout", "-q", work)
+    code, doc = cut(checkout, base="base")
+    assert (code, doc["status"]) == (0, "passed"), doc
+    assert doc["merge base"] and "caveat" not in doc
+    assert [c["slice"] for c in doc["compared"]] == ["foo_bins", "foo_copyright"]
+    assert list(doc["findings"]) == ["slices/foo.yaml"]
 
 
 def test_unknown_base_is_unavailable(checkout) -> None:

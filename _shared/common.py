@@ -188,6 +188,24 @@ def base_ref(base: str) -> str | None:
     return None
 
 
+def comparison(base: str, report: Report) -> str:
+    """The revision the worktree is compared against, recorded in the report:
+    the merge base of `base` and HEAD, so that work landed on the base since
+    branching is not read as this change undoing it. Without one (a shallow
+    clone, unrelated histories) the tip of `base` stands in, with the caveat."""
+    report.data["base"] = base
+    merge_base = (git(["merge-base", base, "HEAD"]) or "").strip()
+    report.data["merge base"] = merge_base or None
+    if merge_base:
+        return merge_base
+    report.data["caveat"] = (
+        f"no merge base between {base} and HEAD in this history, so the "
+        f"comparison is against the tip of {base}: changes landed there since "
+        "branching show up reversed"
+    )
+    return base
+
+
 def fetch_hint(base: str) -> str:
     """The fetch that makes base_ref resolve. The explicit refspec matters: a
     checkout whose remote tracks one branch only, as CI checkouts do, would

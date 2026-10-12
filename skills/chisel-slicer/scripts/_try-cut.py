@@ -17,7 +17,8 @@ Usage:
 Temp roots, and REF's release for --base, are created in the current directory
 (chisel snap compat) and removed on exit. chisel's own output goes to stderr;
 stdout is the YAML report described in common.py. Both --base cuts read the
-same archive, so a lost path is down to the SDF change, not the archive.
+same archive, so a lost path is down to the SDF change, not the archive. REF
+is compared at its merge base with HEAD, or at its tip without one.
 
 A cut that fails on the SDFs fails; one that fails on the archive or the
 network, or that has no chisel to run, is unavailable. A slice REF itself can
@@ -158,8 +159,9 @@ def base_release(base: str, into: Path) -> bool:
 
 
 def cut_diff(base: str, named: list[str], arch: str, report: common.Report) -> None:
-    changed = changed_slices(base)
-    report.data.update(base=base, compared=[])
+    rev = common.comparison(base, report)
+    changed = changed_slices(rev)
+    report.data["compared"] = []
     if changed is None:
         report.mark_unavailable(
             "base", f"git diff against {base!r} failed; is the ref present?"
@@ -176,7 +178,7 @@ def cut_diff(base: str, named: list[str], arch: str, report: common.Report) -> N
     ignore = ignore_flags()
     release = Path(tempfile.mkdtemp(prefix="chisel-base.", dir=Path.cwd()))
     try:
-        if not base_release(base, release):
+        if not base_release(rev, release):
             report.mark_unavailable(
                 "base", f"cannot read chisel.yaml and slices/ at {base!r}"
             )

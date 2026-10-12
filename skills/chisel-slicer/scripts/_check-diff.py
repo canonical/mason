@@ -31,9 +31,11 @@ Usage:
 
 git mode enumerates changed slices/*.yaml and compares each against the base.
 Without --base that is the release branch chisel.yaml names, ubuntu-<version>,
-as origin/<branch> or <branch>, whichever this checkout has; a branch that is
-not fetched is an unavailable check. The report lists the changed SDFs under
-`changed`, for the single-file checkers to take from there.
+as a remote-tracking or local branch, whichever this checkout has; a branch
+that is not fetched is an unavailable check. The comparison point is the merge
+base of the base and HEAD, or the base's tip where history has no merge base.
+The report lists the changed SDFs, added ones included, under `changed`, for
+the single-file checkers to take from there.
 
 Output: the YAML report described in common.py. Findings are advisory; a base
 that git cannot produce or that does not parse makes the check unavailable.
@@ -190,8 +192,8 @@ def compare(old_text: str, new_text: str, label: str, report: common.Report) -> 
 
 def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
     specs = pathspecs or ["slices/*.yaml"]
-    report.data["base"] = base
-    status = common.git(["diff", "--name-status", base, "--", *specs])
+    rev = common.comparison(base, report)
+    status = common.git(["diff", "--name-status", rev, "--", *specs])
     if status is None:
         report.mark_unavailable(
             "base",
@@ -213,9 +215,9 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
             # rename may also drop slices/paths -- compare old vs new content.
             old_path, new_path = parts[1], parts[2]
             report.add("warn", "sdf-renamed", old_path, to=new_path)
-            compare_revisions(base, old_path, new_path, report)
+            compare_revisions(rev, old_path, new_path, report)
         elif code.startswith("M"):
-            compare_revisions(base, path, path, report)
+            compare_revisions(rev, path, path, report)
         if Path(path).exists():
             changed.append(path)
     report.data["changed"] = changed

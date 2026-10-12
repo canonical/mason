@@ -393,6 +393,39 @@ def test_diff_without_manifest_needs_an_explicit_base(tmp_path):
     assert "--base" in doc["unavailable"][0]["reason"]
 
 
+def test_diff_compares_at_the_merge_base(tmp_path):
+    # the base moved on after branching: its new SDF is not this change's removal
+    run = release_checkout(tmp_path)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    run("checkout", "-q", "ubuntu-26.04")
+    (tmp_path / "slices").mkdir(exist_ok=True)
+    (tmp_path / "slices/bar.yaml").write_text(SDF.replace("foo", "bar"))
+    run("add", "slices/bar.yaml")
+    run("commit", "-q", "-m", "bar on the base")
+    run("checkout", "-q", "--detach", head)
+    code, doc = check_diff(tmp_path)
+    assert (code, doc["status"]) == (0, "passed"), doc
+    assert doc["changed"] == ["slices/foo.yaml"]
+    assert doc["merge base"] and "caveat" not in doc
+    assert "findings" not in doc
+
+
+def test_diff_without_a_merge_base_compares_the_tip(tmp_path):
+    run = release_checkout(tmp_path)
+    run("checkout", "-q", "--orphan", "rootless")
+    run("commit", "-q", "-m", "unrelated history")
+    code, doc = check_diff(tmp_path)
+    assert (code, doc["status"]) == (0, "passed"), doc
+    assert doc["merge base"] is None
+    assert "tip of ubuntu-26.04" in doc["caveat"]
+
+
 def test_diff_explicit_base_wins(tmp_path):
     run = release_checkout(tmp_path)
     run("branch", "other", "ubuntu-26.04")
