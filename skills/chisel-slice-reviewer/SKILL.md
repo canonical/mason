@@ -15,15 +15,17 @@ State the scope and any assumption needed to interpret the request.
 
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; keep the checkout as working directory.
-- Run `uv run "<skill-root>/scripts/_orientation.py"` first. If no checkout is
-  present, ask where it is; do not clone or guess one.
+- Run `uv run "<skill-root>/scripts/_orientation.py"` first. The working
+  directory is the checkout; without one, stop and report that. Do not clone
+  or guess one.
 - Confirm that the files and manifest being checked match the review's revision
   and target release. Use read-only git and upstream reads; do not switch branches
   or edit the checkout. If the requested revision is not available to a helper,
   report that check as unavailable rather than checking different files.
-- Read `kb/_verification.md` for check status and review completion. Runtime
-  evidence may come from CI for the reviewed revision; do not claim that static
-  inspection or future CI proves runtime success.
+- The review inspects; it does not cut slices or run spread. Runtime evidence
+  is what already exists for the reviewed revision, its CI results; without
+  it the review is incomplete, never passed. Read `kb/_verification.md` for
+  check status and completion.
 
 ## 1. run static checks
 
@@ -81,10 +83,10 @@ Use `kb/_spread-tests.md` for coverage, assertions and rootfs isolation. Review
 each affected package, including libraries, data and dependency packages.
 Explicit binary references alone do not prove execution or meaningful tests.
 
-Inspect the target branch's CI configuration and the reusable workflows it calls,
-using `kb/_upstream-sources.md`. Compare available lint, cut and spread results
-with the reviewed revision and architectures. Mark missing evidence unavailable;
-do not change the checkout to obtain it.
+Read the lint, cut and spread results CI holds for the reviewed revision, for
+example with `gh pr checks` and the run logs; `kb/_upstream-sources.md` names
+the workflows. A result for another revision or architecture is unavailable
+evidence, not a pass.
 
 Read `kb/_chisel-branches.md` and live contribution guidance linked from
 `kb/_contributing.md` to establish forward-port obligations and PR requirements.
@@ -101,5 +103,5 @@ Return findings with file, slice/path, evidence and proposed correction:
 
 List passed, failed and unavailable checks separately, then give the overall
 verdict under `kb/_verification.md`: approve, request-changes or incomplete.
-Include remaining forward ports and verification gaps. Respond to the user when
-invoked directly, or the parent agent when delegated.
+Include remaining forward ports and verification gaps. The final message is
+the review.

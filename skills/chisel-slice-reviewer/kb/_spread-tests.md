@@ -43,11 +43,6 @@ Every authored package, including pure-library and data-only packages, gets a
   package's docs and upstream tests to identify checks, including runtime
   lookups such as passwd entries, temporary directories, timezone and locale data.
 
-Use `_scaffold-test.py` only when creating a new task. Replace all placeholders
-with real assertions or justified representative tests. Run `_check-test.py`
-after writing or changing a task, then review assertions and coverage manually
-and run the suite. Apply `kb/_verification.md` to the results.
-
 ## Chroot environment patterns
 
 Sliced rootfs is minimal. Tests that need more than bare files must set up the chroot:
