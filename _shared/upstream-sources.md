@@ -11,10 +11,10 @@ The Go source code defines what chisel actually does: how it parses SDFs, resolv
 
 ## 2. `canonical/chisel-docs` (official documentation)
 
-The documentation source renders to <https://documentation.ubuntu.com/chisel/en/latest/>. It is the authoritative reference for SDF format, CLI usage, and slicing workflows.
+The documentation source renders to <https://ubuntu.com/chisel/docs/latest/>. It is the authoritative reference for SDF format, CLI usage, and slicing workflows.
 
 - Repo: <https://github.com/canonical/chisel-docs>
-- Raw page access pattern: `https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/<path>.md`; rendered at `https://documentation.ubuntu.com/chisel/latest/<path>/`
+- Raw page access pattern: `https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/<path>.md`; rendered at `https://ubuntu.com/chisel/docs/latest/<path>/`
 - Key pages:
   - `how-to/slice-a-package.md` -- canonical slicing workflow
   - `reference/chisel-releases/slice-definitions.md` -- SDF format specification
