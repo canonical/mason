@@ -1,6 +1,6 @@
 # Runtime dependency evidence
 
-Use the [official slicing guide](https://documentation.ubuntu.com/chisel/en/latest/how-to/slice-a-package/)
+Use the [official slicing guide](https://ubuntu.com/chisel/docs/latest/how-to/slice-a-package/)
 for package inspection and the [Debian relationship definitions](https://www.debian.org/doc/debian-policy/ch-relationships.html)
 for dependency field semantics. Package dependencies are discovery input; a
 slice's dependencies must supply the selected functionality.
