@@ -2,7 +2,7 @@
 
 [Chisel](https://github.com/canonical/chisel) builds minimal Ubuntu root filesystems by extracting named _slices_ of `.deb` packages instead of whole packages. It is a Go tool that consumes a _chisel release_ (a branch of [chisel-releases](https://github.com/canonical/chisel-releases)) as its source of truth.
 
-Docs: <https://documentation.ubuntu.com/chisel/en/latest/>
+Docs: <https://ubuntu.com/chisel/docs/latest/>
 
 ## Commands
 
