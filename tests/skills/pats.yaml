@@ -29,6 +29,7 @@ sandboxes:
       # as a cheat signal. info/refs stays open for orientation's `git ls-remote`.
       # objects.githubusercontent.com is not allowed: its paths can't be filtered by repo.
       deny:
+        - .oaiusercontent.com # codex's own startup fetch, not the agent's
         - "github.com/*/chisel-releases"
         - "github.com/*/chisel-releases/*"
         - "github.com/*/chisel-releases.git"
