@@ -37,21 +37,30 @@ sandboxes:
         - "codeload.github.com/*/chisel-releases*"
         - "api.github.com/repos/*/chisel-releases*"
   items:
-    docker: {}
+    docker:
+      driver: docker
     # sudo and nesting let an agent run spread tests in nested containers.
-    lxd:
-      driver: lxd
-      sudo: true
-      config: {security.nesting: "true"}
+    # lxd:
+    #   driver: lxd
+    #   sudo: true
+    #   config:
+    #     security.nesting: "true"
 
-# haiku and sonnet bracket the model range; codex-mini is a second harness.
+# haiku and sonnet bracket the model range. codex-mini is a second harness.
 models:
   kind: agent
-  defaults: {harness: claude-cli-keyless, effort: low, sandbox: docker}
+  defaults:
+    harness: claude-cli-keyless
+    effort: low
+    sandbox: docker
   items:
-    haiku: {model: claude-haiku-4-5-20251001}
-    sonnet: {model: claude-sonnet-5}
-    codex-mini: {harness: codex-cli-keyless, model: gpt-5.6-luna}
+    haiku:
+      model: claude-haiku-4-5-20251001
+    sonnet:
+      model: claude-sonnet-5
+    codex-mini:
+      harness: codex-cli-keyless
+      model: gpt-5.6-luna
 
 # one dir per task: task.yaml, prompt.txt, and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
@@ -113,9 +122,20 @@ help-checks:
 
 suites:
   kind: suite
-  defaults: {agents: models}
+  defaults:
+    agents: models
   items:
-    slicer: {tasks: [knockout, denovo], scorers: slice-checks}
+    slicer:
+      tasks:
+        - knockout
+        - denovo
+      scorers: slice-checks
     # slice-checks need ground truth, which refusal has none of.
-    slicer-refusal: {tasks: refusal, scorers: [refusal-checks, orientation-called]}
-    mason: {tasks: help, scorers: help-checks}
+    slicer-refusal:
+      tasks: refusal
+      scorers:
+        - refusal-checks
+        - orientation-called
+    mason:
+      tasks: help
+      scorers: help-checks
