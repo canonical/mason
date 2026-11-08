@@ -1,0 +1,4 @@
+# ground truth: the *.silver.yaml files here.
+prompt-file: prompt.txt
+stage: stage --branch ubuntu-26.04
+collect: collect

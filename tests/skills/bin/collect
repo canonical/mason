@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# copy what the agent wrote into the output dir for the scorers.
+set -eu
+
+case_id="$PATS_TASK_ID"
+out="$PATS_OUTPUT_DIR"
+mkdir -p "$out"
+
+# the slice of every target with ground truth.
+for exp in "$out"/*.expected.yaml; do
+    [ -e "$exp" ] || continue
+    stem="$(basename "$exp" .expected.yaml)"
+    if [ -f "$PATS_WORKDIR/slices/$stem.yaml" ]; then
+        cp "$PATS_WORKDIR/slices/$stem.yaml" "$out/$stem.yaml"
+    fi
+done
+
+# the case's own slice, ground truth or not: for refusal, it existing is the failure.
+if [ -f "$PATS_WORKDIR/slices/$case_id.yaml" ]; then
+    cp "$PATS_WORKDIR/slices/$case_id.yaml" "$out/$case_id.yaml"
+fi
+
+# the spread test: its task.yaml, and the whole dir concatenated for grepping.
+spread_dir="$PATS_WORKDIR/tests/spread/integration/$case_id"
+if [ -f "$spread_dir/task.yaml" ]; then
+    cp "$spread_dir/task.yaml" "$out/$case_id.task.yaml"
+fi
+if [ -d "$spread_dir" ]; then
+    find "$spread_dir" -type f -exec cat {} + >"$out/$case_id.spread.txt" 2>/dev/null || true
+fi

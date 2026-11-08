@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# set up the workdir on the host: stage [--branch <b>] [--knockout <slice>]...
+# --branch clones chisel-releases at <b>. --knockout takes that slice out as
+# ground truth. each <target>.silver.yaml beside the task.yaml is ground truth
+# for a target written from scratch. installs the skills for the harness.
+set -eu
+
+REPO_ROOT="$(cd "$PATS_ROOT/../.." && pwd)"
+OUT="$PATS_OUTPUT_DIR"
+
+function _fail() {
+    printf 'stage: %s\n' "$1" >&2
+    exit 1
+}
+
+function _clone() {
+    local branch="$1"
+    git clone --quiet --depth 1 --branch "$branch" \
+        https://github.com/canonical/chisel-releases.git "$PATS_WORKDIR"
+    cd "$PATS_WORKDIR"
+    printf '%s\n' "$branch" >"$OUT/$PATS_TASK_ID.branch"
+    # "v3" / "chisel-v1" / "1" -> 3 / 1 / 1
+    local fmt
+    fmt="$(grep -m1 '^format:' chisel.yaml | grep -oE '[0-9]+' | head -n1 || true)"
+    printf '%s\n' "$fmt" >"$OUT/$PATS_TASK_ID.format"
+}
+
+# _drop: a target's slice and spread test, for the agent to write.
+function _drop() {
+    rm -f "slices/$1.yaml"
+    rm -rf "tests/spread/integration/$1"
+}
+
+# _reinit_git: one commit of the tree, so history holds no removed slice. no
+# hooks: the host's would reject upstream's files.
+function _reinit_git() {
+    local branch="$1"
+    local git=(git -c core.hooksPath=/dev/null -c commit.gpgsign=false -c user.name=pats -c user.email=pats@local)
+    rm -rf .git
+    git init --quiet -b "$branch"
+    "${git[@]}" add -A
+    "${git[@]}" commit --quiet -m "chisel-releases base (target slices removed)"
+}
+
+# _install: claude reads .claude/skills/, the other harnesses .agents/skills/.
+function _install() {
+    local dest=".agents/skills"
+    case "$PATS_AGENT_HARNESS" in
+        (claude-*) dest=".claude/skills" ;;
+    esac
+    mkdir -p "$PATS_WORKDIR/$dest"
+    cp -R "$REPO_ROOT/skills/." "$PATS_WORKDIR/$dest/"
+}
+
+function main() {
+    local branch="" knockout="" silver t
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            (--branch) branch="$2"; shift 2 ;;
+            (--knockout) knockout="$knockout $2"; shift 2 ;;
+            (*) _fail "unknown argument: $1" ;;
+        esac
+    done
+    mkdir -p "$PATS_WORKDIR" "$OUT"
+    if [ -n "$branch" ]; then
+        _clone "$branch"
+        # shellcheck disable=SC2086
+        for t in $knockout; do
+            [ -f "slices/$t.yaml" ] || _fail "no slices/$t.yaml on $branch to knock out"
+            cp "slices/$t.yaml" "$OUT/$t.expected.yaml"
+            _drop "$t"
+        done
+        for silver in "$PATS_TASK_DIR"/*.silver.yaml; do
+            [ -e "$silver" ] || continue
+            t="$(basename "$silver" .silver.yaml)"
+            cp "$silver" "$OUT/$t.expected.yaml"
+            _drop "$t"
+        done
+        rm -rf "tests/spread/integration/$PATS_TASK_ID"
+        _reinit_git "$branch"
+    elif [ -n "$knockout" ]; then
+        _fail "--knockout needs --branch"
+    fi
+    _install
+}
+
+main "$@"

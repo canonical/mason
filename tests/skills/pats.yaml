@@ -1,53 +1,34 @@
-# mason eval via pats (https://github.com/lczyk/pats).
-# run:   cd tests/skills && pats run        # runs the agent(s) in docker -- slow, live
-# score: cd tests/skills && pats score      # scores the latest run, offline
-# pats builds the sandbox image itself (build: below); no manual docker build.
+# mason eval via pats 1.x (https://github.com/lczyk/pats). in tests/skills:
+#   pats init     builds and pins the sandbox image
+#   pats run      runs the agents (slow, live)
+#   pats score    scores the latest run (offline)
+# steps are shell scripts with bin/ on PATH, and read ids from $PATS_*.
 
 sandboxes:
-  # one sandbox for every harness: pats auto-allows each harness's own hosts
-  # (anthropic/claude for claude-cli, openai/chatgpt for codex-cli,
-  # github/githubcopilot for copilot-cli, openrouter/models.dev/npm for
-  # opencode), so the allowlist below is task needs only.
-  #
-  # github is allowed, but the canonical/chisel-releases repo is not: the skill
-  # legitimately wants github (upstream sources, docs) -- but for our knockout
-  # cases the sibling-branch SDF in chisel-releases IS (or is near-identical to)
-  # the held-out answer. the slicer has no reason to reach for it, so a denial
-  # here is a signal worth reading, not routine noise.
-  # mitm-proxy terminates tls for the hosts named in deny-urls and blocks any
-  # url mentioning the repo; denied urls land in the run metadata (cheat
-  # detector). objects.githubusercontent.com stays unallowed -- its paths are
-  # opaque hashes, unfilterable by repo.
-  - id: docker-mason-test
-    kind: container
-    driver: docker
-    build: .
+  kind: sandbox
+  defaults:
+    provision: provision
+    # task hosts only: pats adds each harness's own.
     egress:
-      mode: mitm-proxy
-      default: deny
       allow:
-        - .ubuntu.com # apt mirrors (archive/ports/security) for deb-list
-        - pypi.org # `uv run <helper>` resolves the helpers' pyyaml from here
+        - .ubuntu.com # apt mirrors, for deb-list
+        - pypi.org # pyyaml for `uv run <helper>`
         - files.pythonhosted.org
         - github.com
         - raw.githubusercontent.com
         - codeload.github.com
         - api.github.com
-        # doc sites agents legitimately reached for in past runs (man pages,
-        # packaging docs) -- reading docs is not cheating.
+        # docs agents read
         - manpages.debian.org
         - www.debian.org
         - wiki.debian.org
         - linux.die.net
         - www.kernel.org
         - lwn.net
-      # the git refs advertisement (info/refs) stays reachable: orientation's
-      # `git ls-remote` reads branch names only, and a denial there would be
-      # routine noise in the cheat detector. that holds under git protocol v1,
-      # which the image pins; v2 posts the ref listing to git-upload-pack too.
-      # the pack fetch a clone needs (git-upload-pack), the web ui, raw files
-      # and archives stay denied.
-      deny-urls:
+      # chisel-releases holds the answers. a hit lands in the pair's metadata.json
+      # as a cheat signal. info/refs stays open for orientation's `git ls-remote`.
+      # objects.githubusercontent.com is not allowed: its paths can't be filtered by repo.
+      deny:
         - "github.com/*/chisel-releases"
         - "github.com/*/chisel-releases/*"
         - "github.com/*/chisel-releases.git"
@@ -55,177 +36,86 @@ sandboxes:
         - "raw.githubusercontent.com/*/chisel-releases*"
         - "codeload.github.com/*/chisel-releases*"
         - "api.github.com/repos/*/chisel-releases*"
+  items:
+    docker: {}
+    # sudo and nesting let an agent run spread tests in nested containers.
+    lxd:
+      driver: lxd
+      sudo: true
+      config: {security.nesting: "true"}
 
+# haiku and sonnet bracket the model range; codex-mini is a second harness.
+models:
+  kind: agent
+  defaults: {harness: claude-cli-keyless, effort: low, sandbox: docker}
+  items:
+    haiku: {model: claude-haiku-4-5-20251001}
+    sonnet: {model: claude-sonnet-5}
+    codex-mini: {harness: codex-cli-keyless, model: gpt-5.6-luna}
 
-# single sandbox defined -> it's the default; no per-agent sandbox: needed.
-agents:
-  - id: haiku
-    kind: claude-cli-keyless
-    model: claude-haiku-4-5-20251001
-    effort: low
-  # same harness, stronger model -- the pair brackets the range the skill has to
-  # work across, and isolates skill quality from model quality.
-  - id: sonnet
-    kind: claude-cli-keyless
-    model: claude-sonnet-5
-    effort: low
-  # small, fast, cost-efficient Codex model; uses the host's ChatGPT login via
-  # ~/.codex/auth.json rather than an API key. a second harness, so a regression
-  # that is really a harness quirk shows up as one.
-  - id: codex-mini
-    kind: codex-cli-keyless
-    model: gpt-5.6-luna
-    effort: low
+# one dir per task: task.yaml, prompt.txt, and any ground truth.
+knockout: # the real slice is taken out and must be rewritten
+  kind: task
+  dir: cases/knockout
+denovo: # several targets from scratch, against silver files
+  kind: task
+  dir: cases/denovo
+refusal:
+  kind: task
+  dir: cases/refusal
+help:
+  kind: task
+  dir: cases/help
 
-# knockout: prepare deletes the real slice (snapshotting it as ground truth);
-# the agent must reproduce it. collect gathers what the agent wrote.
-# single-target cases only for now -- multi-target denovo (i2c-tools, ipmitool)
-# are wired separately later.
-# each task's setup lives in tasks/prepare_<id>.sh (branch + knockout/denovo +
-# any target list baked in; shared logic in tasks/_lib.sh). collect is uniform
-# (tasks/collect.sh reads $PATS_TASK_ID). pats execs both directly with ${id} ->
-# the task id.
-tasks:
-  - id: base-passwd
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: ca-certificates
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: curl
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: python3-minimal
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: python3-pip
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: python3.14-minimal
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: python3.14
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  # denovo, multi-target: ground truth = silver files; one agent run authors
-  # several slices, scorers average across targets.
-  - id: i2c-tools
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  - id: ipmitool
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-  # help: does /mason print the usage block and stop? no repo, no knockout, and
-  # nothing to collect -- the scorers read the transcript only.
-  - id: mason-help
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    timeout: 5m
-  # refusal: the slicer, on a package that does not exist in the archive.
-  # plain checkout, no knockout, no expected file -- the agent must stop and
-  # report, not fabricate an SDF. per-target scorers stay out of its suite
-  # (no expected file -> targets() fallback would zero them).
-  - id: frobnicator
-    prompt: prompts/${id}.txt
-    prepare: tasks/prepare_${id}.sh
-    collect: tasks/collect.sh
-    timeout: 5m
+# scorers/scorer_<id>.py, helpers in scorers/_lib.py. first stdout line: [0,1] or `na`.
+slice-checks:
+  kind: scorer
+  defaults: &py-scorer
+    score: scorers/scorer_"$PATS_SCORER_ID".py
+  items:
+    target-present:
+    yaml-parses:
+    filename-matches-package:
+    paths-sorted:
+    copyright-essential:
+    copyright-path-present:
+    arch-format:
+    mutate-present:
+    mutate-paths:
+    no-man-pages:
+    no-doc-clutter:
+    no-shell-completions:
+    mutable-has-text:
+    slice-count-not-inflated:
+    slice-names-canonical:
+    structural-distance:
+    chisel-cut:
+    orientation-called:
+    spread-test-present:
+    spread-exercises-binaries:
+    v3-essential-format-compat:
+    essential-map-format-compat:
+    hint-format-compat:
+    prefer-format-compat:
+    essential-list-on-v1:
+refusal-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    refuses-nonexistent:
+    refusal-verified:
+help-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    usage-printed:
+    mason-stops-clean:
 
-# each scorer is a standalone uv script scorers/scorer_<id>.py (shared helpers
-# in scorers/_lib.py). pats execs it directly; first stdout line = float [0,1]
-# or `na` (skip). ${id} -> the scorer id.
-scorers:
-  - {id: target-present,              score: "scorers/scorer_${id}.py"}
-  - {id: yaml-parses,                 score: "scorers/scorer_${id}.py"}
-  - {id: filename-matches-package,    score: "scorers/scorer_${id}.py"}
-  - {id: paths-sorted,                score: "scorers/scorer_${id}.py"}
-  - {id: copyright-essential,         score: "scorers/scorer_${id}.py"}
-  - {id: copyright-path-present,      score: "scorers/scorer_${id}.py"}
-  - {id: arch-format,                 score: "scorers/scorer_${id}.py"}
-  - {id: mutate-present,              score: "scorers/scorer_${id}.py"}
-  - {id: mutate-paths,                score: "scorers/scorer_${id}.py"}
-  - {id: no-man-pages,                score: "scorers/scorer_${id}.py"}
-  - {id: no-doc-clutter,             score: "scorers/scorer_${id}.py"}
-  - {id: no-shell-completions,        score: "scorers/scorer_${id}.py"}
-  - {id: mutable-has-text,            score: "scorers/scorer_${id}.py"}
-  - {id: slice-count-not-inflated,    score: "scorers/scorer_${id}.py"}
-  - {id: slice-names-canonical,       score: "scorers/scorer_${id}.py"}
-  - {id: structural-distance,         score: "scorers/scorer_${id}.py"}
-  - {id: chisel-cut,                  score: "scorers/scorer_${id}.py"}
-  - {id: orientation-called,          score: "scorers/scorer_${id}.py"}
-  - {id: spread-test-present,         score: "scorers/scorer_${id}.py"}
-  - {id: spread-exercises-binaries,   score: "scorers/scorer_${id}.py"}
-  - {id: v3-essential-format-compat,  score: "scorers/scorer_${id}.py"}
-  - {id: essential-map-format-compat, score: "scorers/scorer_${id}.py"}
-  - {id: hint-format-compat,          score: "scorers/scorer_${id}.py"}
-  - {id: prefer-format-compat,        score: "scorers/scorer_${id}.py"}
-  - {id: essential-list-on-v1,        score: "scorers/scorer_${id}.py"}
-  # help-suite scorers (transcript-only, no expected files).
-  - {id: usage-printed,               score: "scorers/scorer_${id}.py"}
-  - {id: mason-stops-clean,           score: "scorers/scorer_${id}.py"}
-  # refusal-suite scorers (transcript + collected slice, no expected file).
-  - {id: refuses-nonexistent,         score: "scorers/scorer_${id}.py"}
-  - {id: refusal-verified,            score: "scorers/scorer_${id}.py"}
-
-# suites: run = agents x tasks, score = tasks x scorers, both within the suite.
-# every id explicit (no wildcards); pats' orphan check errors on any task /
-# scorer / agent left out of every suite, so nothing silently stops running.
 suites:
-  - id: slicer
-    agents: &all-agents [haiku, sonnet, codex-mini]
-    tasks:
-      - base-passwd
-      - ca-certificates
-      - curl
-      - python3-minimal
-      - python3-pip
-      - python3.14-minimal
-      - python3.14
-      - i2c-tools
-      - ipmitool
-    scorers:
-      - target-present
-      - yaml-parses
-      - filename-matches-package
-      - paths-sorted
-      - copyright-essential
-      - copyright-path-present
-      - arch-format
-      - mutate-present
-      - mutate-paths
-      - no-man-pages
-      - no-doc-clutter
-      - no-shell-completions
-      - mutable-has-text
-      - slice-count-not-inflated
-      - slice-names-canonical
-      - structural-distance
-      - chisel-cut
-      - orientation-called
-      - spread-test-present
-      - spread-exercises-binaries
-      - v3-essential-format-compat
-      - essential-map-format-compat
-      - hint-format-compat
-      - prefer-format-compat
-      - essential-list-on-v1
-  # the slicer again, but on a package that is not in the archive. its own suite
-  # because the per-target scorers above need an expected file and this task has
-  # none -- they would score 0 rather than skip.
-  - id: slicer-refusal
-    agents: *all-agents
-    tasks: [frobnicator]
-    scorers: [refuses-nonexistent, refusal-verified, orientation-called]
-  - id: mason
-    agents: *all-agents
-    tasks: [mason-help]
-    scorers: [usage-printed, mason-stops-clean]
+  kind: suite
+  defaults: {agents: models}
+  items:
+    slicer: {tasks: [knockout, denovo], scorers: slice-checks}
+    # slice-checks need ground truth, which refusal has none of.
+    slicer-refusal: {tasks: refusal, scorers: [refusal-checks, orientation-called]}
+    mason: {tasks: help, scorers: help-checks}

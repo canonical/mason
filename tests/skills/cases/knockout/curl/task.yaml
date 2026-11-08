@@ -1,0 +1,3 @@
+prompt-file: prompt.txt
+stage: stage --branch ubuntu-26.04 --knockout curl
+collect: collect

@@ -110,9 +110,8 @@ def expected(t: str) -> Any:
 
 
 def fmt() -> int | None:
-    """Manifest format of the case's branch, captured at fixture time (tasks/_lib.sh
-    writes <case>.format from the freshly-cloned chisel.yaml). Derived from the real
-    branch, so it's release-agnostic -- no hardcoded branch->format table to rot."""
+    """Manifest format of the case's branch: <case>.format, which bin/stage reads
+    from the cloned chisel.yaml."""
     f = OUT / f"{TASK}.format"
     if not f.exists():
         return None
