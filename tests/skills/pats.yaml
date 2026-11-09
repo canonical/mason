@@ -44,6 +44,9 @@ sandboxes:
         - "codeload.github.com/*/chisel-releases/**"
         - "api.github.com/repos/*/chisel-releases"
         - "api.github.com/repos/*/chisel-releases/**"
+        # the numeric routes reach a repo by id: canonical's and any fork's,
+        # with no name to filter on, so all of them.
+        - "api.github.com/repositories/**"
   items:
     docker:
       driver: docker

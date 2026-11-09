@@ -15,7 +15,9 @@ _ANSWER = re.compile(
     r"^(github\.com/[^/]+/chisel-releases(?!\.git/info/refs)[/.]"
     r"|raw\.githubusercontent\.com/[^/]+/chisel-releases/.*/(slices|tests)/"
     r"|codeload\.github\.com/[^/]+/chisel-releases"
-    r"|api\.github\.com/repos/[^/]+/chisel-releases)",
+    r"|api\.github\.com/repos/[^/]+/chisel-releases"
+    # canonical/chisel-releases by id (gh api repos/canonical/chisel-releases).
+    r"|api\.github\.com/repositories/499175007(/|$))",
     re.IGNORECASE,
 )
 # mirrors the proxy sees only as tunnels: any that got through is a fetch.
