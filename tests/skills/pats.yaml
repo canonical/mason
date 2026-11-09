@@ -1,6 +1,7 @@
 # mason eval via pats 1.x (https://github.com/lczyk/pats). in tests/skills:
 #   pats init     builds and pins the sandbox image
-#   pats run      runs the agents (slow, live)
+#   pats run      runs the agents (slow, live). keep -j at 4 or below for runs
+#                 whose timings get compared: sandboxes share the cpus.
 #   pats score    scores the latest run (offline)
 # steps are shell scripts with bin/ on PATH, and read names from $PATS_*.
 

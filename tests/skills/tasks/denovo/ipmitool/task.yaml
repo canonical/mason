@@ -7,3 +7,4 @@ prompt: |
   This is an automated eval: work autonomously, do not ask questions, and do not open a PR. Produce the slice files and stop.
 stage: stage --branch ubuntu-26.04
 collect: collect
+timeout: 20m # slower models need more than the 10m default
