@@ -1,4 +1,0 @@
-# /mason prints its usage and stops. scored on the transcript alone.
-prompt-file: prompt.txt
-stage: stage
-timeout: 5m

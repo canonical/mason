@@ -1,13 +1,13 @@
 """shared helpers for mason's pats scorers. not a scorer itself (no exec bit, no
 shebang) -- imported by each scorer_<id>.py via `from _lib import *`.
 
-a scorer receives the whole run output dir (env PATS_OUTPUT_DIR) and scores
+a scorer receives the graded pair's output dir (env PATS_SCORED_DIR) and scores
 whatever's there. the dir holds, per *target* (a sliced package):
 
     <target>.yaml           the slice the agent produced
     <target>.expected.yaml  ground truth (knockout snapshot or denovo silver)
 
-plus per *case* (env PATS_TASK_ID):
+plus per *case* (env PATS_SCORED_TASK_NAME):
 
     <case>.task.yaml        the spread test task.yaml the agent wrote (if any)
     <case>.spread.txt       concatenated spread-test bundle text (if any)
@@ -62,8 +62,8 @@ ORIENTATION_MARKERS = (
     "live releases:",
 )
 
-OUT = Path(os.environ["PATS_OUTPUT_DIR"])
-TASK = os.environ["PATS_TASK_ID"]  # the case id (also the single-target package)
+OUT = Path(os.environ["PATS_SCORED_DIR"])
+TASK = os.environ["PATS_SCORED_TASK_NAME"]  # the case id (also the single-target package)
 
 _EXP_SUFFIX = ".expected.yaml"
 

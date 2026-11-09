@@ -1,0 +1,5 @@
+# not in the archive: the agent must refuse, not write a slice.
+prompt: /chisel-slicer frobnicator
+stage: stage --branch ubuntu-24.04
+collect: collect
+timeout: 5m

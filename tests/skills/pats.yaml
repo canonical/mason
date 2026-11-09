@@ -2,7 +2,7 @@
 #   pats init     builds and pins the sandbox image
 #   pats run      runs the agents (slow, live)
 #   pats score    scores the latest run (offline)
-# steps are shell scripts with bin/ on PATH, and read ids from $PATS_*.
+# steps are shell scripts with bin/ on PATH, and read names from $PATS_*.
 
 sandboxes:
   kind: sandbox
@@ -63,25 +63,25 @@ models:
       harness: codex-cli-keyless
       model: gpt-5.6-luna
 
-# one dir per task: task.yaml, prompt.txt, and any ground truth.
+# one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
   kind: task
-  dir: cases/knockout
+  dir: tasks/knockout
 denovo: # several targets from scratch, against silver files
   kind: task
-  dir: cases/denovo
+  dir: tasks/denovo
 refusal:
   kind: task
-  dir: cases/refusal
+  dir: tasks/refusal
 help:
   kind: task
-  dir: cases/help
+  dir: tasks/help
 
-# scorers/scorer_<id>.py, helpers in scorers/_lib.py. first stdout line: [0,1] or `na`.
+# scorers/scorer_<name>.py, helpers in scorers/_lib.py. first stdout line: [0,1] or `na`.
 slice-checks:
   kind: scorer
   defaults: &py-scorer
-    score: scorers/scorer_"$PATS_SCORER_ID".py
+    score: scorers/scorer_"$PATS_SCORER_NAME".py
   items:
     target-present:
     yaml-parses:

@@ -1,0 +1,8 @@
+prompt: |
+  Use the chisel-slicer skill to author a chisel slice definition file (SDF) for the package `python3.14` on the `ubuntu-26.04` branch.
+
+  You are in a checkout of canonical/chisel-releases (your current directory). Write the slice to `slices/python3.14.yaml`, following the skill's workflow and the conventions in its knowledge base.
+
+  This is an automated eval: work autonomously, do not ask questions, and do not open a PR. Produce the slice file and stop.
+stage: stage --branch ubuntu-26.04 --knockout python3.14
+collect: collect

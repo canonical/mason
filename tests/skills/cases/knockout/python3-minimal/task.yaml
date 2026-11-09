@@ -1,3 +1,0 @@
-prompt-file: prompt.txt
-stage: stage --branch ubuntu-26.04 --knockout python3-minimal
-collect: collect

@@ -1,3 +1,0 @@
-prompt-file: prompt.txt
-stage: stage --branch ubuntu-24.04 --knockout ca-certificates
-collect: collect

@@ -2,7 +2,7 @@
 # copy what the agent wrote into the output dir for the scorers.
 set -eu
 
-case_id="$PATS_TASK_ID"
+case_id="$PATS_TASK_NAME"
 out="$PATS_OUTPUT_DIR"
 mkdir -p "$out"
 
