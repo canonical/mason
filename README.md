@@ -14,7 +14,7 @@
 [![skills.sh](https://skills.sh/b/canonical/mason)](https://skills.sh/canonical/mason)
 [![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fcanonical%2Fmason)](https://tessl.io/registry/canonical/mason)
 
-Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chisel) and [`chisel-releases`](https://github.com/canonical/chisel-releases) -- cross-agent skills and scripts for authoring and reviewing slice definition files.
+Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chisel) and [`chisel-releases`](https://github.com/canonical/chisel-releases) -- cross-agent skills and scripts for authoring and reviewing package slices files.
 
 Install with:
 
@@ -29,12 +29,12 @@ gh skill install canonical/mason chisel-slicer
 and then, for example, write a new slice file:
 
 ```shell
-/chisel-slicer "write slice definition file for foobar"
+/chisel-slicer "write package slices file for foobar"
 ```
 
 ## what's in here
 
 - `mason` - routes `/mason` requests to the right skill or prints usage
-- `chisel-slicer` - authors and tests chisel slice definition files
-- `chisel-slice-reviewer` - read-only review of an SDF or PR
+- `chisel-slicer` - authors and tests chisel package slices files
+- `chisel-slice-reviewer` - read-only review of a package slices file or PR
 - `chisel-slice-porter` - moves a slice between Ubuntu release branches

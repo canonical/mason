@@ -21,7 +21,7 @@ Accepts:
 
 - `ubuntu-XX.XX` -- an online release branch.
 - a directory path -- anything containing a `/`, e.g. `./` for the current checkout.
-- omitted -- inferred from the host's `/etc/lsb-release` (`DISTRIB_ID` / `DISTRIB_RELEASE`), not `/etc/os-release`, and fetched from the chisel-releases repository, so the checkout's own SDFs are not used.
+- omitted -- inferred from the host's `/etc/lsb-release` (`DISTRIB_ID` / `DISTRIB_RELEASE`), not `/etc/os-release`, and fetched from the chisel-releases repository, so the checkout's own package slices files are not used.
 
 On a devel (unstable) or EOL (unmaintained) branch, add `--ignore=unstable` / `--ignore=unmaintained` or `cut` errors out.
 
@@ -44,7 +44,7 @@ git ls-remote --heads https://github.com/canonical/chisel-releases.git 'ubuntu-*
 # Read release manifest
 curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/ubuntu-24.04/chisel.yaml
 
-# Read an SDF
+# Read a package slices file
 curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/ubuntu-24.04/slices/bash.yaml
 
 # Sparse clone (slices + chisel.yaml only)

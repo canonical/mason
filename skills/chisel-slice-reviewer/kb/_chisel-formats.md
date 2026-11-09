@@ -1,6 +1,6 @@
 # `chisel.yaml` Schema Versions
 
-Which SDF features a branch's `format:` decides, and which it does not.
+Which package slices file features a branch's `format:` decides, and which it does not.
 
 ## Versions
 
@@ -10,8 +10,8 @@ A branch's format is a property of *that branch* -- read it from its own `chisel
 |---------|---------------|--------------------------------|
 | **v1** | `ubuntu-24.04` | Pro/esm archives live in a separate `v2-archives:` block. Archives may set `default:` |
 | **v2** | `ubuntu-25.10` | Pro archives move into `archives:` under a `pro:` subkey; `v2-archives:` is now rejected, and `default:` with it |
-| **v3** | `ubuntu-26.04`, `ubuntu-26.10` | `essential:` **must** be a map (`<slice>:` / `<slice>: {arch: ...}`) -- the list form is the parse error _"essential expects a map"_, and `v3-essential:` is rejected as obsolete. Adds `stores:` and per-package `store:` / `default-track:`. Bin slice definitions are read from `bin-slices/` as well as `slices/` |
-| **v4** | none yet | As v3, except `bin-slices/` is no longer read -- bin slice definitions live in `slices/` alongside the rest |
+| **v3** | `ubuntu-26.04`, `ubuntu-26.10` | `essential:` **must** be a map (`<slice>:` / `<slice>: {arch: ...}`) -- the list form is the parse error _"essential expects a map"_, and `v3-essential:` is rejected as obsolete. Adds `stores:` and per-package `store:` / `default-track:`. Bin package slices files are read from `bin-slices/` as well as `slices/` |
+| **v4** | none yet | As v3, except `bin-slices/` is no longer read -- bin package slices files live in `slices/` alongside the rest |
 
 Chisel rejects any other `format:` value outright. Two very old EOL branches (`ubuntu-22.10`, `ubuntu-23.04`) still declare the pre-v1 string `chisel-v1`, which current chisel cannot parse at all.
 
