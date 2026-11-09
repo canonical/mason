@@ -19,7 +19,7 @@ from _lib import *
 _MARKERS = (
     "agent kit for chisel / chisel-releases work",
     "/chisel-slicer <pkg>",
-    "/chisel-slice-reviewer <sdf>",
+    "/chisel-slice-reviewer <package-slices-file>",
     "/chisel-slice-porter <pkg>",
     "slices/curl.yaml",
     "github.com/canonical/mason",

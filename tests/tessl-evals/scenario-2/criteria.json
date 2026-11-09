@@ -1,5 +1,5 @@
 {
-  "context": "The agent reviews a pre-written SDF containing deliberate violations of chisel-releases conventions and produces a structured review report. Criteria check whether the agent correctly identifies each violation, classifies it at the right severity level, uses the prescribed report structure, and ends with the correct verdict.",
+  "context": "The agent reviews a pre-written package slices file containing deliberate violations of chisel-releases conventions and produces a structured review report. Criteria check whether the agent correctly identifies each violation, classifies it at the right severity level, uses the prescribed report structure, and ends with the correct verdict.",
   "type": "weighted_checklist",
   "checklist": [
     {
@@ -9,7 +9,7 @@
     },
     {
       "name": "Fixes compose to a clean file",
-      "description": "Applying every fix the report proposes would yield an SDF with a 'bins' slice, bytewise-sorted contents, no man page, 'arch: amd64', and NOTICE.txt inside the copyright slice -- i.e. the fixes are concrete enough to act on and do not contradict each other",
+      "description": "Applying every fix the report proposes would yield a package slices file with a 'bins' slice, bytewise-sorted contents, no man page, 'arch: amd64', and NOTICE.txt inside the copyright slice -- i.e. the fixes are concrete enough to act on and do not contradict each other",
       "max_score": 6
     },
     {
