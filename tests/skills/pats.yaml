@@ -155,15 +155,22 @@ suites:
     mason:
       tasks: help
       scorers: help-checks
-    # screening: one light and one heavy knockout, plus the refusal.
+
+# chisel-slicer ablation, billed per token: manual, so a bare `pats run`
+# leaves it out. `pats run -S experiments` runs it. screening: one light and
+# one heavy knockout, plus the refusal.
+experiments:
+  kind: suite
+  defaults:
+    agents: ablation
+    manual: true
+  items:
     ablation:
-      agents: ablation
       tasks:
         - base-passwd
         - python3.14
       scorers: slice-checks
     ablation-refusal:
-      agents: ablation
       tasks: refusal
       scorers:
         - refusal-checks
