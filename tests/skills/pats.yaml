@@ -70,6 +70,25 @@ models:
       harness: codex-cli-keyless
       model: gpt-5.6-luna
 
+# chisel-slicer ablation: bin/stage reads the variant from the abl-<variant>
+# name and bin/ablate removes its parts. full-2 is a second baseline sample.
+ablation:
+  kind: agent
+  defaults:
+    harness: opencode-openrouter
+    model: deepseek/deepseek-v4.1-flash
+    sandbox: docker
+    max-cost: 2 # usd per pair: stops a runaway loop, not a normal pair
+  items:
+    abl-full:
+    abl-full-2:
+    abl-no-sdf-format:
+    abl-no-conventions:
+    abl-no-spread:
+    abl-no-verification:
+    abl-no-small-kb:
+    abl-no-kb:
+
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
   kind: task
@@ -147,3 +166,16 @@ suites:
     mason:
       tasks: help
       scorers: help-checks
+    # screening: one light and one heavy knockout, plus the refusal.
+    ablation:
+      agents: ablation
+      tasks:
+        - base-passwd
+        - python3.14
+      scorers: slice-checks
+    ablation-refusal:
+      agents: ablation
+      tasks: refusal
+      scorers:
+        - refusal-checks
+        - orientation-called

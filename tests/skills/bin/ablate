@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# ablate <variant> <skill-dir>: remove a variant's parts from an installed
+# chisel-slicer copy. references to the removed files stay dangling, as they
+# would if the files were deleted.
+set -eu
+
+function main() {
+    local variant="$1" dir="$2" drop p
+    case "$variant" in
+        (full | full-2) drop="" ;;
+        (no-sdf-format) drop="kb/_slice-definition-format.md" ;;
+        (no-conventions) drop="kb/_slice-conventions.md" ;;
+        (no-spread) drop="kb/_spread-tests.md" ;;
+        (no-verification) drop="kb/_verification.md" ;;
+        (no-small-kb) drop="kb/_contributing.md kb/_chisel-cli.md kb/_dependency-policy.md kb/_upstream-sources.md kb/_chisel-formats.md" ;;
+        (no-kb) drop="kb" ;;
+        (*)
+            printf 'ablate: unknown variant %s\n' "$variant" >&2
+            exit 1
+            ;;
+    esac
+    for p in $drop; do
+        rm -r "${dir:?}/$p"
+    done
+}
+
+main "$@"
