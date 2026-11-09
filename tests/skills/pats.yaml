@@ -112,28 +112,17 @@ slice-checks:
     target-present:
     yaml-parses:
     filename-matches-package:
-    paths-sorted:
     copyright-essential:
-    copyright-path-present:
-    arch-format:
     mutate-present:
     mutate-paths:
-    no-man-pages:
-    no-doc-clutter:
-    no-shell-completions:
-    mutable-has-text:
     slice-count-not-inflated:
-    slice-names-canonical:
     structural-distance:
     chisel-cut:
     orientation-called:
     spread-test-present:
     spread-exercises-binaries:
-    v3-essential-format-compat:
-    essential-map-format-compat:
-    hint-format-compat:
-    prefer-format-compat:
-    essential-list-on-v1:
+    no-answer-fetch:
+    hygiene: # the style and format checks, one vote (see its CHECKS)
 refusal-checks:
   kind: scorer
   defaults: *py-scorer
