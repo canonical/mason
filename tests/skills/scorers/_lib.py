@@ -29,10 +29,10 @@ from typing import Any
 import yaml
 
 __all__ = [
-    "CANONICAL",
     "NA",
     "ORIENTATION_MARKERS",
     "OUT",
+    "REJECTED_SLICE_NAMES",
     "TASK",
     "avg",
     "content_paths",
@@ -119,16 +119,10 @@ def fmt() -> int | None:
     return int(m.group()) if m else None
 
 
-# vocabulary for the slice-names-canonical scorer -- matched exactly, or as the
-# first/last part of a compound name (modprobe-config, udev-rules). deliberately
-# permissive: it screens for real vocabulary, not for the single best name.
-# `license`/`notice` are absent on purpose -- no SDF in chisel-releases has one;
-# upstream legal files ship inside the `copyright` slice.
-CANONICAL = {
-    "bins", "libs", "config", "data", "scripts", "copyright", "fonts",
-    "core", "standard", "minimal", "runtime", "var", "headers", "jars",
-    "locales", "services", "modules", "tables", "chisel", "rules", "dev",
-}
+# slice names the conventions reject (kb/_slice-conventions.md). packages coin
+# their own names freely (python's `utils`, binutils' `linker`), so the check
+# flags known-wrong names instead of demanding a fixed vocabulary.
+REJECTED_SLICE_NAMES = {"bin", "lib", "configs", "dev", "all", "license", "notice", "rules"}
 BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
 
 
