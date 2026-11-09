@@ -26,17 +26,23 @@ sandboxes:
         - www.kernel.org
         - lwn.net
       # chisel-releases holds the answers. a hit lands in the pair's metadata.json
-      # as a cheat signal. info/refs stays open for orientation's `git ls-remote`.
+      # as a cheat signal. orientation's `git ls-remote` (info/refs) and its raw
+      # chisel.yaml fetches stay open; on raw only slices/ and tests/ are answers.
+      # a glob's `*` stays in one path segment, so it pins the owner and leaves
+      # e.g. chisel-docs/.../chisel-releases/ open; `**` takes all below.
       # objects.githubusercontent.com is not allowed: its paths can't be filtered by repo.
       deny:
         - .oaiusercontent.com # codex's own startup fetch, not the agent's
         - "github.com/*/chisel-releases"
-        - "github.com/*/chisel-releases/*"
+        - "github.com/*/chisel-releases/**"
         - "github.com/*/chisel-releases.git"
         - "github.com/*/chisel-releases.git/git-upload-pack"
-        - "raw.githubusercontent.com/*/chisel-releases*"
-        - "codeload.github.com/*/chisel-releases*"
-        - "api.github.com/repos/*/chisel-releases*"
+        - "raw.githubusercontent.com/*/chisel-releases/**/slices/**"
+        - "raw.githubusercontent.com/*/chisel-releases/**/tests/**"
+        - "codeload.github.com/*/chisel-releases"
+        - "codeload.github.com/*/chisel-releases/**"
+        - "api.github.com/repos/*/chisel-releases"
+        - "api.github.com/repos/*/chisel-releases/**"
   items:
     docker:
       driver: docker
