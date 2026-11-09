@@ -157,7 +157,7 @@ def test_check_slice() -> None:
 
         # COVER: the path-shape rules chisel enforces at parse time. each is a
         # block on its own, and none of them fire on a well-formed path.
-        def path_sdf(entry: str) -> str:
+        def path_package_slices_file(entry: str) -> str:
             return (
                 "package: foo\nessential:\n  foo_copyright:\nslices:\n  bins:\n"
                 f"    contents:\n      {entry}\n"
@@ -174,7 +174,7 @@ def test_check_slice() -> None:
             ("/var/lib/chisel/*/**: {generate: manifest}", "generate-path"),
             ("/x: {prefer: foo}", "prefer-self"),
         ]:
-            assert expected in codes(lint(path_sdf(entry), "3"), "block"), entry
+            assert expected in codes(lint(path_package_slices_file(entry), "3"), "block"), entry
 
         for entry in [
             "/usr/bin/*: {arch: [amd64]}",
@@ -182,7 +182,7 @@ def test_check_slice() -> None:
             "/var/lib/chisel/**: {generate: manifest}",
             "/x: {prefer: otherpkg}",
         ]:
-            assert not found(lint(path_sdf(entry), "3"), "block"), entry
+            assert not found(lint(path_package_slices_file(entry), "3"), "block"), entry
 
         # base-files really does own bin/ and lib/ -- exempt from the name warning.
         bf = (
@@ -202,11 +202,11 @@ def test_check_slice() -> None:
         assert mismatch[0]["file-stem"] == "bar", mismatch
 
         # hint validation (v3): a good hint is clean; length/style are checked.
-        def hint_sdf(h):
+        def hint_package_slices_file(h):
             return f"package: foo\nessential:\n  foo_copyright:\nslices:\n  bins:\n    hint: {h}\n    contents:\n      /usr/bin/foo:\n  copyright:\n    contents:\n      /usr/share/doc/foo/copyright:\n"
 
-        assert not found(lint(hint_sdf("System log viewer"), "3"))
-        doc = lint(hint_sdf("The tool that manages absolutely everything here."), "3")
+        assert not found(lint(hint_package_slices_file("System log viewer"), "3"))
+        doc = lint(hint_package_slices_file("The tool that manages absolutely everything here."), "3")
         assert "hint-too-long" in codes(doc, "block"), doc  # a parse error
         assert any(
             f["code"] == "hint-style" and f["rule"] == "article"
@@ -223,7 +223,7 @@ def test_check_slice() -> None:
 def test_branch_format_from_git() -> None:
     # --branch resolves format from that branch's chisel.yaml in the local git
     # object store (no hardcoded table, no network). Build a throwaway repo whose
-    # committed chisel.yaml is v3, then lint a list-form SDF against --branch.
+    # committed chisel.yaml is v3, then lint a list-form package slices file against --branch.
     import os
 
     env = {
@@ -449,18 +449,18 @@ def test_orientation_release_discovery() -> None:
 def test_check_test() -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
-        sdf = write(d, "foo.yaml", CLEAN)
+        package_slices_file = write(d, "foo.yaml", CLEAN)
         exercised = write(
             d,
             "task.yaml",
             'summary: x\nexecute: |\n  rootfs="$(install-slices foo_bins)"\n  chroot "$rootfs" foo --version\n',
         )
-        _, doc = report("check-test.py", sdf, exercised)
+        _, doc = report("check-test.py", package_slices_file, exercised)
         assert doc["status"] == "passed" and not found(doc), doc
 
         # a test that touches none of the binaries is the red flag (warn).
         missing = write(d, "empty.yaml", "summary: x\nexecute: |\n  true\n")
-        _, doc = report("check-test.py", sdf, missing)
+        _, doc = report("check-test.py", package_slices_file, missing)
         assert "untested" in codes(doc, "warn"), doc
 
         # partial coverage is advisory (info), not a warn: two bins, one tested.
@@ -482,8 +482,8 @@ def test_check_test() -> None:
 def test_check_test_requires_task_without_explicit_binaries(
     tmp_path: Path, contents: str
 ) -> None:
-    sdf = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
-    _, doc = report("check-test.py", sdf, str(tmp_path / "missing.yaml"))
+    package_slices_file = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
+    _, doc = report("check-test.py", package_slices_file, str(tmp_path / "missing.yaml"))
     assert "no-test" in codes(doc, "warn"), doc
 
 
@@ -499,13 +499,13 @@ def test_check_test_requires_task_without_explicit_binaries(
     ],
 )
 def test_check_test_rejects_malformed_task(tmp_path: Path, task: str) -> None:
-    sdf = write(tmp_path, "foo.yaml", CLEAN)
-    _, doc = report("check-test.py", sdf, write(tmp_path, "task.yaml", task))
+    package_slices_file = write(tmp_path, "foo.yaml", CLEAN)
+    _, doc = report("check-test.py", package_slices_file, write(tmp_path, "task.yaml", task))
     assert "task-invalid" in codes(doc, "warn"), doc
 
 
 def test_check_test_ignores_metadata_and_comments(tmp_path: Path) -> None:
-    sdf = write(tmp_path, "foo.yaml", CLEAN)
+    package_slices_file = write(tmp_path, "foo.yaml", CLEAN)
     task = write(
         tmp_path,
         "task.yaml",
@@ -514,16 +514,16 @@ def test_check_test_ignores_metadata_and_comments(tmp_path: Path) -> None:
             "  # foo --version\n  true  # foo\n"
         ),
     )
-    assert "untested" in codes(report("check-test.py", sdf, task)[1], "warn")
+    assert "untested" in codes(report("check-test.py", package_slices_file, task)[1], "warn")
     write(tmp_path, "test.sh", "# foo\ntrue # foo\n")
-    assert "untested" in codes(report("check-test.py", sdf, task)[1], "warn")
+    assert "untested" in codes(report("check-test.py", package_slices_file, task)[1], "warn")
     write(tmp_path, "test.sh", 'chroot "$rootfs" /usr/bin/foo --version\n')
     task = write(tmp_path, "task.yaml", "summary: x\nexecute: ./test.sh\n")
-    assert not found(report("check-test.py", sdf, task)[1])
+    assert not found(report("check-test.py", package_slices_file, task)[1])
 
 
 def test_check_test_accepts_data_assertions(tmp_path: Path) -> None:
-    sdf = write(
+    package_slices_file = write(
         tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", "/usr/share/foo/data")
     )
     task = write(
@@ -534,16 +534,16 @@ def test_check_test_accepts_data_assertions(tmp_path: Path) -> None:
             '  chroot "$rootfs" consumer /usr/share/foo/data | grep -Fiq expected\n'
         ),
     )
-    _, doc = report("check-test.py", sdf, task)
+    _, doc = report("check-test.py", package_slices_file, task)
     assert "no-binaries" in codes(doc, "info"), doc
     assert not found(doc, "warn"), doc
 
 
 def test_check_test_reports_unreadable_helper(tmp_path: Path) -> None:
-    sdf = write(tmp_path, "foo.yaml", CLEAN)
+    package_slices_file = write(tmp_path, "foo.yaml", CLEAN)
     task = write(tmp_path, "task.yaml", "summary: x\nexecute: ./test.sh\n")
     (tmp_path / "test.sh").write_bytes(b"\xff")
-    _, doc = report("check-test.py", sdf, task)
+    _, doc = report("check-test.py", package_slices_file, task)
     assert "task-invalid" in codes(doc, "warn"), doc
 
 
@@ -790,7 +790,7 @@ def test_check_diff_until_empty_still_covers(tmp_path: Path) -> None:
 
 
 def test_check_diff_base_mode(tmp_path: Path) -> None:
-    # --base reads the old SDF from git and the new one from the worktree
+    # --base reads the old package slices file from git and the new one from the worktree
     import os
 
     env = {
@@ -822,21 +822,21 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
     def check_diff() -> dict:
         return report("check-diff.py", "--base=HEAD", cwd=tmp_path, env=env)[1]
 
-    sdf = tmp_path / "slices" / "foo.yaml"
-    sdf.parent.mkdir()
-    sdf.write_text(SPLIT_BASE, encoding="utf-8")
+    package_slices_file = tmp_path / "slices" / "foo.yaml"
+    package_slices_file.parent.mkdir()
+    package_slices_file.write_text(SPLIT_BASE, encoding="utf-8")
     git("init", "-q")
     git("add", "-A")
     git("commit", "-qm", "base")
 
-    sdf.write_text(split("      foo_helper:\n", HELPER), encoding="utf-8")
+    package_slices_file.write_text(split("      foo_helper:\n", HELPER), encoding="utf-8")
     doc = check_diff()
     assert not found(doc, "warn"), doc
     assert [(f["file"], f["slice"], f["to"]) for f in found(doc, "info")] == [
         ("slices/foo.yaml", "bins", "foo_helper")
     ], doc
 
-    sdf.write_text(split(""), encoding="utf-8")
+    package_slices_file.write_text(split(""), encoding="utf-8")
     doc = check_diff()
     assert [(f["file"], f["slice"], f["code"]) for f in found(doc, "warn")] == [
         ("slices/foo.yaml", "bins", "removed")
@@ -846,13 +846,13 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
 def test_scaffold_test() -> None:
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
-        sdf = write(d, "foo.yaml", CLEAN)  # ships /usr/bin/foo in the bins slice.
-        out = run("scaffold-test.py", str(sdf))
+        package_slices_file = write(d, "foo.yaml", CLEAN)  # ships /usr/bin/foo in the bins slice.
+        out = run("scaffold-test.py", str(package_slices_file))
         assert (
             "install-slices foo_bins" in out and 'chroot "$rootfs" /usr/bin/foo' in out
         ), out
         task = write(d, "task.yaml", out)
-        _, doc = report("check-test.py", str(sdf), str(task))
+        _, doc = report("check-test.py", str(package_slices_file), str(task))
         assert "scaffold" in codes(doc, "warn"), doc
 
 
@@ -860,16 +860,16 @@ def test_scaffold_test() -> None:
 def test_scaffold_marks_non_explicit_binary_tests(
     tmp_path: Path, contents: str
 ) -> None:
-    sdf = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
-    scaffold = run("scaffold-test.py", sdf)
+    package_slices_file = write(tmp_path, "foo.yaml", CLEAN.replace("/usr/bin/foo", contents))
+    scaffold = run("scaffold-test.py", package_slices_file)
     task = write(tmp_path, "task.yaml", scaffold)
     assert "install-slices foo_bins" in scaffold, scaffold
-    _, doc = report("check-test.py", sdf, task)
+    _, doc = report("check-test.py", package_slices_file, task)
     assert "scaffold" in codes(doc, "warn"), doc
 
 
 def test_scaffold_keeps_helpers_and_mixed_slices(tmp_path: Path) -> None:
-    sdf = write(
+    package_slices_file = write(
         tmp_path,
         "foo.yaml",
         CLEAN.replace("/usr/bin/foo", "/usr/libexec/foo/helper").replace(
@@ -877,7 +877,7 @@ def test_scaffold_keeps_helpers_and_mixed_slices(tmp_path: Path) -> None:
             "  data:\n    contents:\n      /usr/share/foo/data:\n  copyright:\n",
         ),
     )
-    out = run("scaffold-test.py", sdf)
+    out = run("scaffold-test.py", package_slices_file)
     assert 'chroot "$rootfs" /usr/libexec/foo/helper' in out, out
     assert "install-slices foo_data" in out, out
     assert "install-slices foo_copyright" not in out, out
@@ -885,7 +885,7 @@ def test_scaffold_keeps_helpers_and_mixed_slices(tmp_path: Path) -> None:
 
 def test_robustness() -> None:
     # a PR-review bot runs on arbitrary diffs; the checkers must degrade
-    # gracefully on malformed SDFs, never crash. each of these should produce a
+    # gracefully on malformed package slices files, never crash. each of these should produce a
     # block (or clean handling), never a Python traceback.
     cases = {
         "empty.yaml": "",
