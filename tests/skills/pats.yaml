@@ -27,6 +27,7 @@ sandboxes:
       default: deny
       allow:
         - .ubuntu.com # apt mirrors (archive/ports/security) for deb-list
+        - mirrors.edge.kernel.org # TEMP (fork only): see the Dockerfile's apt mirror note
         - pypi.org # `uv run <helper>` resolves the helpers' pyyaml from here
         - files.pythonhosted.org
         - github.com

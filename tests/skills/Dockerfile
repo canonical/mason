@@ -10,6 +10,12 @@
 # the docker layer cache makes the no-change case a no-op.
 FROM docker.io/library/ubuntu:26.04
 
+# TEMP (fork only): github runners' azure dns can't resolve *.ubuntu.com right
+# now, so fetch from a non-canonical mirror of the same archive. apt still
+# verifies the archive signatures. drop this once the dns issue is resolved.
+RUN sed -i -E 's#http://(archive|security)\.ubuntu\.com/ubuntu/?#http://mirrors.edge.kernel.org/ubuntu/#' \
+        /etc/apt/sources.list.d/ubuntu.sources
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
