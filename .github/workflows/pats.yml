@@ -1,0 +1,33 @@
+name: pats
+
+# skill evals (tests/skills/pats.yaml) via alesancor1/pats-action. on prs this
+# runs the suite on the pr head and on the base branch, comments the score
+# delta, and fails on a regression larger than max-regression.
+# tracks pats-action@main on purpose while it's being developed -- pin a sha
+# once it settles.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pats-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pats:
+    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      working-directory: tests/skills
+      pats-version: v0.7.6
+      # the cheap suite (mason-help x 3 agents) while testing the wiring;
+      # widen to e.g. "-s slicer" (or drop -s for everything) once it works.
+      run-args: -s mason -j -1
+      score-args: -s mason
+      max-regression: "0.05" # 5%
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CODEX_AUTH: ${{ secrets.CODEX_AUTH }}
