@@ -1,5 +1,7 @@
 # mason
 
+<!-- This is just a change to check that the score is within the threshold for the PR, since nothing changed in the skill itself -->
+
 <!-- AI AGENTS: Agent guidance is in AGENTS.md -->
 
 <img src="assets/logo2.png" alt="Mason logo" align="right" width="300">
