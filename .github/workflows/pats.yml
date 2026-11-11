@@ -29,5 +29,4 @@ jobs:
       score-args: -s mason
       max-regression: "0.05" # 5%
     secrets:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      CODEX_AUTH: ${{ secrets.CODEX_AUTH }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

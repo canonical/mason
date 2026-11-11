@@ -58,24 +58,21 @@ sandboxes:
 
 
 # single sandbox defined -> it's the default; no per-agent sandbox: needed.
+# all agents go through opencode + openrouter (OPENROUTER_API_KEY), so one key
+# covers every vendor. models are picked cheap on purpose; model ids are
+# openrouter's, without the openrouter/ prefix (pats adds it).
 agents:
   - id: haiku
-    kind: claude-cli-keyless
-    model: claude-haiku-4-5-20251001
-    effort: low
-  # same harness, stronger model -- the pair brackets the range the skill has to
-  # work across, and isolates skill quality from model quality.
-  - id: sonnet
-    kind: claude-cli-keyless
-    model: claude-sonnet-5
-    effort: low
-  # small, fast, cost-efficient Codex model; uses the host's ChatGPT login via
-  # ~/.codex/auth.json rather than an API key. a second harness, so a regression
-  # that is really a harness quirk shows up as one.
-  - id: codex-mini
-    kind: codex-cli-keyless
-    model: gpt-5.6-luna
-    effort: low
+    kind: opencode-openrouter
+    model: anthropic/claude-haiku-5.5
+  # a second and third vendor, so a regression that is really a model quirk
+  # shows up as one.
+  - id: gpt-nano
+    kind: opencode-openrouter
+    model: openai/gpt-5-nano
+  - id: glm-flash
+    kind: opencode-openrouter
+    model: z-ai/glm-5.3-flash
 
 # knockout: prepare deletes the real slice (snapshotting it as ground truth);
 # the agent must reproduce it. collect gathers what the agent wrote.
@@ -181,7 +178,7 @@ scorers:
 # scorer / agent left out of every suite, so nothing silently stops running.
 suites:
   - id: slicer
-    agents: &all-agents [haiku, sonnet, codex-mini]
+    agents: &all-agents [haiku, gpt-nano, glm-flash]
     tasks:
       - base-passwd
       - ca-certificates
