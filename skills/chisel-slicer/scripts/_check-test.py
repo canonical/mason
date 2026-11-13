@@ -42,11 +42,11 @@ except ImportError:
     import common
 
 CODES = {
-    "package-slices-file-unreadable": "the package slices file does not read or parse, so its binaries are unknown",
+    "slices-file-unreadable": "the package slices file does not read or parse, so its binaries are unknown",
     "no-test": "every package needs tests/spread/integration/<pkg>/task.yaml",
     "task-invalid": "a spread task is a mapping with non-empty summary and execute strings",
     "scaffold": "the scaffold's TODO(author) placeholders are still there",
-    "no-binaries": "the package slices file declares no explicit binaries; review the slice assertions by hand",
+    "no-binaries": "the slices file declares no explicit binaries; review the slice assertions by hand",
     "unscannable": "the shell does not tokenise; review coverage by hand",
     "untested": "the spread test references none of the declared binaries",
     "partly-tested": "some declared binaries are never referenced; review whether they need a test",
@@ -90,25 +90,27 @@ def task_sources(task: Path) -> list[str]:
     ]
 
 
-def check(package_slices_file: Path, task_arg: str | None) -> common.Report:
+def check(slices_file: Path, task_arg: str | None) -> common.Report:
     report = common.Report(CODES)
     try:
-        doc = yaml.safe_load(package_slices_file.read_text(encoding="utf-8"))
+        doc = yaml.safe_load(slices_file.read_text(encoding="utf-8"))
     except (FileNotFoundError, UnicodeError, yaml.YAMLError) as e:
-        report.add("warn", "package-slices-file-unreadable", package_slices_file, error=str(e).splitlines()[0])
+        report.add(
+            "warn", "slices-file-unreadable", slices_file, error=str(e).splitlines()[0]
+        )
         return report
     except OSError as e:
-        report.mark_unavailable("read", f"{package_slices_file}: {e}")
+        report.mark_unavailable("read", f"{slices_file}: {e}")
         return report
 
     bins = declared_binaries(doc)
     task = (
         Path(task_arg)
         if task_arg
-        else (Path("tests/spread/integration") / package_slices_file.stem / "task.yaml")
+        else (Path("tests/spread/integration") / slices_file.stem / "task.yaml")
     )
     if not task.exists():
-        report.add("warn", "no-test", package_slices_file, expected=str(task))
+        report.add("warn", "no-test", slices_file, expected=str(task))
         return report
 
     try:
@@ -122,7 +124,7 @@ def check(package_slices_file: Path, task_arg: str | None) -> common.Report:
     if any("TODO(author):" in source for source in sources):
         report.add("warn", "scaffold", task)
     if not bins:
-        report.add("info", "no-binaries", package_slices_file)
+        report.add("info", "no-binaries", slices_file)
         return report
     try:
         text = "\n".join(
