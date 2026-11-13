@@ -81,7 +81,7 @@ ablation:
     harness: opencode-openrouter
     model: deepseek/deepseek-v4.1-flash
     sandbox: docker
-    max-cost: 2 # usd per pair: stops a runaway loop, not a normal pair
+    budget: 2 # usd per pair: stops a runaway loop, not a normal pair
   items:
     abl-full:
     abl-full-2:
