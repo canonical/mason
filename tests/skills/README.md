@@ -1,4 +1,4 @@
-skill behaviour tests using [`pats`](https://github.com/lczyk/pats) 1.x
+skill behaviour tests using [`pats`](https://github.com/lczyk/pats) 1.0
 
 ```
 go install github.com/lczyk/pats/cmd/pats@v1.0.0
