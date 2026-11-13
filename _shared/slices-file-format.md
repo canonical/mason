@@ -122,11 +122,11 @@ Some deps only apply on certain arches. How you express that depends on the bran
     dotnet-sdk-aot-10.0_libs: {arch: [amd64, arm64]}
   ```
 
-Every package slices file on a v3 branch uses the map form, arch-gated or not -- there is no list-form `essential:` on v3.
+Every slices file on a v3 branch uses the map form, arch-gated or not -- there is no list-form `essential:` on v3.
 
 ## `hint:` Style
 
-Optional one-line description of what a slice provides. Chisel caps it at 40 printable chars (a parse error past that). The `validate-hints` CI check (spaCy) enforces the style below on every changed package slices file in any `ubuntu-*` PR. A hint is a **noun phrase**, not a sentence:
+Optional one-line description of what a slice provides. Chisel caps it at 40 printable chars (a parse error past that). The `validate-hints` CI check (spaCy) enforces the style below on every changed slices file in any `ubuntu-*` PR. A hint is a **noun phrase**, not a sentence:
 
 - sentence case -- every sentence in the hint starts uppercase, not just the first.
 - no finite verbs -- phrase as a noun fragment, not "Manages X" / "Views Y".
@@ -140,4 +140,4 @@ e.g. `hint: System log viewer` (not `hint: Views system logs`).
 ## Manifest & Pro Archives
 
 - **Manifest**: convention is `base-files_chisel` declaring `/var/lib/chisel/**: {generate: manifest}`, which makes chisel produce `/var/lib/chisel/manifest.wall`. Only touch when slicing `base-files`.
-- **Pro slices**: package slices file has `archive: <name>` -> `pro:`-tagged archive in `chisel.yaml` (`fips`, `fips-updates`, `esm-apps`, `esm-infra`).
+- **Pro slices**: slices file has `archive: <name>` -> `pro:`-tagged archive in `chisel.yaml` (`fips`, `fips-updates`, `esm-apps`, `esm-infra`).

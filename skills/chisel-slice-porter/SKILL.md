@@ -25,12 +25,12 @@ Adapt the source slices and tests to the user's target release checkout.
 ## 1. establish source and target
 
 Identify the source revision, target release and requested packages. Read both
-manifests and source package slices files/tests. Use `kb/_chisel-branches.md` for the branch model
+manifests and source slices files/tests. Use `kb/_chisel-branches.md` for the branch model
 and `kb/_chisel-formats.md` for format compatibility.
 
 Establish target maintenance from its manifest; stop on an EOL or unknown target.
 Check orientation's release-discovery status before drawing conclusions about
-other releases. If the target already has a package slices file, compare and report differences;
+other releases. If the target already has a slices file, compare and report differences;
 reconcile it only when that work was requested.
 
 For a locally available source revision:
@@ -63,7 +63,7 @@ when inspection cannot complete.
 ## 3. adapt package slices files and tests
 
 Read `kb/_slice-conventions.md` and the relevant sections of
-`kb/_package-slices-file-format.md`. Preserve the source's grouping unless target
+`kb/_slices-file-format.md`. Preserve the source's grouping unless target
 packaging or verified functionality requires a change. Adapt paths, dependencies,
 legal files and format-sensitive fields using the inspected target evidence.
 Preserve effective contents of any published target slices being reconciled.
@@ -80,7 +80,7 @@ uv run "<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread
 
 ## 4. verify the target
 
-For every new or modified package slices file:
+For every new or modified slices file:
 
 ```bash
 uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
@@ -95,7 +95,7 @@ uv run "<skill-root>/scripts/_try-cut.py" --arch <arch> <pkg>_<slice>
 spread lxd:tests/spread/integration/<pkg>
 ```
 
-For changes to published target package slices files, compare against the target base revision:
+For changes to published target slices files, compare against the target base revision:
 
 ```bash
 uv run "<skill-root>/scripts/_check-diff.py"

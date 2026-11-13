@@ -29,12 +29,12 @@ gh skill install canonical/mason chisel-slicer
 and then, for example, write a new slice file:
 
 ```shell
-/chisel-slicer "write package slices file for foobar"
+/chisel-slicer "write slices file for foobar"
 ```
 
 ## what's in here
 
 - `mason` - routes `/mason` requests to the right skill or prints usage
-- `chisel-slicer` - authors and tests chisel package slices files
-- `chisel-slice-reviewer` - read-only review of a package slices file or PR
+- `chisel-slicer` - authors and tests chisel slices files
+- `chisel-slice-reviewer` - read-only review of a slices file or PR
 - `chisel-slice-porter` - moves a slice between Ubuntu release branches

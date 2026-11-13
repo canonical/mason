@@ -17,7 +17,7 @@ Agent kit for chisel / chisel-releases work.
   follow it, passing the request through as plain language. authoring or adding a package slices file ->
   `chisel-slicer`; reviewing one -> `chisel-slice-reviewer`; moving one between release
   branches -> `chisel-slice-porter`.
-  e.g. `/mason "please help me write a package slices file for foobar"` -> `chisel-slicer`, foobar.
+  e.g. `/mason "please help me write a slices file for foobar"` -> `chisel-slicer`, foobar.
 - **usage** -- no args, "help", or intent not obviously covered by a skill below: print the
   usage block below verbatim, then stop. Do not load or run anything else -- never guess.
 
@@ -25,9 +25,9 @@ Agent kit for chisel / chisel-releases work.
 mason -- agent kit for chisel / chisel-releases work
 
 skills:
-  /chisel-slicer <pkg>              author + test a package slices file (no PR)
-  /chisel-slice-reviewer <package-slices-file>
-                                    read-only review of a package slices file
+  /chisel-slicer <pkg>              author + test a slices file (no PR)
+  /chisel-slice-reviewer <slices-file>
+                                    read-only review of a slices file
   /chisel-slice-porter <pkg> <from> <to>
                                     move a slice between release branches
 

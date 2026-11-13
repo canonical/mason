@@ -44,7 +44,7 @@ git ls-remote --heads https://github.com/canonical/chisel-releases.git 'ubuntu-*
 # Read release manifest
 curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/ubuntu-24.04/chisel.yaml
 
-# Read a package slices file
+# Read a slices file
 curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/ubuntu-24.04/slices/bash.yaml
 
 # Sparse clone (slices + chisel.yaml only)

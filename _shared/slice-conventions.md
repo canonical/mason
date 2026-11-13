@@ -7,7 +7,7 @@ Conventions the chisel-releases reviewers enforce on package slices files. These
 Group by content type for ordinary packages: executables, libraries, config and
 data. For large runtimes or packages with distinct functional subsets, use a
 minimum-functional `core`, a fuller `standard`, and named subsets as needed.
-Choose a coherent scheme per package slices file and ship only functionality that can be tested.
+Choose a coherent scheme per slices file and ship only functionality that can be tested.
 Do not include configuration for a tool that is not sliced, such as a logrotate
 drop-in without logrotate. Describe what a slice ships, not which application
 prompted its creation.
@@ -23,7 +23,7 @@ a failed lookup.
 
 ## Canonical Slice Names
 
-Names are convention but reviewers enforce them. The counts below are how many package slices files on `ubuntu-26.04` use each name, as a rough signal of how established it is; a name is not wrong for being rare, but a rare one wants a reason.
+Names are convention but reviewers enforce them. The counts below are how many slices files on `ubuntu-26.04` use each name, as a rough signal of how established it is; a name is not wrong for being rare, but a rare one wants a reason.
 
 | Name | Used by | Contents |
 |------|---------|----------|
@@ -34,9 +34,9 @@ Names are convention but reviewers enforce them. The counts below are how many p
 | `data` | 21 | Static data (templates, tables, arch-independent payload). Not fonts -- those get `fonts` |
 | `headers` | 15 | `/usr/include/...`. This is the name `-dev` packages use, not `dev` |
 | `jars` | 5 | JVM artefacts |
-| `copyright` | 690 | The deb copyright file, plus any upstream `NOTICE` / `LICENSE` / `ThirdPartyNotices` the package ships. Every package slices file has one |
+| `copyright` | 690 | The deb copyright file, plus any upstream `NOTICE` / `LICENSE` / `ThirdPartyNotices` the package ships. Every slices file has one |
 | `fonts` | 15 | Font files. Every font package uses this, not `data` |
-| `core` | 38 | Minimum-functional subset. **Not "everything"**. Avoid `all` -- exactly one package slices file uses it (`fonts-ubuntu`, an umbrella aggregate) |
+| `core` | 38 | Minimum-functional subset. **Not "everything"**. Avoid `all` -- exactly one slices file uses it (`fonts-ubuntu`, an umbrella aggregate) |
 | `standard` | 24 | Fuller-featured above `core` |
 | `var` | 6 | Directories/files under `/var/` |
 | `services` | 12 | Systemd service files |
@@ -67,7 +67,7 @@ Conventions on how a `contents:` path is written. Chisel accepts either form; re
 - **No explicit `symlink:` if the deb ships it.** Chisel preserves the deb's own symlinks. Write `symlink:` only for paths the deb does not ship, e.g. ones a maintainer script creates.
 - **Annotate explicit symlinks** with a comment: `/usr/bin/dotnet:  # Symlink to ../lib/dotnet/dotnet`.
 - **Inline-style for short option maps**: `/path: {arch: [amd64, arm64]}`.
-- **Arch list order is a nit, not a gate.** Alphabetical reads tidily, but real package slices files (`systemd`) use a priority order; do not block on it.
+- **Arch list order is a nit, not a gate.** Alphabetical reads tidily, but real slices files (`systemd`) use a priority order; do not block on it.
 
 ## File Layout
 
@@ -76,7 +76,7 @@ Conventions on how a `contents:` path is written. Chisel accepts either form; re
   package's legal files.
 - The `copyright` slice last in the `slices:` block.
 - `package:` matches the filename stem -- `slices/foo.yaml` -> `package: foo`.
-- One package slices file per package. Never two packages in one YAML file.
+- One slices file per package. Never two packages in one YAML file.
 
 ## Exclude by Default
 

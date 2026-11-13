@@ -3,7 +3,7 @@ name: chisel-slicer
 description: >-
   Authors and tests chisel package slices files against
   canonical/chisel-releases. Use when the user wants to slice an Ubuntu package
-  or add a new package slices file to their release branch. Does not open PRs.
+  or add a new slices file to their release branch. Does not open PRs.
 ---
 
 # chisel-slicer
@@ -42,7 +42,7 @@ Author slices against the user's `canonical/chisel-releases` checkout.
 
 Read the orientation output for the release, maintenance status, manifest format
 and available tools. Stop on an unmaintained or unknown target, or an existing
-`slices/<pkg>.yaml`; report the conflict before authoring a new package slices file.
+`slices/<pkg>.yaml`; report the conflict before authoring a new slices file.
 Check release-discovery status before drawing conclusions about other releases.
 Read `kb/_dependency-policy.md` for package inspection.
 
@@ -73,7 +73,7 @@ another runtime need.
 
 ## 4. design and write
 
-Read representative package slices files from the target checkout: `bash`, `base-files`, `openssl`
+Read representative slices files from the target checkout: `bash`, `base-files`, `openssl`
 and `dpkg`, choosing those relevant to the package. Read these references before
 writing:
 
@@ -81,16 +81,16 @@ writing:
   style and file layout.
 - `kb/_chisel-formats.md`: fields supported by the manifest format and installed
   chisel version. Use the actual format, not a release-name guess.
-- `kb/_package-slices-file-format.md`: contents options, essentials, conflicts and
+- `kb/_slices-file-format.md`: contents options, essentials, conflicts and
   mutation semantics; consult the relevant sections for the design.
 
 Write only inspected paths. Wire both cross-package dependencies and required
 siblings (for example, a binary needing its own package's config). Search existing
-package slices files for shared paths before declaring them; check conflicts with an actual cut.
+slices files for shared paths before declaring them; check conflicts with an actual cut.
 
 ## 5. lint and test
 
-For every new or modified package slices file:
+For every new or modified slices file:
 
 ```bash
 uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
@@ -131,7 +131,7 @@ completion gate below.
 
 ## 6. verify against upstream
 
-Before completion, consult the official slicing guide and the package slices file/manifest
+Before completion, consult the official slicing guide and the slices file/manifest
 references through `kb/_upstream-sources.md`. Check fields, design choices and
 branch compatibility. Fix discrepancies or document justified divergence using
 that reference's source precedence. Apply `kb/_verification.md` when a source
@@ -149,7 +149,7 @@ finished. Report complete, ready for remaining verification or blocked.
 Respond to the user for direct invocation, or to the parent agent when delegated.
 Summarise:
 
-- package slices files created or changed and their slice breakdown.
+- slices files created or changed and their slice breakdown.
 - Required dependency graph, reused slices, new dependencies and authoring order.
 - Checks passed, failed or unavailable; representative coverage choices and gaps.
 - Remaining decisions or risks before the user opens a PR.

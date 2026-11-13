@@ -34,7 +34,7 @@ unverified; it does not establish that a release is EOL or that no ports remain.
 
 ## Completion and reports
 
-- **Change complete:** all intended package slices files and tests are written,
+- **Change complete:** all intended slices files and tests are written,
   coverage reviewed, and applicable checks passed with no unresolved defects.
 - **Ready for remaining verification:** the files and available checks are
   finished, but only permitted unavailable checks remain. Name them explicitly;

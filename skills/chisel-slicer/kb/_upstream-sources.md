@@ -7,17 +7,17 @@ The knowledge in these reference files is derived from three upstream projects. 
 The Go source code defines what chisel actually does: how it parses package slices files, resolves dependencies, extracts files, runs mutate scripts, handles wildcards, and validates fields. The tool's behaviour is the ultimate arbiter of what is valid.
 
 - Repo: <https://github.com/canonical/chisel>
-- Key paths: `internal/setup/` (package slices file parsing), `internal/slicer/` (slice cutting logic)
+- Key paths: `internal/setup/` (slices file parsing), `internal/slicer/` (slice cutting logic)
 
 ## 2. `canonical/chisel-docs` (official documentation)
 
-The documentation source renders to <https://ubuntu.com/chisel/docs/latest/>. It is the authoritative reference for package slices file format, CLI usage, and slicing workflows.
+The documentation source renders to <https://ubuntu.com/chisel/docs/latest/>. It is the authoritative reference for slices file format, CLI usage, and slicing workflows.
 
 - Repo: <https://github.com/canonical/chisel-docs>
 - Raw page access pattern: `https://raw.githubusercontent.com/canonical/chisel-docs/main/docs/<path>.md`; rendered at `https://ubuntu.com/chisel/docs/latest/<path>/`
 - Key pages:
   - `how-to/slice-a-package.md` -- canonical slicing workflow
-  - `reference/chisel-releases/slice-definitions.md` -- package slices file format specification
+  - `reference/chisel-releases/slice-definitions.md` -- slices file format specification
   - `reference/chisel-releases/chisel.yaml.md` -- release config schema (format versions, archives, maintenance)
   - `explanation/slice-design-approaches.md` -- grouping-by-content vs grouping-by-function
   - `explanation/slices.md` -- conceptual overview of slices
@@ -27,7 +27,7 @@ The documentation source renders to <https://ubuntu.com/chisel/docs/latest/>. It
 
 ## 3. `canonical/chisel-releases` (existing slices & conventions)
 
-The collection of published package slices files is the ground truth for conventions, naming patterns, and reviewer expectations. Studying real package slices files is more reliable than any written convention doc.
+The collection of published slices files is the ground truth for conventions, naming patterns, and reviewer expectations. Studying real slices files is more reliable than any written convention doc.
 
 - Repo: <https://github.com/canonical/chisel-releases>
 - Key files on each release branch: `chisel.yaml`, `slices/bash.yaml`, `slices/base-files.yaml`

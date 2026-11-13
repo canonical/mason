@@ -8,7 +8,7 @@ description: >-
 
 # chisel-slice-reviewer
 
-Review the supplied package slices file as it stands, or a branch/PR against its target base.
+Review the supplied slices file as it stands, or a branch/PR against its target base.
 State the scope and any assumption needed to interpret the request.
 
 ## roots and boundaries
@@ -40,8 +40,8 @@ The target base is the release branch named by `chisel.yaml`; orientation
 reports it as `target base` and whether it is fetched. Pass `--base=<ref>` only
 to review against something else.
 
-Then run the single-file checkers on each package slices file `_check-diff.py` lists, or on the
-one package slices file under review:
+Then run the single-file checkers on each slices file `_check-diff.py` lists, or on the
+one slices file under review:
 
 ```bash
 uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
@@ -55,7 +55,7 @@ and runtime evidence before choosing the overall verdict.
 
 Read the references relevant to the changed slices:
 
-- `kb/_package-slices-file-format.md` and `kb/_chisel-formats.md`: field semantics,
+- `kb/_slices-file-format.md` and `kb/_chisel-formats.md`: field semantics,
   manifest format and tool-version compatibility.
 - `kb/_slice-conventions.md`: grouping, naming, legal files, path style and
   preservation of published slice contents.
