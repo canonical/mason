@@ -32,6 +32,19 @@ _REFUSAL_PHRASES = (
     "not a real ubuntu package",
     "cannot be found",
     "cannot be sliced",
+    "can't be sliced",
+    "is not present",
+    "isn't present",
+    "not in the archive",
+    "does not appear",
+    "doesn't appear",
+    "could not find",
+    "couldn't find",
+    "unable to find",
+    "absent",
+    "blocked",
+    "not a package",
+    "not in the",
 )
 
 
@@ -40,7 +53,7 @@ def score() -> float:
     wrote_slice = (OUT / f"{TASK}.yaml").exists() or any(
         f"slices/{TASK}.yaml" in w for w in t["writes"]
     )
-    hay = ("\n".join(t["texts"]) if t["parsed"] else t["raw"]).lower()
+    hay = ("\n".join(t["texts"]) if t["parsed"] else t["raw"]).lower().replace("\u2019", "'")
     said_so = any(p in hay for p in _REFUSAL_PHRASES)
     return ((not wrote_slice) + said_so) / 2.0
 

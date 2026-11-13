@@ -1,0 +1,24 @@
+#!/bin/sh
+# the pats sandbox plus what the skills run: dpkg-deb, pyyaml, uv, chisel.
+set -eu
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends dpkg-dev file python3-yaml
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
+# v1 lets `git ls-remote` read refs from info/refs, which egress allows. v2 posts
+# to git-upload-pack, which egress denies.
+git config --system protocol.version 1
+
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
+arch="$(dpkg --print-architecture)"
+ver="$(curl -fsSL https://api.github.com/repos/canonical/chisel/releases/latest |
+    sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"
+curl -fsSL "https://github.com/canonical/chisel/releases/download/$ver/chisel_${ver}_linux_$arch.tar.gz" \
+    -o /tmp/chisel.tgz
+tar -xzf /tmp/chisel.tgz -C /usr/local/bin chisel
+rm /tmp/chisel.tgz
+chisel version

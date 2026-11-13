@@ -3,7 +3,9 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""slice-names-canonical: slice names use canonical vocabulary."""
+"""slice-names-canonical: no slice name the conventions reject (bin, lib,
+configs, dev, all, license, notice, bare rules). base-files is the one package
+whose `bin` and `lib` slices are right: they build the directory trees."""
 from _lib import *
 
 
@@ -12,18 +14,10 @@ def score() -> float:
         doc = produced(t)
         if not has_slices(doc):
             return 0.0
-        slices = doc["slices"]
-        ok = 0
-        for name in slices:
-            if not isinstance(name, str):
-                continue
-            if name in CANONICAL:
-                ok += 1
-                continue
-            parts = name.split("-")
-            if len(parts) >= 2 and (parts[-1] in CANONICAL or parts[0] in CANONICAL):
-                ok += 1
-        return ok / len(slices)
+        names = [n for n in doc["slices"] if isinstance(n, str)]
+        allowed = {"bin", "lib"} if doc.get("package") == "base-files" else set()
+        bad = [n for n in names if n in REJECTED_SLICE_NAMES - allowed]
+        return 1.0 - len(bad) / len(names) if names else 0.0
     return avg(f)
 
 emit(score)

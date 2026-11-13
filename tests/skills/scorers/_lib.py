@@ -1,13 +1,13 @@
 """shared helpers for mason's pats scorers. not a scorer itself (no exec bit, no
 shebang) -- imported by each scorer_<id>.py via `from _lib import *`.
 
-a scorer receives the whole run output dir (env PATS_OUTPUT_DIR) and scores
+a scorer receives the graded pair's output dir (env PATS_SCORED_DIR) and scores
 whatever's there. the dir holds, per *target* (a sliced package):
 
     <target>.yaml           the slice the agent produced
     <target>.expected.yaml  ground truth (knockout snapshot or denovo silver)
 
-plus per *case* (env PATS_TASK_ID):
+plus per *case* (env PATS_SCORED_TASK_NAME):
 
     <case>.task.yaml        the spread test task.yaml the agent wrote (if any)
     <case>.spread.txt       concatenated spread-test bundle text (if any)
@@ -29,10 +29,10 @@ from typing import Any
 import yaml
 
 __all__ = [
-    "CANONICAL",
     "NA",
     "ORIENTATION_MARKERS",
     "OUT",
+    "REJECTED_SLICE_NAMES",
     "TASK",
     "avg",
     "content_paths",
@@ -62,8 +62,8 @@ ORIENTATION_MARKERS = (
     "live releases:",
 )
 
-OUT = Path(os.environ["PATS_OUTPUT_DIR"])
-TASK = os.environ["PATS_TASK_ID"]  # the case id (also the single-target package)
+OUT = Path(os.environ["PATS_SCORED_DIR"])
+TASK = os.environ["PATS_SCORED_TASK_NAME"]  # the case id (also the single-target package)
 
 _EXP_SUFFIX = ".expected.yaml"
 
@@ -110,9 +110,8 @@ def expected(t: str) -> Any:
 
 
 def fmt() -> int | None:
-    """Manifest format of the case's branch, captured at fixture time (tasks/_lib.sh
-    writes <case>.format from the freshly-cloned chisel.yaml). Derived from the real
-    branch, so it's release-agnostic -- no hardcoded branch->format table to rot."""
+    """Manifest format of the case's branch: <case>.format, which bin/stage reads
+    from the cloned chisel.yaml."""
     f = OUT / f"{TASK}.format"
     if not f.exists():
         return None
@@ -120,16 +119,10 @@ def fmt() -> int | None:
     return int(m.group()) if m else None
 
 
-# vocabulary for the slice-names-canonical scorer -- matched exactly, or as the
-# first/last part of a compound name (modprobe-config, udev-rules). deliberately
-# permissive: it screens for real vocabulary, not for the single best name.
-# `license`/`notice` are absent on purpose -- no SDF in chisel-releases has one;
-# upstream legal files ship inside the `copyright` slice.
-CANONICAL = {
-    "bins", "libs", "config", "data", "scripts", "copyright", "fonts",
-    "core", "standard", "minimal", "runtime", "var", "headers", "jars",
-    "locales", "services", "modules", "tables", "chisel", "rules", "dev",
-}
+# slice names the conventions reject (kb/_slice-conventions.md). packages coin
+# their own names freely (python's `utils`, binutils' `linker`), so the check
+# flags known-wrong names instead of demanding a fixed vocabulary.
+REJECTED_SLICE_NAMES = {"bin", "lib", "configs", "dev", "all", "license", "notice", "rules"}
 BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
 
 

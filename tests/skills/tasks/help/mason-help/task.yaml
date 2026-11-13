@@ -1,0 +1,4 @@
+# /mason prints its usage and stops. scored on the transcript alone.
+prompt: /mason
+stage: stage
+timeout: 5m
