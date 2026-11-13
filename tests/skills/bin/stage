@@ -44,22 +44,13 @@ function _reinit_git() {
 }
 
 # _install: claude reads .claude/skills/, the other harnesses .agents/skills/.
-# an abl-<variant> agent gets chisel-slicer alone, ablated: the other skills
-# carry copies of its kb files.
 function _install() {
     local dest=".agents/skills"
     case "$PATS_AGENT_HARNESS" in
         (claude-*) dest=".claude/skills" ;;
     esac
     mkdir -p "$PATS_WORKDIR/$dest"
-    case "$PATS_AGENT_NAME" in
-        (abl-*)
-            cp -R "$REPO_ROOT/skills/chisel-slicer" "$PATS_WORKDIR/$dest/"
-            ablate "${PATS_AGENT_NAME#abl-}" "$PATS_WORKDIR/$dest/chisel-slicer"
-            printf '%s\n' "${PATS_AGENT_NAME#abl-}" >"$OUT/variant.txt"
-            ;;
-        (*) cp -R "$REPO_ROOT/skills/." "$PATS_WORKDIR/$dest/" ;;
-    esac
+    cp -R "$REPO_ROOT/skills/." "$PATS_WORKDIR/$dest/"
 }
 
 function main() {
