@@ -14,7 +14,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SHARED = ROOT / "_shared"
-PACKAGE_SLICES_FILE = """\
+SLICES_FILE = """\
 package: foo
 essential:
   - foo_copyright
@@ -52,10 +52,10 @@ def test_missing_base_is_unavailable(tmp_path):
 
 
 def test_unknown_format_is_unavailable(tmp_path):
-    package_slices_file = tmp_path / "foo.yaml"
-    package_slices_file.write_text(PACKAGE_SLICES_FILE)
+    slices_file = tmp_path / "foo.yaml"
+    slices_file.write_text(SLICES_FILE)
     result = subprocess.run(
-        [sys.executable, str(SHARED / "check-slice.py"), str(package_slices_file)],
+        [sys.executable, str(SHARED / "check-slice.py"), str(slices_file)],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -70,7 +70,7 @@ def test_unknown_format_is_unavailable(tmp_path):
 def test_diff_unreadable_base_is_unavailable(tmp_path):
     old, new = tmp_path / "old.yaml", tmp_path / "new.yaml"
     old.write_text("bad: [yaml")
-    new.write_text(PACKAGE_SLICES_FILE)
+    new.write_text(SLICES_FILE)
     result = subprocess.run(
         [sys.executable, str(SHARED / "check-diff.py"), str(old), str(new)],
         capture_output=True,
@@ -83,7 +83,7 @@ def test_diff_unreadable_base_is_unavailable(tmp_path):
     assert [u["check"] for u in doc["unavailable"]] == ["base"]
 
 
-def test_inaccessible_package_slices_file_is_unavailable(monkeypatch, tmp_path):
+def test_inaccessible_slices_file_is_unavailable(monkeypatch, tmp_path):
     checker = module(SHARED / "check-test.py")
 
     def denied(*args, **kwargs):
@@ -278,8 +278,8 @@ def test_checkout_access_refusal_is_not_missing_checkout(tmp_path, monkeypatch):
 
 def test_inaccessible_task_is_not_a_test_defect(tmp_path, monkeypatch):
     checker = module(SHARED / "check-test.py")
-    package_slices_file = tmp_path / "foo.yaml"
-    package_slices_file.write_text(PACKAGE_SLICES_FILE)
+    slices_file = tmp_path / "foo.yaml"
+    slices_file.write_text(SLICES_FILE)
     monkeypatch.chdir(tmp_path)
     task = tmp_path / "tests/spread/integration/foo/task.yaml"
     task.parent.mkdir(parents=True)
@@ -289,7 +289,7 @@ def test_inaccessible_task_is_not_a_test_defect(tmp_path, monkeypatch):
         raise PermissionError("access denied")
 
     monkeypatch.setattr(checker, "task_sources", denied)
-    report = checker.check(package_slices_file, None)
+    report = checker.check(slices_file, None)
     assert report.status == "unavailable"
     assert not report.findings
 
@@ -341,7 +341,7 @@ def release_checkout(path, branch="ubuntu-26.04"):
     run("commit", "-q", "-m", "manifest")
     run("checkout", "-q", "--detach")
     (path / "slices").mkdir()
-    (path / "slices/foo.yaml").write_text(PACKAGE_SLICES_FILE)
+    (path / "slices/foo.yaml").write_text(SLICES_FILE)
     run("add", "slices/foo.yaml")
     run("commit", "-q", "-m", "foo")
     return run
@@ -394,7 +394,7 @@ def test_diff_without_manifest_needs_an_explicit_base(tmp_path):
 
 
 def test_diff_compares_at_the_merge_base(tmp_path):
-    # the base moved on after branching: its new package slices file is not this change's removal
+    # the base moved on after branching: its new slices file is not this change's removal
     run = release_checkout(tmp_path)
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -405,7 +405,7 @@ def test_diff_compares_at_the_merge_base(tmp_path):
     ).stdout.strip()
     run("checkout", "-q", "ubuntu-26.04")
     (tmp_path / "slices").mkdir(exist_ok=True)
-    (tmp_path / "slices/bar.yaml").write_text(PACKAGE_SLICES_FILE.replace("foo", "bar"))
+    (tmp_path / "slices/bar.yaml").write_text(SLICES_FILE.replace("foo", "bar"))
     run("add", "slices/bar.yaml")
     run("commit", "-q", "-m", "bar on the base")
     run("checkout", "-q", "--detach", head)

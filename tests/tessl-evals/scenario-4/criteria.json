@@ -19,7 +19,7 @@
     },
     {
       "name": "copyright slice last",
-      "description": "In chisel-releases/slices/nmap.yaml and each new dependency package slices file, the 'copyright' slice is the last slice defined",
+      "description": "In chisel-releases/slices/nmap.yaml and each new dependency slices file, the 'copyright' slice is the last slice defined",
       "max_score": 6
     },
     {
@@ -39,7 +39,7 @@
     },
     {
       "name": "bytewise sorting",
-      "description": "In every slice of every new package slices file, contents: paths and essential: entries are each sorted bytewise (LC_COLLATE=C)",
+      "description": "In every slice of every new slices file, contents: paths and essential: entries are each sorted bytewise (LC_COLLATE=C)",
       "max_score": 6
     },
     {

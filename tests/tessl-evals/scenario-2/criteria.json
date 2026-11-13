@@ -9,7 +9,7 @@
     },
     {
       "name": "Fixes compose to a clean file",
-      "description": "Applying every fix the report proposes would yield a package slices file with a 'bins' slice, bytewise-sorted contents, no man page, 'arch: amd64', and NOTICE.txt inside the copyright slice -- i.e. the fixes are concrete enough to act on and do not contradict each other",
+      "description": "Applying every fix the report proposes would yield a slices file with a 'bins' slice, bytewise-sorted contents, no man page, 'arch: amd64', and NOTICE.txt inside the copyright slice -- i.e. the fixes are concrete enough to act on and do not contradict each other",
       "max_score": 6
     },
     {
