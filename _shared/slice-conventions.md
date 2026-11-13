@@ -1,6 +1,6 @@
 # Slice Naming and Content Conventions
 
-Conventions the chisel-releases reviewers enforce on Package Slices Files. These are not parse errors -- chisel accepts any well-formed slice name -- but a PR that ignores them is rejected.
+Conventions the chisel-releases reviewers enforce on package slices files. These are not parse errors -- chisel accepts any well-formed slice name -- but a PR that ignores them is rejected.
 
 ## Grouping
 

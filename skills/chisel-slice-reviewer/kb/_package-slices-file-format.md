@@ -1,6 +1,6 @@
 # Package Slices File Format
 
-A _slice_ is a named subset of files from a single `.deb` package. Slices are defined in **Package Slices Files** -- YAML files named `<package>.yaml` stored in the `slices/` directory of a chisel-releases branch.
+A _slice_ is a named subset of files from a single `.deb` package. Slices are defined in **package slices files** -- YAML files named `<package>.yaml` stored in the `slices/` directory of a chisel-releases branch.
 
 Addressing: `<package_name>_<slice_name>` (underscore separates package from slice; underscores are not allowed in Debian package names). Used in `essential:` lists and on the `chisel cut` CLI.
 
