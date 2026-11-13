@@ -1,6 +1,6 @@
-# Slice Definition File (SDF) Format
+# Package Slices File Format
 
-A _slice_ is a named subset of files from a single `.deb` package. Slices are defined in **Slice Definition Files (SDFs)** -- YAML files named `<package>.yaml` stored in the `slices/` directory of a chisel-releases branch.
+A _slice_ is a named subset of files from a single `.deb` package. Slices are defined in **package slices files** -- YAML files named `<package>.yaml` stored in the `slices/` directory of a chisel-releases branch.
 
 Addressing: `<package_name>_<slice_name>` (underscore separates package from slice; underscores are not allowed in Debian package names). Used in `essential:` lists and on the `chisel cut` CLI.
 
@@ -20,7 +20,7 @@ So "is this a parse error?" and "will this do anything?" have different answers.
 | `package` | string | Required | Deb package name; **must match filename stem** (`slices/foo.yaml` -> `package: foo`) |
 | `archive` | string | Optional | Selects archive from `chisel.yaml`'s `archives:`. Omit for default |
 | `essential` | list (v1/v2) / map (v3) of `<pkg>_<slice>` | Optional | Applied to **every** slice in the file. Typically `<pkg>_copyright` |
-| `slices` | map name -> body | Required | The slice definitions |
+| `slices` | map name -> body | Required | The slice entries |
 
 ## Per-slice Keys
 
@@ -122,11 +122,11 @@ Some deps only apply on certain arches. How you express that depends on the bran
     dotnet-sdk-aot-10.0_libs: {arch: [amd64, arm64]}
   ```
 
-Every SDF on a v3 branch uses the map form, arch-gated or not -- there is no list-form `essential:` on v3.
+Every slices file on a v3 branch uses the map form, arch-gated or not -- there is no list-form `essential:` on v3.
 
 ## `hint:` Style
 
-Optional one-line description of what a slice provides. Chisel caps it at 40 printable chars (a parse error past that). The `validate-hints` CI check (spaCy) enforces the style below on every changed SDF in any `ubuntu-*` PR. A hint is a **noun phrase**, not a sentence:
+Optional one-line description of what a slice provides. Chisel caps it at 40 printable chars (a parse error past that). The `validate-hints` CI check (spaCy) enforces the style below on every changed slices file in any `ubuntu-*` PR. A hint is a **noun phrase**, not a sentence:
 
 - sentence case -- every sentence in the hint starts uppercase, not just the first.
 - no finite verbs -- phrase as a noun fragment, not "Manages X" / "Views Y".
@@ -140,4 +140,4 @@ e.g. `hint: System log viewer` (not `hint: Views system logs`).
 ## Manifest & Pro Archives
 
 - **Manifest**: convention is `base-files_chisel` declaring `/var/lib/chisel/**: {generate: manifest}`, which makes chisel produce `/var/lib/chisel/manifest.wall`. Only touch when slicing `base-files`.
-- **Pro slices**: SDF has `archive: <name>` -> `pro:`-tagged archive in `chisel.yaml` (`fips`, `fips-updates`, `esm-apps`, `esm-infra`).
+- **Pro slices**: slices file has `archive: <name>` -> `pro:`-tagged archive in `chisel.yaml` (`fips`, `fips-updates`, `esm-apps`, `esm-infra`).

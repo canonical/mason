@@ -6,8 +6,8 @@ shared:
       path: kb/_verification.md
     dependency-policy.md:
       path: kb/_dependency-policy.md
-    slice-definition-format.md:
-      path: kb/_slice-definition-format.md
+    slices-file-format.md:
+      path: kb/_slices-file-format.md
     slice-conventions.md:
       path: kb/_slice-conventions.md
     chisel-formats.md:
@@ -49,8 +49,8 @@ shared:
       path: scripts/_deb-list.py
     file.py:
       path: scripts/_file.py
-    slice-definition-format.md:
-      path: kb/_slice-definition-format.md
+    slices-file-format.md:
+      path: kb/_slices-file-format.md
     slice-conventions.md:
       path: kb/_slice-conventions.md
     chisel-formats.md:
@@ -78,8 +78,8 @@ shared:
       path: kb/_dependency-policy.md
     upstream-sources.md:
       path: kb/_upstream-sources.md
-    slice-definition-format.md:
-      path: kb/_slice-definition-format.md
+    slices-file-format.md:
+      path: kb/_slices-file-format.md
     slice-conventions.md:
       path: kb/_slice-conventions.md
     chisel-formats.md:

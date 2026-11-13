@@ -10,7 +10,7 @@ Usage:
   try-cut.py --base[=REF] [--arch ARCH] [<pkg>_<slice> ...]
 
   --arch ARCH   package architecture (passed through to chisel cut)
-  --base[=REF]  cut every slice of each SDF changed since REF (or the slices
+  --base[=REF]  cut every slice of each package slices file changed since REF (or the slices
                 named) twice, from REF and from the worktree, and report each
                 path the worktree's cut no longer installs. REF defaults to
                 the target base chisel.yaml names, resolved as check-diff does
@@ -18,10 +18,10 @@ Usage:
 Temp roots, and REF's release for --base, are created in the current directory
 (chisel snap compat) and removed on exit. chisel's own output goes to stderr;
 stdout is the YAML report described in common.py. Both --base cuts read the
-same archive, so a lost path is down to the SDF change, not the archive. REF
+same archive, so a lost path is down to the slices file change, not the archive. REF
 is compared at its merge base with HEAD, or at its tip without one.
 
-A cut that fails on the SDFs fails; one that fails on the archive or the
+A cut that fails on the slices files fails; one that fails on the archive or the
 network, or that has no chisel to run, is unavailable. A slice REF itself can
 no longer cut is not compared.
 """
@@ -53,7 +53,7 @@ CODES = {
     "base-cut-failed": "the base ref no longer cuts, so this slice was not compared",
 }
 
-# chisel errors that say nothing about the SDFs: the archive or the network
+# chisel errors that say nothing about the slices files: the archive or the network
 # could not be reached, or served an inconsistent release.
 UNREACHABLE = (
     "cannot talk to archive",
@@ -127,7 +127,7 @@ def cut_once(slices: list[str], arch: str, report: common.Report) -> None:
 
 
 def changed_slices(base: str) -> dict[str, list[str]] | None:
-    """SDF path -> the slices it has both at base and in the worktree."""
+    """slices file path -> the slices it has both at base and in the worktree."""
     status = common.git(["diff", "--name-status", base, "--", "slices/*.yaml"])
     if status is None:
         return None
@@ -135,7 +135,7 @@ def changed_slices(base: str) -> dict[str, list[str]] | None:
     for line in status.splitlines():
         code, _, path = line.partition("\t")
         if not code.startswith("M"):
-            continue  # added, removed and renamed SDFs are check-diff's to report
+            continue  # added, removed and renamed slices files are check-diff's to report
         old = yaml.safe_load(common.git(["show", f"{base}:{path}"]) or "") or {}
         new = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
         before = old.get("slices") or {}
@@ -169,8 +169,8 @@ def cut_diff(base: str, named: list[str], arch: str, report: common.Report) -> N
         )
         return
     work = [
-        (sdf, s)
-        for sdf, slices in changed.items()
+        (slices_file, s)
+        for slices_file, slices in changed.items()
         for s in slices
         if not named or s in named
     ]
@@ -184,17 +184,17 @@ def cut_diff(base: str, named: list[str], arch: str, report: common.Report) -> N
                 "base", f"cannot read chisel.yaml and slices/ at {base!r}"
             )
             return
-        for sdf, s in work:
+        for slices_file, s in work:
             before, _ = cut(release, [s], arch, ignore)
             if before is None:
-                report.add("info", "base-cut-failed", sdf, slice=s)
+                report.add("info", "base-cut-failed", slices_file, slice=s)
                 continue
             after, error = cut(Path.cwd(), [s], arch, ignore)
             if after is None:
-                report.add("block", "cut-failed", sdf, slice=s, error=error)
+                report.add("block", "cut-failed", slices_file, slice=s, error=error)
                 continue
             for path in sorted(before - after):
-                report.add("warn", "lost", sdf, slice=s, path=path)
+                report.add("warn", "lost", slices_file, slice=s, path=path)
             report.data["compared"].append(
                 common.Flow(slice=s, before=len(before), after=len(after))
             )

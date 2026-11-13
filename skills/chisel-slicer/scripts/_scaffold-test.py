@@ -5,7 +5,7 @@
 # ///
 """scaffold-test: emit a spread task.yaml skeleton for a slice's binaries.
 
-This reads an SDF and prints a starting task.yaml with a fresh rootfs for each
+This reads a package slices file and prints a starting task.yaml with a fresh rootfs for each
 non-copyright slice. Explicit paths in recognised binary directories get a
 chroot placeholder; other slices and globbed binaries get author markers.
 Replace these with functional checks following kb/_spread-tests.md. The
@@ -31,7 +31,7 @@ BIN_DIRS = ("/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/", "/usr/libexec/")
 
 
 def slice_execs(doc: Any) -> dict[str, tuple[list[str], list[str]]]:
-    """slice name -> (explicit binary paths, glob paths), ordered as in the SDF."""
+    """slice name -> (explicit binary paths, glob paths), ordered as in the slices file."""
     out: dict[str, tuple[list[str], list[str]]] = {}
     slices = doc.get("slices") if isinstance(doc, dict) else None
     if not isinstance(slices, dict):
@@ -101,16 +101,16 @@ def main(argv: list[str]) -> int:
     if not args:
         print("usage: scaffold-test.py slices/<pkg>.yaml", file=sys.stderr)
         return 2
-    sdf = Path(args[0])
+    slices_file = Path(args[0])
     try:
-        doc = yaml.safe_load(sdf.read_text(encoding="utf-8"))
+        doc = yaml.safe_load(slices_file.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as e:
-        print(f"error: cannot read {sdf}: {e}", file=sys.stderr)
+        print(f"error: cannot read {slices_file}: {e}", file=sys.stderr)
         return 2
     pkg = (
         doc.get("package")
         if isinstance(doc, dict) and isinstance(doc.get("package"), str)
-        else sdf.stem
+        else slices_file.stem
     )
     print(scaffold(doc, pkg), end="")
     return 0

@@ -6,7 +6,7 @@
 """mutable-has-text: mutable entries are regular files, not directories.
 
 chisel allows mutable only on a regular file -- a text file or a non-dir copy
-(a bare path is an implicit copy from the deb, valid). Real SDFs mark
+(a bare path is an implicit copy from the deb, valid). Real package slices files mark
 bare-extracted config files mutable (e.g. libpam-runtime's /etc/pam.d/common-*),
 so requiring an explicit text/copy would wrongly penalise them. It is rejected
 on a directory (make: true / trailing slash) and on a symlink.

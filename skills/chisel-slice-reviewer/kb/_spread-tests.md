@@ -21,7 +21,7 @@ rootfs="$(install-slices <pkg>_<slice> [<pkg2>_<slice2> ...])"
 
 ## Two-layer testing model
 
-- **Layer 1 -- installability**: `chisel cut` succeeds. The SDF parses, dependencies resolve, files extract. This is what the `install-slices` CI check validates.
+- **Layer 1 -- installability**: `chisel cut` succeeds. The package slices file parses, dependencies resolve, files extract. This is what the `install-slices` CI check validates.
 - **Layer 2 -- functionality**: `chroot` + commands prove the sliced rootfs actually works. This is what spread tests validate.
 
 Both layers are required. A slice that installs but doesn't function is rejected.

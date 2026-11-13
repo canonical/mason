@@ -1,5 +1,5 @@
 prompt: |
-  Use the chisel-slicer skill to author a chisel slice definition file (SDF) for the package `python3-minimal` on the `ubuntu-26.04` branch.
+  Use the chisel-slicer skill to author a chisel package slices file for the package `python3-minimal` on the `ubuntu-26.04` branch.
 
   You are in a checkout of canonical/chisel-releases (your current directory). Write the slice to `slices/python3-minimal.yaml`, following the skill's workflow and the conventions in its knowledge base.
 

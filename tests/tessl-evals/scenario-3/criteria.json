@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent authors a correct SDF and spread test for the shared library libreadline8t64 on ubuntu-26.04 (v3 format). The package was renamed in the t64 transition; its soname is still libreadline.so.8. Depends: libc6, libtinfo6, readline-common. Every check inspects the artefacts: chisel-releases/slices/libreadline8t64.yaml, chisel-releases/tests/spread/integration/libreadline8t64/task.yaml.",
+  "context": "Tests whether the agent authors a correct package slices file and spread test for the shared library libreadline8t64 on ubuntu-26.04 (v3 format). The package was renamed in the t64 transition; its soname is still libreadline.so.8. Depends: libc6, libtinfo6, readline-common. Every check inspects the artefacts: chisel-releases/slices/libreadline8t64.yaml, chisel-releases/tests/spread/integration/libreadline8t64/task.yaml.",
   "type": "weighted_checklist",
   "checklist": [
     {
