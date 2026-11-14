@@ -50,6 +50,13 @@ sandboxes:
   items:
     docker:
       driver: docker
+    # stage, collect and the scorers run here: the pats snap runs nothing on
+    # the host. same image as the agent's; open egress, since stage clones
+    # chisel-releases (which the agent's deny list blocks) and the uv scorers
+    # fetch pyyaml.
+    steps:
+      driver: docker
+      egress: ~
     # sudo and nesting let an agent run spread tests in nested containers.
     # lxd:
     #   driver: lxd
@@ -87,6 +94,7 @@ slice-checks:
   kind: scorer
   defaults: &py-scorer
     score: scorers/scorer_"$PATS_SCORER_NAME".py
+    step-sandbox: steps
   items:
     target-present:
     yaml-parses:
