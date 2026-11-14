@@ -57,21 +57,16 @@ sandboxes:
     #   config:
     #     security.nesting: "true"
 
-# haiku and sonnet bracket the model range. codex-mini is a second harness.
+# one cheap model through opencode + openrouter (OPENROUTER_API_KEY). the id is
+# openrouter's, without the openrouter/ prefix.
 models:
   kind: agent
   defaults:
-    harness: claude-cli-keyless
-    effort: low
+    harness: opencode-openrouter
     sandbox: docker
   items:
-    haiku:
-      model: claude-haiku-4-5-20251001
-    sonnet:
-      model: claude-sonnet-5
-    codex-mini:
-      harness: codex-cli-keyless
-      model: gpt-5.6-luna
+    deepseek-flash:
+      model: deepseek/deepseek-v4.1-flash
 
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
