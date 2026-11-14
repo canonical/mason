@@ -2,3 +2,4 @@
 prompt: /mason
 stage: stage
 timeout: 5m
+step-sandbox: steps # the pats snap runs no host steps

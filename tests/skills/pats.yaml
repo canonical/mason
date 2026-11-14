@@ -50,6 +50,13 @@ sandboxes:
   items:
     docker:
       driver: docker
+    # stage, collect and the scorers run here: the pats snap runs nothing on
+    # the host. same image as the agent's; open egress, since stage clones
+    # chisel-releases (which the agent's deny list blocks) and the uv scorers
+    # fetch pyyaml.
+    steps:
+      driver: docker
+      egress: ~
     # sudo and nesting let an agent run spread tests in nested containers.
     # lxd:
     #   driver: lxd
@@ -57,21 +64,16 @@ sandboxes:
     #   config:
     #     security.nesting: "true"
 
-# haiku and sonnet bracket the model range. codex-mini is a second harness.
+# one cheap model through opencode + openrouter (OPENROUTER_API_KEY). the id is
+# openrouter's, without the openrouter/ prefix.
 models:
   kind: agent
   defaults:
-    harness: claude-cli-keyless
-    effort: low
+    harness: opencode-openrouter
     sandbox: docker
   items:
-    haiku:
-      model: claude-haiku-4-5-20251001
-    sonnet:
-      model: claude-sonnet-5
-    codex-mini:
-      harness: codex-cli-keyless
-      model: gpt-5.6-luna
+    deepseek-flash:
+      model: deepseek/deepseek-v4.1-flash
 
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
@@ -92,6 +94,7 @@ slice-checks:
   kind: scorer
   defaults: &py-scorer
     score: scorers/scorer_"$PATS_SCORER_NAME".py
+    step-sandbox: steps
   items:
     target-present:
     yaml-parses:

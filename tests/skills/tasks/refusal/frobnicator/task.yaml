@@ -3,3 +3,4 @@ prompt: /chisel-slicer frobnicator
 stage: stage --branch ubuntu-24.04
 collect: collect
 timeout: 5m
+step-sandbox: steps # the pats snap runs no host steps

@@ -1,0 +1,29 @@
+name: pats
+
+# skill evals (tests/skills/pats.yaml) via alesancor1/pats-action. on prs this
+# runs the suite on the pr head and on the base branch, comments the score
+# delta, and fails on a regression larger than max-regression.
+# pinned to a pats-action commit; bump it to pick up changes.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pats-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pats:
+    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@2627a0237b9c45a12a95b293ded38881aa45c9fe # main
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      working-directory: tests/skills
+      pats-channel: latest/candidate
+      run-args: -S slicer -j -1
+      score-args: -S slicer
+      max-regression: "0.1" # 10%
+    secrets:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
