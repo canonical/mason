@@ -181,6 +181,7 @@ slice-checks:
     mutate-paths:
     slice-count-not-inflated:
     structural-distance:
+    deps-recall: # ground truth's cross-package essentials kept
     chisel-cut:
     orientation-called:
     spread-test-present:
