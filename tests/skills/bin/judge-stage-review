@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# the judge's view of a review pair: the review under test (review.md), the
+# file it reviewed (reviewed.yaml) and the task's key (key.yaml). the
+# transcript goes, so the judge grades the answer, not the process.
+set -eu
+
+cp "$PATS_SCORED_TASK_DIR/key.yaml" "$PATS_WORKDIR/key.yaml"
+for f in "$PATS_SCORED_TASK_DIR"/*.review.yaml; do
+    cp "$f" "$PATS_WORKDIR/reviewed.yaml"
+done
+cd "$PATS_ROOT/scorers"
+uv run --quiet --with pyyaml python -c 'from _lib import final_text; print(final_text())' >"$PATS_WORKDIR/review.md"
+rm -f "$PATS_WORKDIR/stdout.log" "$PATS_WORKDIR/stderr.log"

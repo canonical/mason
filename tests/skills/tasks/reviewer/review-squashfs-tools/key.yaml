@@ -1,0 +1,10 @@
+verdict: request-changes
+defects:
+  - id: missing-libgcc-s1
+    severity: blocking
+    what: libgcc-s1_libs was dropped, though the comment above it says mksquashfs crashes without it
+    locators: [libgcc-s1]
+  - id: missing-libzstd1
+    severity: blocking
+    what: libzstd1_libs was dropped, though the binaries link against libzstd
+    locators: [libzstd1, libzstd]

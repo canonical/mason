@@ -54,6 +54,7 @@ __all__ = [
     "declared_binaries",
     "emit",
     "expected",
+    "final_text",
     "fmt",
     "fmt_compat",
     "has_slices",
@@ -66,6 +67,7 @@ __all__ = [
     "path_penalty",
     "produced",
     "raw_text",
+    "review_key",
     "rock",
     "rock_file",
     "slices_used",
@@ -372,6 +374,25 @@ def raw_text() -> str:
         if p.exists():
             chunks.append(_ANSI.sub("", p.read_text(encoding="utf-8", errors="replace")))
     return "\n".join(chunks)
+
+
+def final_text() -> str:
+    """the agent's last non-empty message: the answer an autonomous run ends on."""
+    c = calls()
+    texts = [t for t in c["texts"] if t.strip()]
+    if texts:
+        return texts[-1]
+    if not c["parsed"]:
+        return raw_text()
+    return ""
+
+
+def review_key() -> dict:
+    """the reviewer task's key.yaml: expected verdict and seeded defects."""
+    p = Path(os.environ.get("PATS_SCORED_TASK_DIR", "")) / "key.yaml"
+    if not p.is_file():
+        raise NA
+    return yaml.safe_load(p.read_text()) or {}
 
 
 def transcript() -> dict:
