@@ -146,6 +146,13 @@ candidates:
       model: nvidia/nemotron-3.5-super-vl
     step-3.7-flash:
       model: stepfun/step-3.7-flash
+    # the kept points at another effort
+    deepseek-v4.1-flash-high:
+      model: deepseek/deepseek-v4.1-flash
+      effort: high
+    glm-5.3-flash-high:
+      model: z-ai/glm-5.3-flash
+      effort: high
 
 # judges only score (agent scorers), never run tasks. opus on the claude login.
 judges:
