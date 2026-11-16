@@ -124,6 +124,7 @@ candidates:
     harness: pi-openrouter
     effort: low
     sandbox: docker
+    budget: 1 # usd per pair: 2.5x the dearest screen pair of a kept point
   items:
     deepseek-v4.1-flash:
       model: deepseek/deepseek-v4.1-flash
