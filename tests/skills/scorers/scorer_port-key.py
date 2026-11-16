@@ -48,7 +48,7 @@ def _essentials(doc) -> set[str]:
 
 def score() -> float:
     key = _key()
-    doc = produced(TASK)
+    doc = produced(targets()[0])
     if not has_slices(doc):
         return 0.0
     paths = content_paths(doc)

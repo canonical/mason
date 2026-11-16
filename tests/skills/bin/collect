@@ -30,9 +30,11 @@ out="$PATS_OUTPUT_DIR"
 mkdir -p "$out"
 
 # the slice of every target with ground truth.
+targets=()
 for exp in "$out"/*.expected.yaml; do
     [ -e "$exp" ] || continue
     stem="$(basename "$exp" .expected.yaml)"
+    targets+=("$stem")
     if [ -f "$PATS_WORKDIR/slices/$stem.yaml" ]; then
         cp "$PATS_WORKDIR/slices/$stem.yaml" "$out/$stem.yaml"
     fi
@@ -44,7 +46,11 @@ if [ -f "$PATS_WORKDIR/slices/$case_id.yaml" ]; then
 fi
 
 # the spread test: its task.yaml, and the whole dir concatenated for grepping.
+# a case named apart from its one target (debianutils-back) tests the target.
 spread_dir="$PATS_WORKDIR/tests/spread/integration/$case_id"
+if [ ! -d "$spread_dir" ] && [ "${#targets[@]}" -eq 1 ]; then
+    spread_dir="$PATS_WORKDIR/tests/spread/integration/${targets[0]}"
+fi
 if [ -f "$spread_dir/task.yaml" ]; then
     cp "$spread_dir/task.yaml" "$out/$case_id.task.yaml"
 fi
