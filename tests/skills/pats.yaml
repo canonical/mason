@@ -199,6 +199,7 @@ slice-checks:
     slice-count-not-inflated:
     structural-distance:
     deps-recall: # ground truth's cross-package essentials kept
+    consumers-kept: # slice names other slices files depend on
     chisel-cut:
     orientation-called:
     spread-test-present:
