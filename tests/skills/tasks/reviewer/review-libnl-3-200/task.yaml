@@ -1,4 +1,4 @@
-# control: upstream unchanged. review-libnl-3-200/key.yaml expects incomplete.
+# natural defect: upstream unchanged, flagged by the kb. review-libnl-3-200/key.yaml lists it.
 prompt: |
   Use the chisel-slice-reviewer skill to review the proposed new package slices file `slices/libnl-3-200.yaml` and its spread test, `tests/spread/integration/libnl-3-200/`, for `ubuntu-26.04`.
 
