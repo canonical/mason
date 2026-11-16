@@ -1,0 +1,4 @@
+# a format-only port: the source's contents and dependencies, nothing more.
+present: [/usr/bin/sed, /usr/share/doc/sed/copyright]
+essential: [libacl1_libs, libc6_libs, libselinux1_libs, sed_copyright]
+only: true

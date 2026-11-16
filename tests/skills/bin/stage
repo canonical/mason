@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# set up the workdir on the host: stage [--branch <b>] [--knockout <slice>]... [--rock]
-# --branch clones chisel-releases at <b>. --knockout takes that slice out as
-# ground truth. each <target>.silver.yaml beside the task.yaml is ground truth
-# for a target written from scratch. --rock stages a rock task instead: the
-# task's project/ (if any) becomes the workdir, one git commit, and its
-# case.yaml, rockcraft.expected.yaml and tests are ground truth. installs the
-# skills for the harness.
+# set up the workdir on the host:
+#   stage [--branch <b>] [--source <b>] [--knockout <slice>]... [--rock]
+# --branch clones chisel-releases at <b>. --source adds another release branch
+# as a local branch of the same name, for ports: egress keeps the agent off
+# chisel-releases. --knockout takes that slice out as ground truth. each
+# <target>.silver.yaml beside the task.yaml is ground truth for a target written
+# from scratch. --rock stages a rock task instead: the task's project/ (if any)
+# becomes the workdir, one git commit, and its case.yaml, rockcraft.expected.yaml
+# and tests are ground truth. installs the skills for the harness.
 set -eu
 
 REPO_ROOT="$(cd "$PATS_ROOT/../.." && pwd)"
@@ -44,6 +46,16 @@ function _reinit_git() {
     git init --quiet -b "$branch"
     "${git[@]}" add -A
     "${git[@]}" commit --quiet -m "chisel-releases base (target slices removed)"
+}
+
+# _add_source: upstream's <branch> as a local branch of the same name.
+function _add_source() {
+    local src="$1" tmp
+    tmp="$(mktemp -d)"
+    git clone --quiet --depth 1 --branch "$src" \
+        https://github.com/canonical/chisel-releases.git "$tmp/src"
+    git fetch --quiet --depth 1 "$tmp/src" "$src:$src"
+    rm -rf "$tmp"
 }
 
 # _install: claude reads .claude/skills/, the other harnesses .agents/skills/.
@@ -91,10 +103,11 @@ function _rock() {
 }
 
 function main() {
-    local branch="" knockout="" rock=0 silver t
+    local branch="" source="" knockout="" rock=0 silver t
     while [ $# -gt 0 ]; do
         case "$1" in
             (--branch) branch="$2"; shift 2 ;;
+            (--source) source="$2"; shift 2 ;;
             (--knockout) knockout="$knockout $2"; shift 2 ;;
             (--rock) rock=1; shift ;;
             (*) _fail "unknown argument: $1" ;;
@@ -117,8 +130,11 @@ function main() {
         done
         rm -rf "tests/spread/integration/$CASE"
         _reinit_git "$branch"
-    elif [ -n "$knockout" ]; then
-        _fail "--knockout needs --branch"
+        if [ -n "$source" ]; then
+            _add_source "$source"
+        fi
+    elif [ -n "$knockout" ] || [ -n "$source" ]; then
+        _fail "--knockout and --source need --branch"
     fi
     _install
     if [ "$rock" = 1 ]; then

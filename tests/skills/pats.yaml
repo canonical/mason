@@ -159,6 +159,9 @@ refusal:
 help:
   kind: task
   dir: tasks/help
+porter: # a slice ported from another release branch, against the target's own
+  kind: task
+  dir: tasks/porter
 rock-create: # build a rock from scratch: archive, service, source, ppa, fallback
   kind: task
   dir: tasks/rock-create
@@ -194,6 +197,11 @@ refusal-checks:
   items:
     refuses-nonexistent:
     refusal-verified:
+port-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    port-key: # the adaptations in the task's key.yaml
 help-checks:
   kind: scorer
   defaults: *py-scorer
@@ -274,6 +282,11 @@ suites:
     mason:
       tasks: help
       scorers: help-checks
+    porter:
+      tasks: porter
+      scorers:
+        - port-checks
+        - slice-checks
 
 # the candidates over every task. manual, so a bare `pats run` leaves them out:
 # pats run -S study [-a <candidate>] [-t <task>]
@@ -296,3 +309,8 @@ study:
     study-mason:
       tasks: help
       scorers: help-checks
+    study-porter:
+      tasks: porter
+      scorers:
+        - port-checks
+        - slice-checks
