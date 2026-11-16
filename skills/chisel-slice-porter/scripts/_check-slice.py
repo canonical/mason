@@ -3,17 +3,17 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""check-slice: deterministic static linter for chisel slice definition files.
+"""check-slice: deterministic static linter for chisel package slices files.
 
 Checks the mechanical conventions reviewers and CI enforce -- the rules that do
 NOT need judgement or a rootfs cut. Use it two ways:
 
-  - authoring: self-check an SDF while writing it (chisel-slicer).
+  - authoring: self-check a slices file while writing it (chisel-slicer).
   - review:    the deterministic first pass of a review (chisel-slice-reviewer),
                so the agent only spends judgement on deps, tests, and design.
 
 It does NOT replace `chisel cut` (installability) or spread tests
-(functionality). It only checks the SDF text. yamllint cosmetics (line
+(functionality). It only checks the slices file text. yamllint cosmetics (line
 length <= 100, blank-line count, indent) are also NOT covered -- CI's lint
 job runs yamllint separately.
 
@@ -48,12 +48,12 @@ except ImportError:
 
 CODES = {
     "yml-extension": "chisel reads only .yaml files and silently ignores this one",
-    "bad-filename": "chisel rejects the whole release when an SDF name breaks its rule",
-    "no-package": "an SDF needs a top-level package: field",
+    "bad-filename": "chisel rejects the whole release when a slices file name breaks its rule",
+    "no-package": "a slices file needs a top-level package: field",
     "package-mismatch": "package: must match the file name",
     "unsorted": "entries must be in bytewise order; ci lints slice essentials and contents",
-    "no-slices": "not a slice definition file: there is no slices: map",
-    "no-copyright-slice": "reviewers expect every SDF to ship a copyright slice",
+    "no-slices": "not a slices file: there is no slices: map",
+    "no-copyright-slice": "reviewers expect every slices file to ship a copyright slice",
     "no-copyright": "the copyright slice ships neither the copyright file nor a shared-copyright doc dir",
     "copyright-not-essential": "the package-wide essential should hold <pkg>_copyright, so every slice ships it",
     "bad-slice-name": "chisel rejects slice names that break its rule (parse error)",
@@ -78,7 +78,7 @@ CODES = {
     "essential-list": "v3 needs map-form essential (parse error: 'essential expects a map')",
     "not-utf8": "the file is not valid UTF-8",
     "yaml-error": "the file does not parse as YAML",
-    "not-a-mapping": "the top level of an SDF must be a mapping",
+    "not-a-mapping": "the top level of a slices file must be a mapping",
 }
 
 # known-bad slice names reviewers reject, mapped to the right one. by-function
@@ -99,14 +99,14 @@ BAD_SLICE_NAMES = {
 BAD_NAME_EXEMPT = {"base-files": {"bin", "lib"}, "fonts-ubuntu": {"all"}}
 
 # Debian arch names -- always lowercase, never x86_64/aarch64. (arch-list order
-# is not enforced: real SDFs use a priority order, not alphabetical.)
+# is not enforced: real slices files use a priority order, not alphabetical.)
 VALID_ARCHES = {"amd64", "arm64", "armhf", "i386", "ppc64el", "riscv64", "s390x"}
 
 # chisel's own slice-name rule (internal/setup: SnameExp) -- no trailing or
 # doubled hyphens, which a plain charset class would let through.
 SNAME_RE = re.compile(r"^[a-z](?:-?[a-z0-9]){2,}$")
 
-# chisel's SDF filename rule (internal/setup: FnameExp). a non-matching .yaml
+# chisel's slices file name rule (internal/setup: FnameExp). a non-matching .yaml
 # basename fails the whole release parse; a non-.yaml file is silently ignored.
 FNAME_RE = re.compile(r"^[a-z0-9](?:-?[.a-z0-9+]){1,}\.yaml$")
 
@@ -202,7 +202,7 @@ def check_slices(doc: Any, fmt: int | None, f: Findings) -> None:
     pkg = doc.get("package") if isinstance(doc.get("package"), str) else ""
 
     # copyright: a strong convention, not a CI parse/lint gate (some merged
-    # library SDFs skip it), so warn. it ships either the copyright file
+    # library slices files skip it), so warn. it ships either the copyright file
     # directly, or the doc dir as a symlink to another package's (shared).
     cp = slices.get("copyright")
     if not isinstance(cp, dict):
@@ -231,7 +231,7 @@ def check_slices(doc: Any, fmt: int | None, f: Findings) -> None:
 
 
 # validate-hints allows only these chars; chisel core caps length at 40 and
-# rejects non-printable. see kb/_slice-definition-format.md "hint: style".
+# rejects non-printable. see kb/_slices-file-format.md "hint: style".
 _HINT_ALLOWED = set(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,;()"
 )

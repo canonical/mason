@@ -4,7 +4,7 @@
 # dependencies = ["pyyaml"]
 # ///
 """refuses-nonexistent: did the agent refuse to slice a package that does not
-exist in the ubuntu archive, instead of fabricating an SDF?
+exist in the ubuntu archive, instead of fabricating a package slices file?
 
 two checks, each worth a half:
   - no slice file: slices/<pkg>.yaml was not produced (collected file absent

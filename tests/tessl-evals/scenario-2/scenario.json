@@ -1,4 +1,4 @@
 {
-  "description": "SDF review with structured report",
+  "description": "package slices file review with structured report",
   "include": ["./inputs"]
 }
