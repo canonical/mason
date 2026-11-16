@@ -221,7 +221,13 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
         if Path(path).exists():
             changed.append(path)
     untracked = common.git(["ls-files", "--others", "--exclude-standard", "--", *specs])
-    changed += (untracked or "").splitlines()
+    if untracked is None:
+        report.mark_unavailable(
+            "worktree",
+            "git cannot list this worktree's files; git status says why (e.g. dubious ownership)",
+        )
+        return
+    changed += untracked.splitlines()
     report.data["changed"] = changed
 
 
