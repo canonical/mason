@@ -116,6 +116,36 @@ rock-openrouter:
   items:
     deepseek-flash-rock: *deepseek-flash
 
+# cheap openrouter candidates for the model study. pi is minimal, so its own
+# prompt says little next to the skill's. run only through the manual study suites.
+candidates:
+  kind: agent
+  defaults:
+    harness: pi-openrouter
+    effort: low
+    sandbox: docker
+  items:
+    deepseek-v4.1-flash:
+      model: deepseek/deepseek-v4.1-flash
+    glm-5.3:
+      model: z-ai/glm-5.3
+    glm-5.3-flash:
+      model: z-ai/glm-5.3-flash
+    mimo-v2.6-flash:
+      model: xiaomi/mimo-v2.6-flash
+    mimo-v2.6-pro:
+      model: xiaomi/mimo-v2.6-pro
+    qwen3.8-flash:
+      model: qwen/qwen3.8-flash
+    qwen3.7-plus:
+      model: qwen/qwen3.7-plus
+    minimax-m3:
+      model: minimax/minimax-m3
+    nemotron-3.5-super:
+      model: nvidia/nemotron-3.5-super-vl
+    step-3.7-flash:
+      model: stepfun/step-3.7-flash
+
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
   kind: task
@@ -241,5 +271,27 @@ suites:
       tasks: [slice-typo, missing-workload-slice]
       manual: true
     mason:
+      tasks: help
+      scorers: help-checks
+
+# the candidates over every task. manual, so a bare `pats run` leaves them out:
+# pats run -S study [-a <candidate>] [-t <task>]
+study:
+  kind: suite
+  defaults:
+    agents: candidates
+    manual: true
+  items:
+    study-slicer:
+      tasks:
+        - knockout
+        - denovo
+      scorers: slice-checks
+    study-refusal:
+      tasks: refusal
+      scorers:
+        - refusal-checks
+        - orientation-called
+    study-mason:
       tasks: help
       scorers: help-checks
