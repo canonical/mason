@@ -216,6 +216,8 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
             compare_revisions(rev, path, path, report)
         if Path(path).exists():
             changed.append(path)
+    untracked = common.git(["ls-files", "--others", "--exclude-standard", "--", *specs])
+    changed += (untracked or "").splitlines()
     report.data["changed"] = changed
 
 
