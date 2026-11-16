@@ -1,6 +1,5 @@
 # back port: 26.04's slice depends on fine-grained coreutils and dpkg slices
-# that 24.04 doesn't have, and lists /usr/share/debianutils/shells.d/, which
-# 24.04's package doesn't ship.
+# that 24.04 doesn't have.
 # key.yaml holds the adaptations the port must make. the target's own slice
 # (knocked out) is supporting evidence only.
 prompt: |
