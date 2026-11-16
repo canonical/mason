@@ -1,0 +1,11 @@
+# hard: postinst runs update-alternatives for libblas.so.3, which upstream
+# replaces with per-arch symlinks.
+prompt: |
+  Use the chisel-slicer skill to author a chisel package slices file for the package `libblas3` on the `ubuntu-24.04` branch.
+
+  You are in a checkout of canonical/chisel-releases (your current directory). Write the slice to `slices/libblas3.yaml`, following the skill's workflow and the conventions in its knowledge base.
+
+  This is an automated eval: work autonomously, do not ask questions, and do not open a PR. Produce the slices file and the spread test the workflow asks for, then stop.
+stage: stage --branch ubuntu-24.04 --knockout libblas3
+collect: collect
+timeout: 20m

@@ -50,6 +50,13 @@ function _reinit_git() {
     "${git[@]}" commit --quiet -m "chisel-releases base (target slices removed)"
 }
 
+# _consumers: the <pkg>_<slice> names other slices files depend on, which a
+# rewrite of <pkg> has to keep. scorers filter the loose grep.
+function _consumers() {
+    grep -rhoE "[a-z0-9.+-]*_[a-z0-9-]+" slices/ 2>/dev/null |
+        grep -F "$1_" | sort -u >"$OUT/$1.consumers" || true
+}
+
 # _add_source: upstream's <branch> as a local branch of the same name.
 function _add_source() {
     local src="$1" tmp
@@ -124,6 +131,7 @@ function main() {
             [ -f "slices/$t.yaml" ] || _fail "no slices/$t.yaml on $branch to knock out"
             cp "slices/$t.yaml" "$OUT/$t.expected.yaml"
             _drop "$t"
+            _consumers "$t"
         done
         for silver in "$PATS_TASK_DIR"/*.silver.yaml; do
             [ -e "$silver" ] || continue
