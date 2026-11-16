@@ -197,8 +197,6 @@ slice-checks:
     copyright-essential:
     mutate-present:
     mutate-paths:
-    slice-count-not-inflated:
-    structural-distance:
     deps-recall: # ground truth's cross-package essentials kept
     consumers-kept: # slice names other slices files depend on
     chisel-cut:
@@ -207,6 +205,13 @@ slice-checks:
     spread-exercises-binaries:
     no-answer-fetch:
     hygiene: # the style and format checks, one vote (see its CHECKS)
+# layout against the ground truth. not for ports, which keep the source's.
+slice-shape:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    slice-count-not-inflated:
+    structural-distance:
 refusal-checks:
   kind: scorer
   defaults: *py-scorer
@@ -277,7 +282,9 @@ suites:
       tasks:
         - knockout
         - denovo
-      scorers: slice-checks
+      scorers:
+        - slice-checks
+        - slice-shape
     # ci-<skill> and ci-<skill>-<variant> are what ci runs when skills/<skill>/
     # changes (.github/scripts/pats-suites.sh). manual, on the openrouter agents.
     ci-chisel-slicer: {<<: *slicer, agents: openrouter, manual: true}
@@ -330,7 +337,9 @@ study:
       tasks:
         - knockout
         - denovo
-      scorers: slice-checks
+      scorers:
+        - slice-checks
+        - slice-shape
     study-refusal:
       tasks: refusal
       scorers:
