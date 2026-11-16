@@ -1,0 +1,6 @@
+# 26.04's gawk moved grcat and pwcat from /usr/lib/<triplet>/awk to /usr/libexec/awk,
+# and no longer pre-depends on libsigsegv2 (upstream's 26.04 slice still lists it).
+present: [/usr/bin/gawk, /usr/libexec/awk/grcat, /usr/libexec/awk/pwcat, /usr/lib/*-linux-*/gawk/*.so]
+absent: [/usr/lib/*-linux-*/awk/grcat, /usr/lib/*-linux-*/awk/pwcat]
+essential: [libc6_libs, libgmp10_libs, libmpfr6_libs, libreadline8t64_libs]
+absent-essential: [libsigsegv2_libs]
