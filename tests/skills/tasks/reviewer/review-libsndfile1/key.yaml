@@ -1,0 +1,10 @@
+verdict: request-changes
+defects:
+  - id: hardcoded-triplet
+    severity: blocking
+    what: the library path hard-codes x86_64-linux-gnu, so the slice ships no library on arm64, armhf, ppc64el, riscv64 or s390x (upstream uses /usr/lib/*-linux-*/)
+    locators: [x86_64-linux-gnu]
+  - id: missing-libmp3lame0
+    severity: blocking
+    what: libsndfile.so.1 links libmp3lame.so.0 (Depends libmp3lame0), and no other essential pulls libmp3lame0_libs, so the library cannot load
+    locators: [libmp3lame0]

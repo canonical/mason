@@ -1,0 +1,4 @@
+# control: the upstream file unchanged. no seeded defects, and no CI evidence in
+# the sandbox, so the right verdict is incomplete.
+verdict: incomplete
+defects: []
