@@ -1,5 +1,10 @@
-# /mason prints its usage and stops. scored on the transcript alone.
-prompt: /mason
+# /mason prints its usage and stops. scored on the transcript alone. pi runs a
+# skill as /skill:<name>, the other harnesses as /<name>.
+prompt-cmd: |
+  case "$PATS_AGENT_HARNESS" in
+      (pi-*) echo /skill:mason ;;
+      (*) echo /mason ;;
+  esac
 stage: stage
 timeout: 5m
 step-sandbox: steps # the pats snap runs no host steps
