@@ -228,7 +228,6 @@ review-checks:
   defaults: *py-scorer
   items:
     review-verdict:
-    review-recall:
     review-read-only:
     review-findings: # judged: seeded-defect recall x precision of the rest
       score: ~
