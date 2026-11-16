@@ -57,6 +57,29 @@ function _consumers() {
         grep -F "$1_" | sort -u >"$OUT/$1.consumers" || true
 }
 
+# _refs: package names a slices file mentions as <pkg>_<slice>, loosely.
+function _refs() {
+    grep -oE "[a-z0-9.+-]+_[a-z0-9-]+" "$1" | cut -d_ -f1 | sort -u
+}
+
+# _providers: the slices files ground truth's dependencies reach, transitively,
+# so a scorer can tell another set of slices ships the same paths.
+function _providers() {
+    local t="$1" dir="$OUT/$1.providers" queue p seen
+    mkdir -p "$dir"
+    seen=" $t "
+    queue="$(_refs "$OUT/$t.expected.yaml")"
+    while [ -n "$queue" ]; do
+        p="${queue%%$'\n'*}"
+        if [ "$p" = "$queue" ]; then queue=""; else queue="${queue#*$'\n'}"; fi
+        case "$seen" in (*" $p "*) continue ;; esac
+        seen="$seen$p "
+        [ -n "$p" ] && [ -f "slices/$p.yaml" ] || continue
+        cp "slices/$p.yaml" "$dir/"
+        queue="$queue"$'\n'"$(_refs "slices/$p.yaml")"
+    done
+}
+
 # _add_source: upstream's <branch> as a local branch of the same name.
 function _add_source() {
     local src="$1" tmp
@@ -132,12 +155,14 @@ function main() {
             cp "slices/$t.yaml" "$OUT/$t.expected.yaml"
             _drop "$t"
             _consumers "$t"
+            _providers "$t"
         done
         for silver in "$PATS_TASK_DIR"/*.silver.yaml; do
             [ -e "$silver" ] || continue
             t="$(basename "$silver" .silver.yaml)"
             cp "$silver" "$OUT/$t.expected.yaml"
             _drop "$t"
+            _providers "$t"
         done
         if [ -n "$review" ]; then
             [ -f "$PATS_TASK_DIR/$review.review.yaml" ] || _fail "no $review.review.yaml beside the task"
