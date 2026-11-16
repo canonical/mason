@@ -1,0 +1,10 @@
+verdict: request-changes
+defects:
+  - id: wrong-ifconfig-path
+    severity: blocking
+    what: /usr/bin/ifconfig is not in the package (it ships /usr/sbin/ifconfig), so the cut fails
+    locators: [/usr/bin/ifconfig]
+  - id: copyright-not-essential
+    severity: should-fix
+    what: the top-level essential on net-tools_copyright was removed, so slices no longer pull the copyright file
+    locators: [net-tools_copyright]

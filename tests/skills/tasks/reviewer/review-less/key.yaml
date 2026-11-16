@@ -1,0 +1,6 @@
+verdict: request-changes
+defects:
+  - id: missing-libtinfo6
+    severity: blocking
+    what: bins dropped libtinfo6_libs, which less links against (runtime failure)
+    locators: [libtinfo6]

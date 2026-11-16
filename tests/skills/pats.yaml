@@ -146,6 +146,17 @@ candidates:
     step-3.7-flash:
       model: stepfun/step-3.7-flash
 
+# judges only score (agent scorers), never run tasks. opus on the claude login.
+judges:
+  kind: agent
+  defaults:
+    harness: claude-cli-keyless
+    effort: low
+    sandbox: docker
+  items:
+    judge-opus:
+      model: claude-opus-5-5
+
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
   kind: task
@@ -159,6 +170,9 @@ refusal:
 help:
   kind: task
   dir: tasks/help
+reviewer: # seeded defects in a real slice (key.yaml), plus an unchanged control
+  kind: task
+  dir: tasks/reviewer
 porter: # a slice ported from another release branch, against the target's own
   kind: task
   dir: tasks/porter
@@ -202,6 +216,19 @@ port-checks:
   defaults: *py-scorer
   items:
     port-key: # the adaptations in the task's key.yaml
+review-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    review-verdict:
+    review-recall:
+    review-read-only:
+    review-findings: # judged: seeded-defect recall x precision of the rest
+      score: ~
+      agent: judge-opus
+      prompt-file: judges/review-findings.md
+      stage: judge-stage-review
+      timeout: 10m
 help-checks:
   kind: scorer
   defaults: *py-scorer
@@ -287,6 +314,11 @@ suites:
       scorers:
         - port-checks
         - slice-checks
+    reviewer:
+      tasks: reviewer
+      scorers:
+        - review-checks
+        - orientation-called
 
 # the candidates over every task. manual, so a bare `pats run` leaves them out:
 # pats run -S study [-a <candidate>] [-t <task>]
@@ -314,3 +346,8 @@ study:
       scorers:
         - port-checks
         - slice-checks
+    study-reviewer:
+      tasks: reviewer
+      scorers:
+        - review-checks
+        - orientation-called

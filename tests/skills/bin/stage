@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # set up the workdir on the host:
-#   stage [--branch <b>] [--source <b>] [--knockout <slice>]... [--rock]
+#   stage [--branch <b>] [--source <b>] [--review <pkg>] [--knockout <slice>]... [--rock]
 # --branch clones chisel-releases at <b>. --source adds another release branch
 # as a local branch of the same name, for ports: egress keeps the agent off
 # chisel-releases. --knockout takes that slice out as ground truth. each
 # <target>.silver.yaml beside the task.yaml is ground truth for a target written
-# from scratch. --rock stages a rock task instead: the task's project/ (if any)
-# becomes the workdir, one git commit, and its case.yaml, rockcraft.expected.yaml
-# and tests are ground truth. installs the skills for the harness.
+# from scratch. --review swaps <pkg>'s slice for the <pkg>.review.yaml beside
+# the task.yaml, uncommitted, with upstream's spread test. --rock stages a rock
+# task instead: the task's project/ (if any) becomes the workdir, one git commit,
+# and its case.yaml, rockcraft.expected.yaml and tests are ground truth. installs
+# the skills for the harness.
 set -eu
 
 REPO_ROOT="$(cd "$PATS_ROOT/../.." && pwd)"
@@ -103,11 +105,12 @@ function _rock() {
 }
 
 function main() {
-    local branch="" source="" knockout="" rock=0 silver t
+    local branch="" source="" review="" knockout="" rock=0 silver t keep=""
     while [ $# -gt 0 ]; do
         case "$1" in
             (--branch) branch="$2"; shift 2 ;;
             (--source) source="$2"; shift 2 ;;
+            (--review) review="$2"; shift 2 ;;
             (--knockout) knockout="$knockout $2"; shift 2 ;;
             (--rock) rock=1; shift ;;
             (*) _fail "unknown argument: $1" ;;
@@ -128,13 +131,25 @@ function main() {
             cp "$silver" "$OUT/$t.expected.yaml"
             _drop "$t"
         done
+        if [ -n "$review" ]; then
+            [ -f "$PATS_TASK_DIR/$review.review.yaml" ] || _fail "no $review.review.yaml beside the task"
+            keep="$(mktemp -d)"
+            cp -R "tests/spread/integration/$review" "$keep/test"
+            _drop "$review"
+        fi
         rm -rf "tests/spread/integration/$CASE"
         _reinit_git "$branch"
         if [ -n "$source" ]; then
             _add_source "$source"
         fi
-    elif [ -n "$knockout" ] || [ -n "$source" ]; then
-        _fail "--knockout and --source need --branch"
+        # review: the proposed files land uncommitted on the clean base.
+        if [ -n "$review" ]; then
+            cp "$PATS_TASK_DIR/$review.review.yaml" "slices/$review.yaml"
+            cp -R "$keep/test" "tests/spread/integration/$review"
+            rm -rf "$keep"
+        fi
+    elif [ -n "$knockout" ] || [ -n "$source" ] || [ -n "$review" ]; then
+        _fail "--knockout, --source and --review need --branch"
     fi
     _install
     if [ "$rock" = 1 ]; then
