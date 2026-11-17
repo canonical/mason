@@ -7,3 +7,4 @@ prompt: |
 stage: stage --branch ubuntu-24.04 --knockout base-passwd
 collect: collect
 timeout: 20m # slower models need more than the 10m default
+step-sandbox: steps # the pats snap runs no host steps
