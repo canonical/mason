@@ -79,7 +79,8 @@ conventions. Do not turn an unsupported stylistic preference into a hard gate.
 
 ## 3. assess tests and upstream checks
 
-Use `kb/_spread-tests.md` for coverage, assertions and rootfs isolation. Review
+Use `kb/_spread-tests.md` for coverage, assertions, rootfs isolation and what a
+test may add to the rootfs. Review
 each affected package, including libraries, data and dependency packages.
 Explicit binary references alone do not prove execution or meaningful tests.
 
