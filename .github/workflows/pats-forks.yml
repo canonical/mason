@@ -1,0 +1,35 @@
+name: pats (forks)
+
+# skill evals (tests/skills/pats.yaml) for prs from forks, whose own
+# `pull_request` run gets no secrets. this one runs on `pull_request_target`:
+# the workflow file is main's and the jobs can hold a key. the code under test
+# is still the fork's, so the run job sits in the pats-forks environment until
+# a maintainer approves it. a push to the pr is a new run, to approve again.
+#
+# no secret is passed: the run job reads OPENROUTER_API_KEY from the
+# environment, a key of its own and not the repo's.
+
+on:
+  pull_request_target:
+
+concurrency:
+  group: pats-forks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pats:
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    # TODO: back to alesancor1/pats-action once it takes `environment` and
+    # `allow-unsafe-pr-checkout` (https://github.com/alesancor1/pats-action/pull/1).
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@518c890d2e0fb0792fe489249e7966dfc2cc5e3f # feat/pull-request-target
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      environment: pats-forks
+      allow-unsafe-pr-checkout: true
+      working-directory: tests/skills
+      pats-channel: latest/candidate
+      run-args: -S slicer-ci -j -1
+      score-args: -S slicer-ci
+      max-regression: "0.1" # 10%
