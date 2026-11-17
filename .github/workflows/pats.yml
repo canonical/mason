@@ -32,6 +32,9 @@ jobs:
       contents: read
       pull-requests: write
     with:
+      # a pr run waits for a maintainer, so a push alone spends nothing. a
+      # manual dispatch is that choice already.
+      environment: ${{ github.event_name == 'pull_request' && 'pats-in-repo' || '' }}
       working-directory: tests/skills
       pats-channel: latest/candidate
       run-args: -S slicer-ci -j -1
