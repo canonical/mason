@@ -9,7 +9,8 @@ produced?
 ground truth uses mutate where a maintainer script would create files (e.g.
 /etc/passwd from the shipped masters). what matters is that the file exists in
 the cut, not how: a produced path counts when its own mutate writes it, or it
-is a `copy:` / `symlink:` entry, or a non-placeholder `text:`. scored as the
+is a `copy:` / `symlink:` entry, a non-placeholder `text:`, or a `mutable:`
+entry of a slice whose mutate writes something. scored as the
 share of ground truth's written paths covered. na when ground truth writes
 nothing.
 """
@@ -26,11 +27,15 @@ def _written(doc) -> set[str]:
 
 def _provided(doc) -> set[str]:
     out = set(_written(doc))
-    for _, path, entry in iter_contents(doc):
+    writers = {s for s, m in mutate_map(doc).items() if "content.write" in m}
+    for sname, path, entry in iter_contents(doc):
         if not isinstance(entry, dict):
             continue
         text = entry.get("text")
-        if "copy" in entry or "symlink" in entry or (isinstance(text, str) and text.strip() and text != "FIXME"):
+        real_text = isinstance(text, str) and text.strip() and text != "FIXME"
+        # a computed write path ("/etc/" + name) only shows as a mutable entry
+        computed = entry.get("mutable") and sname in writers
+        if "copy" in entry or "symlink" in entry or real_text or computed:
             out.add(path)
     return out
 
