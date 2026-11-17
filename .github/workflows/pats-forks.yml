@@ -11,6 +11,13 @@ name: pats (forks)
 
 on:
   pull_request_target:
+    # the list in pats.yml.
+    paths:
+      - skills/**
+      - tests/skills/**
+      - "!tests/skills/README.md"
+      - .github/workflows/pats-forks.yml
+      #
 
 concurrency:
   group: pats-forks-${{ github.event.pull_request.number }}
