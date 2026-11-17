@@ -5,7 +5,7 @@ status separate from finding severity.
 
 - **Passed:** the check ran and met its acceptance criteria. Static checks do
   not prove installability or runtime behaviour.
-- **Failed:** evidence shows a defect: SDF blocks, unjustified warnings, missing
+- **Failed:** evidence shows a defect: package slices file blocks, unjustified warnings, missing
   or malformed tests, unfinished scaffolds, inadequate assertions, unresolved
   source conflicts, or a cut/spread failure caused by the proposed change.
   Report the defect and fix it when changes are in scope.
@@ -34,7 +34,7 @@ unverified; it does not establish that a release is EOL or that no ports remain.
 
 ## Completion and reports
 
-- **Change complete:** all intended SDFs and tests are written,
+- **Change complete:** all intended slices files and tests are written,
   coverage reviewed, and applicable checks passed with no unresolved defects.
 - **Ready for remaining verification:** the files and available checks are
   finished, but only permitted unavailable checks remain. Name them explicitly;

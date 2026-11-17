@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent authors a correct chisel SDF and spread test for the nano editor on the v3-format ubuntu-26.04 branch. nano ships two executables (rnano is a symlink the deb itself provides), a system-wide /etc/nanorc, a directory of syntax definitions under /usr/share/nano/, a Suggests: on hunspell, and a lot of doc clutter. Every check inspects the artefacts: chisel-releases/slices/nano.yaml, chisel-releases/tests/spread/integration/nano/task.yaml.",
+  "context": "Tests whether the agent authors a correct chisel package slices file and spread test for the nano editor on the v3-format ubuntu-26.04 branch. nano ships two executables (rnano is a symlink the deb itself provides), a system-wide /etc/nanorc, a directory of syntax definitions under /usr/share/nano/, a Suggests: on hunspell, and a lot of doc clutter. Every check inspects the artefacts: chisel-releases/slices/nano.yaml, chisel-releases/tests/spread/integration/nano/task.yaml.",
   "type": "weighted_checklist",
   "checklist": [
     {

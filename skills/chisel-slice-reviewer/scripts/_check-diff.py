@@ -3,14 +3,14 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""check-diff: catch append-only regressions between two versions of an SDF.
+"""check-diff: catch append-only regressions between two versions of a package slices file.
 
-Published slices are append-only: removing an SDF or a slice fails the
+Published slices are append-only: removing a slices file or a slice fails the
 removed-slices CI gate; dropping a content path from a kept slice has no CI
 gate but is an append-only regression reviewers reject. Those are diff-shaped
 checks -- single-file linting can't see them. This does:
 
-  - an SDF that existed is now gone (or renamed) -> removed-slices CI fails
+  - a slices file that existed is now gone (or renamed) -> removed-slices CI fails
   - a slice key that existed is now gone         -> removed-slices CI fails
   - a content path dropped from a kept slice     -> append-only regression
   - a kept path limited to fewer arches, or to
@@ -34,7 +34,7 @@ Without --base that is the release branch chisel.yaml names, ubuntu-<version>,
 as a remote-tracking or local branch, whichever this checkout has; a branch
 that is not fetched is an unavailable check. The comparison point is the merge
 base of the base and HEAD, or the base's tip where history has no merge base.
-The report lists the changed SDFs, added ones included, under `changed`, for
+The report lists the changed slices files, added ones included, under `changed`, for
 the single-file checkers to take from there.
 
 Output: the YAML report described in common.py. Findings are advisory; a base
@@ -56,13 +56,13 @@ except ImportError:
 
 REJECTED = "reviewers reject it unless it left the archive"
 CODES = {
-    "sdf-removed": "removed-slices ci fails unless the package left the archive",
-    "sdf-renamed": "the old file name is gone: removed-slices ci fails unless the package left the archive",
+    "slices-file-removed": "removed-slices ci fails unless the package left the archive",
+    "slices-file-renamed": "the old file name is gone: removed-slices ci fails unless the package left the archive",
     "slice-removed": "removed-slices ci fails unless the package left the archive",
     "removed": f"dropped from a published slice; {REJECTED}",
     "narrowed": f"kept, but installed on fewer arches or dropped after mutate; {REJECTED}",
     "moved": "still installed through an essential, i.e. a subdivided slice",
-    "unparseable": "the new file does not parse as an SDF; fix that first",
+    "unparseable": "the new file does not parse as a slices file; fix that first",
 }
 
 
@@ -74,7 +74,7 @@ def parse(text: str) -> Any:
 
 
 def slice_contents(doc: Any) -> dict[str, dict[str, Any]]:
-    """slice name -> {content path: its options}. empty if not an SDF."""
+    """slice name -> {content path: its options}. empty if not a slices file."""
     out: dict[str, dict[str, Any]] = {}
     slices = doc.get("slices") if isinstance(doc, dict) else None
     if not isinstance(slices, dict):
@@ -149,7 +149,7 @@ def covers(old: Any, new: Any) -> bool:
 def compare(old_text: str, new_text: str, label: str, report: common.Report) -> None:
     old_doc = parse(old_text)
     if not isinstance(old_doc, dict) or not isinstance(old_doc.get("slices"), dict):
-        report.mark_unavailable("base", f"{label}: base is not a parseable SDF")
+        report.mark_unavailable("base", f"{label}: base is not a parseable slices file")
         return
     new_doc = parse(new_text)
     old, new = slice_contents(old_doc), slice_contents(new_doc)
@@ -207,14 +207,14 @@ def run_base(base: str, pathspecs: list[str], report: common.Report) -> None:
             continue
         code, path = parts[0], parts[-1]
         if code.startswith("D"):
-            report.add("warn", "sdf-removed", path)
+            report.add("warn", "slices-file-removed", path)
             continue
         if code.startswith("R") and len(parts) >= 3:
             # rename: old path is parts[1], new is parts[2]. the old filename is
             # gone (removed-slices CI fails on it, e.g. a soname bump), and the
             # rename may also drop slices/paths -- compare old vs new content.
             old_path, new_path = parts[1], parts[2]
-            report.add("warn", "sdf-renamed", old_path, to=new_path)
+            report.add("warn", "slices-file-renamed", old_path, to=new_path)
             compare_revisions(rev, old_path, new_path, report)
         elif code.startswith("M"):
             compare_revisions(rev, path, path, report)

@@ -18,7 +18,7 @@ slice's dependencies must supply the selected functionality.
   retained `essential:` graph supplies every required provider, including
   transitive shared libraries and runtime lookups absent from linker output.
 - Match dependencies to actual slice contents, including siblings in the same
-  package. An existing SDF alone does not establish that the needed files ship.
+  package. An existing package slices file alone does not establish that the needed files ship.
 - Resolve alternatives and virtual packages through target provider metadata,
   respecting version and architecture constraints. Use host apt metadata only
   when its suites, components and architecture match the target manifest.
