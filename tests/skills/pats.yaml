@@ -80,8 +80,8 @@ models:
       harness: codex-cli-keyless
       model: gpt-5.6-luna
 
-# billed per token against OPENROUTER_API_KEY. only the manual slicer-ci suite
-# names it, so a bare `pats run` leaves it out.
+# billed per token against OPENROUTER_API_KEY. only the manual ci-* suites name
+# it, so a bare `pats run` leaves it out.
 openrouter:
   kind: agent
   defaults:
@@ -150,8 +150,9 @@ suites:
         - knockout
         - denovo
       scorers: slice-checks
-    # the slicer suite on the openrouter agents: `pats run -S slicer-ci`.
-    slicer-ci:
+    # ci-<skill> is what ci runs when skills/<skill>/ changes
+    # (.github/scripts/pats-suites.sh). manual, on the openrouter agents.
+    ci-chisel-slicer:
       agents: openrouter
       tasks:
         - knockout

@@ -17,6 +17,7 @@ on:
       - tests/skills/**
       - "!tests/skills/README.md"
       - .github/workflows/pats-forks.yml
+      - .github/scripts/pats-suites.sh
       #
 
 concurrency:
@@ -24,8 +25,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pats:
+  # picks the ci suites the change needs, as in pats.yml. the checkout is
+  # main's: the fork's files and pats.yaml are read as data only.
+  plan:
     if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      suite-args: ${{ steps.plan.outputs.suite-args }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REF: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$GITHUB_REPOSITORY/contents/tests/skills/pats.yaml?ref=$REF" > "$RUNNER_TEMP/pats.yaml"
+          args="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' |
+            bash .github/scripts/pats-suites.sh "$RUNNER_TEMP/pats.yaml")"
+          echo "suites: ${args:-none}"
+          printf 'suite-args=%s\n' "$args" >> "$GITHUB_OUTPUT"
+
+  pats:
+    needs: plan
+    if: needs.plan.outputs.suite-args != ''
     # TODO: back to alesancor1/pats-action once it takes `environment` and
     # `allow-unsafe-pr-checkout` (https://github.com/alesancor1/pats-action/pull/1).
     uses: lczyk/pats-action/.github/workflows/Pats.yaml@518c890d2e0fb0792fe489249e7966dfc2cc5e3f # feat/pull-request-target
@@ -37,8 +68,8 @@ jobs:
       allow-unsafe-pr-checkout: true
       working-directory: tests/skills
       pats-channel: latest/candidate
-      run-args: -S slicer-ci -j -1
-      score-args: -S slicer-ci
+      run-args: ${{ needs.plan.outputs.suite-args }} -j -1
+      score-args: ${{ needs.plan.outputs.suite-args }}
       max-regression: "0.1" # 10%
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
