@@ -1,73 +1,7 @@
 # writer half of a writer / reviewer pair: a cheap writer's own knockout
 # output plus another model's real review of it, to be fixed. scored like the
 # debianutils knockout, against upstream.
-prompt: |
-  Use the chisel-slicer skill to revise the proposed package slices file `slices/debianutils.yaml` and its spread test, `tests/spread/integration/debianutils/`, for `ubuntu-26.04`.
-
-  You are in a checkout of canonical/chisel-releases (your current directory). The proposed files are uncommitted changes in the working tree. A reviewer left the review below. Address its findings where they hold up, and check them yourself: a reviewer can be wrong. Follow the skill's workflow and the conventions in its knowledge base.
-
-  This is an automated eval: work autonomously, do not ask questions, and do not open a PR. Produce the revised files and stop.
-
-  ---
-
-  # Review: `slices/debianutils.yaml` + `tests/spread/integration/debianutils/` (ubuntu-26.04)
-
-  **Scope.** Working-tree, uncommitted review: new `slices/debianutils.yaml` and new `tests/spread/integration/debianutils/task.yaml` against target base `ubuntu-26.04` (HEAD `6a0d28b`, branch only). Target package inspected from the public resolute archive (`debianutils` 5.23.2build1, amd64 + arm64). Reviewer did not cut slices or run spread.
-
-  ## Blocking
-
-  **B1. `debianutils_which` does not provide `/usr/bin/which`.**
-  - `which.debianutils` is only wired to `/usr/bin/which` by the package `postinst` via `update-alternatives --install /usr/bin/which which /usr/bin/which.debianutils 0 ...` (confirmed in the deb postinst). Chisel does not run maintainer scripts, so the cut rootfs has no `/usr/bin/which`.
-  - This is not hypothetical: tracked slices `tomcat10-common_scripts` (`slices/tomcat10-common.yaml:25`) and `tomcat11-common_catalina`/`setclasspath` (`slices/tomcat11-common.yaml:25,37`) already depend on `debianutils_which`, and `tomcat11-common/bin/setclasspath.sh` runs `JAVA_PATH=\`which java 2>/dev/null\``. The declared dependency currently supplies nothing that satisfies it.
-  - Repository convention is to recreate postinst alternatives explicitly (e.g. `slices/gawk.yaml` `/usr/bin/awk: { symlink: /usr/bin/gawk }  # symlink created in postinst`; `slices/sudo.yaml` `sudo`/`visudo`).
-  - **Fix:** add `/usr/bin/which: { symlink: /usr/bin/which.debianutils }  # Alternative created by postinst` to `debianutils_which` (man-page alternative is excluded by the no-man-pages rule).
-
-  **B2. `debianutils_scripts` and `debianutils_which` are missing `base-files_bin`, so their `/bin/sh` scripts cannot execute.**
-  - Both `savelog` and `which.debianutils` start `#! /bin/sh` (verified from the deb). `dash_bins` only ships `/usr/bin/dash` and `/usr/bin/sh` (`slices/dash.yaml`); the `/bin -> usr/bin` link comes from `base-files_bin` (`slices/base-files.yaml:16`). Neither the test helper (`install-slices` adds only `base-files_chisel` -> `base-files_var`) nor these slices provide it.
-  - Established convention: script slices declare `base-files_bin` (`gzip_scripts`, `sysvinit-utils_scripts`, `init-system-helpers`, `passwd_shadowconfig`, etc.). Without it `chroot "$rootfs" /usr/bin/savelog` / `which.debianutils` fails with ENOENT on the interpreter.
-  - **Fix:** add `base-files_bin` to the `essential:` map of both slices.
-
-  **B3. `debianutils_scripts` omits `savelog`'s runtime utilities.**
-  - `savelog` uses `basename`, `date`, `dirname`, `mkdir`, `chmod`, `chown`, `chgrp`, `rm`, `mv`, `ln`, `touch`, `ls` (coreutils), `gzip` by default (`COMPRESS=gzip`), and `sed` for `-C`. Crucially, the script aborts with exit 2 before doing anything if the compression binary is absent:
-    `if [ -n "$COMPRESS" ] && [ -z "$(command -v $COMPRESS)" ]; then ... exit 2`.
-  - With the current `dash_bins`-only dependency the rotation the test performs cannot succeed. Compare `gzip_scripts`, which lists `coreutils_bins`, `gzip_bins`, `sed_bins` (plus `base-files_bin`, `dash_bins`).
-  - **Fix:** extend `debianutils_scripts.essential:` with `coreutils_bins`, `gzip_bins`, `sed_bins`.
-
-  **B4. The spread test contains assertions that can never pass** (verified by executing the exact binaries from the 5.23.2build1 deb):
-  - `chroot "$rootfs" /usr/bin/ischroot 2>&1 | grep -Fiq "not in chroot"` -- `ischroot` prints nothing except `Usage:`/version (`strings` and direct run confirm); the test also runs it *inside* a chroot, where the expected result would be exit 0. The trailing `if chroot ... ischroot; then ...` is likewise backwards.
-  - `chroot "$rootfs" /usr/bin/run-parts 2>&1 | grep -Fiq "usage"` -- with no args `run-parts` prints `run-parts: missing operand` / ``Try `run-parts --help'``; no `usage`.
-  - `chroot "$rootfs" /usr/bin/run-parts --list /tmp/rp | grep -Fxq "job"` -- `--list` prints the path as passed, i.e. `/tmp/rp/job`, so the exact-match `job` fails.
-  - `chroot "$rootfs" /usr/bin/savelog 2>&1 | grep -Fiq "usage"` -- with no arguments `savelog` exits 0 silently; usage is only printed for `-h`/bad options.
-  - Under spread's abort-on-error execution these abort the task at the first bad pipeline, so this test must not be merged as-is.
-  - **Fixes:** drive `ischroot` with `--help | grep -Fiq usage` (or drop the exit check); `run-parts --help` for a usage check; match `grep -Fxq "/tmp/rp/job"` (or `grep -Fq job`); `savelog -h`.
-
-  ## Should-fix
-
-  - **S1. Test doesn't cover the actual gap.** `debianutils_which` is exercised only through `which.debianutils`; once `/usr/bin/which` is added (B1), assert that `/usr/bin/which mytool` works, since that is what the tomcat slices rely on.
-  - **S2. `scripts` slice scope.** The package's other shell helpers (`/usr/sbin/add-shell`, `remove-shell`, `update-shells`, `installkernel`) are unshipped. Omitting untestable/install-only helpers is defensible, but the choice should be justified; `scripts` currently ships only `savelog`.
-  - **S3. `tempfile` deprecation warning** is written to stderr; redirect it (`2>/dev/null`) so it doesn't pollute logs. The `tempfile` assertion itself is sound.
-
-  ## Nits
-
-  - `mkdir -p "${rootfs}/usr/bin"` in the which block is redundant (chisel creates it), and `mkdir -p "${rootfs}/var/log"` is redundant given `base-files_chisel -> base-files_var`.
-  - The `bins` comment says "exercise each ELF binary from a fresh rootfs" but all three run in one rootfs.
-
-  ## Checks
-
-  **Passed (static):**
-  - `_orientation.py`: checkout recognized; target base `ubuntu-26.04`; `format: v3`.
-  - `_check-diff.py`: changed `slices/debianutils.yaml` only; no append-only regressions (new file).
-  - `_check-slice.py slices/debianutils.yaml`: parse/name/sorting/v3-map-essential/doc-exclusion all pass.
-  - `_check-test.py slices/debianutils.yaml`: structural checks pass.
-
-  **Unavailable:**
-  - `chisel cut` / installability and spread integration runs: not executed by this review (spread not installed, no backend; CI results for this revision not accessible -- GitHub egress denied).
-  - CI gate results (lint, validate-hints, removed-slices, pkg-deps): reusable workflow definitions live on unreachable `main`; unavailable.
-  - Comparison against the published/canonical `debianutils.yaml` and other release branches (24.04/26.10) or the slices navigator: GitHub reads denied; unavailable. Forward-port coverage therefore unverified.
-
-  ## Verdict
-
-  **Request changes.** B1-B3 are demonstrated functional/dependency defects (the declared `debianutils_which` consumers and both script slices are non-functional), and B4 means the accompanying spread test fails outright. Static checks passing does not offset these. Remaining forward ports (notably 26.10) and all runtime/CI evidence are unverified.
+prompt-cmd: prompt
 stage: stage --branch ubuntu-26.04 --knockout debianutils --review debianutils
 collect: collect
 timeout: 20m

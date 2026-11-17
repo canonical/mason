@@ -1,0 +1,5 @@
+Use the chisel-slicer skill to author chisel package slices files for these packages on the `ubuntu-26.04` branch: libi2c0, udev, i2c-tools.
+
+You are in a checkout of canonical/chisel-releases (your current directory). These slices do not exist yet -- create `slices/<package>.yaml` for each of the three packages. Follow the skill's workflow and the conventions in its knowledge base, including any inter-package dependencies between them.
+
+This is an automated eval: work autonomously, do not ask questions, and do not open a PR. Produce the slices files and the spread tests the workflow asks for, then stop.
