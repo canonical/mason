@@ -80,6 +80,18 @@ models:
       harness: codex-cli-keyless
       model: gpt-5.6-luna
 
+# billed per token against OPENROUTER_API_KEY. only the manual slicer-ci suite
+# names it, so a bare `pats run` leaves it out.
+openrouter:
+  kind: agent
+  defaults:
+    harness: opencode-openrouter
+    sandbox: docker
+    budget: 2 # usd per pair: stops a runaway loop, not a normal pair
+  items:
+    deepseek-flash: # the id is openrouter's, without the openrouter/ prefix
+      model: deepseek/deepseek-v4.1-flash
+
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
   kind: task
@@ -138,6 +150,14 @@ suites:
         - knockout
         - denovo
       scorers: slice-checks
+    # the slicer suite on the openrouter agents: `pats run -S slicer-ci`.
+    slicer-ci:
+      agents: openrouter
+      tasks:
+        - knockout
+        - denovo
+      scorers: slice-checks
+      manual: true
     # slice-checks need ground truth, which refusal has none of.
     slicer-refusal:
       tasks: refusal
