@@ -1,0 +1,51 @@
+summary: Integration tests for debianutils
+
+execute: |
+  # debianutils_bins: exercise each ELF binary from a fresh rootfs so a
+  # missing dependency can't hide behind another test.
+  rootfs="$(install-slices debianutils_bins)"
+  # ischroot: running outside a chroot must report "not in chroot" (exit 1).
+  chroot "$rootfs" /usr/bin/ischroot 2>&1 | grep -Fiq "not in chroot"
+  if chroot "$rootfs" /usr/bin/ischroot; then
+    echo "ischroot unexpectedly exited 0" >&2
+    exit 1
+  fi
+  # run-parts: usage/error text proves it links and runs.
+  chroot "$rootfs" /usr/bin/run-parts 2>&1 | grep -Fiq "usage"
+  if chroot "$rootfs" /usr/bin/run-parts; then
+    echo "run-parts unexpectedly exited 0" >&2
+    exit 1
+  fi
+  # run-parts: list the scripts it would run in a real directory.
+  mkdir -p "${rootfs}/tmp/rp" && touch "${rootfs}/tmp/rp/job"
+  chroot "$rootfs" /usr/bin/run-parts --list /tmp/rp | grep -Fxq "job"
+  # tempfile: create a real temporary file and check it exists.
+  mkdir -p "${rootfs}/tmp"
+  tmpfile="$(chroot "$rootfs" /usr/bin/tempfile -d /tmp)"
+  test -f "${rootfs}${tmpfile}"
+  rm -f "${rootfs}${tmpfile}"
+
+  # debianutils_scripts: savelog must rotate a real log file.
+  rootfs="$(install-slices debianutils_scripts)"
+  chroot "$rootfs" /usr/bin/savelog 2>&1 | grep -Fiq "usage"
+  mkdir -p "${rootfs}/var/log"
+  echo "hello" > "${rootfs}/var/log/app.log"
+  chroot "$rootfs" /usr/bin/savelog -c 2 /var/log/app.log
+  # The rotated copy holds the original content and the original is gone.
+  test -f "${rootfs}/var/log/app.log.0"
+  grep -Fq "hello" "${rootfs}/var/log/app.log.0"
+  test ! -f "${rootfs}/var/log/app.log"
+  test ! -f "${rootfs}/var/log/app.log.1"
+
+  # debianutils_which: locate a real executable through PATH.
+  rootfs="$(install-slices debianutils_which)"
+  mkdir -p "${rootfs}/usr/bin"
+  touch "${rootfs}/usr/bin/mytool" && chmod 755 "${rootfs}/usr/bin/mytool"
+  result="$(chroot "$rootfs" /usr/bin/which.debianutils mytool)"
+  test "${result}" = "/usr/bin/mytool"
+  # Non-existent command produces no output and exits non-zero.
+  if result="$(chroot "$rootfs" /usr/bin/which.debianutils definitely-missing 2>/dev/null)"; then
+    echo "which.debianutils unexpectedly exited 0" >&2
+    exit 1
+  fi
+  test -z "${result}"
