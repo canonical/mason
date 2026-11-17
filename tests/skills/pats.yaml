@@ -47,6 +47,13 @@ sandboxes:
         # the numeric routes reach a repo by id: canonical's and any fork's,
         # with no name to filter on, so all of them.
         - "api.github.com/repositories/**"
+        # the skills under test come installed, or not at all (-noskill agents).
+        - "github.com/*/mason"
+        - "github.com/*/mason/**"
+        - "github.com/*/mason.git/git-upload-pack"
+        - "raw.githubusercontent.com/*/mason/**"
+        - "codeload.github.com/*/mason/**"
+        - "api.github.com/repos/*/mason/**"
   items:
     docker:
       driver: docker
@@ -146,6 +153,12 @@ candidates:
       model: nvidia/nemotron-3.5-super-vl
     step-3.7-flash:
       model: stepfun/step-3.7-flash
+    # the kept points without the skills: stage installs none and bin/prompt
+    # drops the skill from the prompt. the tessl-style no-skill baseline.
+    deepseek-v4.1-flash-noskill:
+      model: deepseek/deepseek-v4.1-flash
+    glm-5.3-flash-noskill:
+      model: z-ai/glm-5.3-flash
     # the kept points at another effort
     deepseek-v4.1-flash-high:
       model: deepseek/deepseek-v4.1-flash

@@ -10,7 +10,8 @@
 # only the <pkg>.review.test.yaml beside it when there is one.
 # --rock stages a rock task instead: the task's project/ (if any) becomes the
 # workdir, one git commit, and its case.yaml, rockcraft.expected.yaml and tests
-# are ground truth. installs the skills for the harness.
+# are ground truth. installs the skills for the harness, except for a -noskill
+# baseline agent.
 set -eu
 
 REPO_ROOT="$(cd "$PATS_ROOT/../.." && pwd)"
@@ -32,6 +33,14 @@ function _clone() {
     local fmt
     fmt="$(grep -m1 '^format:' chisel.yaml | grep -oE '[0-9]+' | head -n1 || true)"
     printf '%s\n' "$fmt" >"$OUT/$CASE.format"
+}
+
+# _scrub_agents: upstream's AGENTS.md tells agents to install the skills under
+# test. both arms drop those lines, so the only difference is the install.
+function _scrub_agents() {
+    [ -f AGENTS.md ] || return 0
+    grep -viE 'mason|tessl|skill' AGENTS.md >AGENTS.md.tmp || true
+    mv AGENTS.md.tmp AGENTS.md
 }
 
 # _drop: a target's slice and spread test, for the agent to write.
@@ -94,6 +103,9 @@ function _add_source() {
 # _install: claude reads .claude/skills/, the other harnesses .agents/skills/.
 function _install() {
     local dest=".agents/skills"
+    case "$PATS_AGENT_NAME" in
+        (*-noskill) return 0 ;;
+    esac
     case "$PATS_AGENT_HARNESS" in
         (claude-*) dest=".claude/skills" ;;
     esac
@@ -150,6 +162,7 @@ function main() {
     mkdir -p "$PATS_WORKDIR" "$OUT"
     if [ -n "$branch" ]; then
         _clone "$branch"
+        _scrub_agents
         # shellcheck disable=SC2086
         for t in $knockout; do
             [ -f "slices/$t.yaml" ] || _fail "no slices/$t.yaml on $branch to knock out"

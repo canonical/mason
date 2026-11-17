@@ -1,10 +1,5 @@
 # natural-defect review: a cheap writer's slices file and spread test from the
 # debianutils knockout, unedited. review-debianutils/key.yaml lists the defects.
-prompt: |
-  Use the chisel-slice-reviewer skill to review the proposed new package slices file `slices/debianutils.yaml` and its spread test, `tests/spread/integration/debianutils/`, for `ubuntu-26.04`.
-
-  You are in a checkout of canonical/chisel-releases (your current directory). The proposed files are uncommitted changes in the working tree. Follow the skill's workflow and the conventions in its knowledge base.
-
-  This is an automated eval: work autonomously, do not ask questions, and do not modify any files. Your final message is the review.
+prompt-cmd: prompt
 stage: stage --branch ubuntu-26.04 --review debianutils
 timeout: 20m
