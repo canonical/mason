@@ -57,15 +57,16 @@ jobs:
   pats:
     needs: plan
     if: needs.plan.outputs.suite-args != ''
-    # TODO: back to alesancor1/pats-action once it takes `environment` and
-    # `allow-unsafe-pr-checkout` (https://github.com/alesancor1/pats-action/pull/1).
-    uses: lczyk/pats-action/.github/workflows/Pats.yaml@518c890d2e0fb0792fe489249e7966dfc2cc5e3f # feat/pull-request-target
+    # TODO: back to alesancor1/pats-action once it takes `environment`
+    # (https://github.com/alesancor1/pats-action/pull/1).
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@82e6d1f25ff1ac9dba8f39555d5147b17673a01c # feat/pull-request-target
     permissions:
       contents: read
       pull-requests: write
     with:
+      # on pull_request_target with an environment, the action checks out
+      # the fork's head.
       environment: pats-forks
-      allow-unsafe-pr-checkout: true
       working-directory: tests/skills
       pats-channel: latest/candidate
       run-args: ${{ needs.plan.outputs.suite-args }} -j -1
