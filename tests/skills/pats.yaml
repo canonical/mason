@@ -64,16 +64,21 @@ sandboxes:
     #   config:
     #     security.nesting: "true"
 
-# one cheap model through opencode + openrouter (OPENROUTER_API_KEY). the id is
-# openrouter's, without the openrouter/ prefix.
+# haiku and sonnet bracket the model range. codex-mini is a second harness.
 models:
   kind: agent
   defaults:
-    harness: opencode-openrouter
+    harness: claude-cli-keyless
+    effort: low
     sandbox: docker
   items:
-    deepseek-flash:
-      model: deepseek/deepseek-v4.1-flash
+    haiku:
+      model: claude-haiku-4-5-20251001
+    sonnet:
+      model: claude-sonnet-5
+    codex-mini:
+      harness: codex-cli-keyless
+      model: gpt-5.6-luna
 
 # billed per token against OPENROUTER_API_KEY. only the manual slicer-ci suite
 # names it, so a bare `pats run` leaves it out.
