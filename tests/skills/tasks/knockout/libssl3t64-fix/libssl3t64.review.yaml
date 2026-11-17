@@ -1,0 +1,28 @@
+package: libssl3t64
+
+essential:
+  libssl3t64_copyright:
+
+slices:
+  libs:
+    essential:
+      libc6_libs:
+      libssl3t64_libcrypto:
+    contents:
+      /usr/lib/*-linux-*/engines-3/afalg.so:
+      /usr/lib/*-linux-*/engines-3/loader_attic.so:
+      /usr/lib/*-linux-*/engines-3/padlock.so:
+      /usr/lib/*-linux-*/libssl.so.*:
+      # legacy.so ships in the openssl-provider-legacy package since 26.04;
+      # see openssl-provider-legacy_libs (kept separate to avoid a cycle with
+      # libssl3t64_libcrypto).
+
+  libcrypto:
+    essential:
+      libc6_libs:
+    contents:
+      /usr/lib/*-linux-*/libcrypto.so.*:
+
+  copyright:
+    contents:
+      /usr/share/doc/libssl3t64/copyright:
