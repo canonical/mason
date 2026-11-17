@@ -6,8 +6,8 @@ name: pats (forks)
 # is still the fork's, so the run job sits in the pats-forks environment until
 # a maintainer approves it. a push to the pr is a new run, to approve again.
 #
-# no secret is passed: the run job reads OPENROUTER_API_KEY from the
-# environment, a key of its own and not the repo's.
+# the key has to be passed for the reusable workflow to see it. pats-forks has
+# its own OPENROUTER_API_KEY, which wins over the repo's in the run job.
 
 on:
   pull_request_target:
@@ -33,3 +33,5 @@ jobs:
       run-args: -S slicer-ci -j -1
       score-args: -S slicer-ci
       max-regression: "0.1" # 10%
+    secrets:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
