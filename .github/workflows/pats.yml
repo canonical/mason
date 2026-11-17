@@ -17,7 +17,9 @@ jobs:
   pats:
     # a pr from a fork gets no secrets, so its run could only fail.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@2627a0237b9c45a12a95b293ded38881aa45c9fe # main
+    # TODO: back to alesancor1/pats-action once the fork's branch lands there
+    # (https://github.com/alesancor1/pats-action/pull/1).
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@518c890d2e0fb0792fe489249e7966dfc2cc5e3f # feat/pull-request-target
     permissions:
       contents: read
       pull-requests: write
