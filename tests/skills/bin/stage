@@ -6,8 +6,8 @@
 # chisel-releases. --knockout takes that slice out as ground truth. each
 # <target>.silver.yaml beside the task.yaml is ground truth for a target written
 # from scratch. --review swaps <pkg>'s slice for the <pkg>.review.yaml beside
-# the task.yaml, uncommitted, with upstream's spread test, or the
-# <pkg>.review.test.yaml beside it as the test's task.yaml when there is one.
+# the task.yaml, uncommitted, with upstream's spread test, or with a test of
+# only the <pkg>.review.test.yaml beside it when there is one.
 # --rock stages a rock task instead: the task's project/ (if any) becomes the
 # workdir, one git commit, and its case.yaml, rockcraft.expected.yaml and tests
 # are ground truth. installs the skills for the harness.
@@ -169,11 +169,10 @@ function main() {
             [ -f "$PATS_TASK_DIR/$review.review.yaml" ] || _fail "no $review.review.yaml beside the task"
             keep="$(mktemp -d)"
             mkdir "$keep/test"
-            if [ -d "tests/spread/integration/$review" ]; then
-                cp -R "tests/spread/integration/$review/." "$keep/test"
-            fi
             if [ -f "$PATS_TASK_DIR/$review.review.test.yaml" ]; then
                 cp "$PATS_TASK_DIR/$review.review.test.yaml" "$keep/test/task.yaml"
+            elif [ -d "tests/spread/integration/$review" ]; then
+                cp -R "tests/spread/integration/$review/." "$keep/test"
             fi
             _drop "$review"
         fi
