@@ -4,11 +4,10 @@ name: pats (forks)
 # `pull_request` run gets no secrets. this one runs on `pull_request_target`:
 # the workflow file is main's and the jobs can hold a key. the code under test
 # is still the fork's, so the run job sits in the pats-forks environment until
-# a maintainer approves it, and holds only that environment's key. a push to
-# the pr is a new run, to approve again.
+# a maintainer approves it. a push to the pr is a new run, to approve again.
 #
-# the jobs follow alesancor1/pats-action's reusable workflow, which takes
-# neither an environment nor a fork checkout under this trigger.
+# no secret is passed: the run job reads OPENROUTER_API_KEY from the
+# environment, a key of its own and not the repo's.
 
 on:
   pull_request_target:
@@ -17,101 +16,20 @@ concurrency:
   group: pats-forks-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-permissions: {}
-
-env:
-  # the pats-action commit, the same one pats.yml pins.
-  PATS_ACTION_REF: 2627a0237b9c45a12a95b293ded38881aa45c9fe
-
 jobs:
-  # has the key, read-only token. uploads the json report.
-  run:
+  pats:
     if: github.event.pull_request.head.repo.full_name != github.repository
-    environment: pats-forks
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - head
-          - base
-    # the base run may fail without blocking the report.
-    continue-on-error: ${{ matrix.target == 'base' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    permissions:
-      contents: read
-    steps:
-      - name: Check out pats-action
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: alesancor1/pats-action
-          ref: ${{ env.PATS_ACTION_REF }}
-          path: .pats-action
-          persist-credentials: false
-
-      - name: Check out target
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # the head by sha: the commit the approval was for, not the branch.
-          ref: ${{ matrix.target == 'base' && github.event.pull_request.base.ref || github.event.pull_request.head.sha }}
-          path: target
-          persist-credentials: false
-          allow-unsafe-pr-checkout: true
-
-      - name: Run pats
-        uses: ./.pats-action/actions/run
-        with:
-          pats-channel: latest/candidate
-          working-directory: target/tests/skills
-          run-args: -S slicer-ci -j -1
-          score-args: -S slicer-ci
-          artifact-name: pats-report-${{ matrix.target }}
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY_FORKS }}
-
-  # no key, write token. renders, comments, fails on a regression vs base.
-  report:
-    needs: run
-    runs-on: ubuntu-latest
+    # TODO: back to alesancor1/pats-action once it takes `environment` and
+    # `allow-unsafe-pr-checkout` (https://github.com/alesancor1/pats-action/pull/1).
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@518c890d2e0fb0792fe489249e7966dfc2cc5e3f # feat/pull-request-target
     permissions:
       contents: read
       pull-requests: write
-    steps:
-      - name: Check out pats-action
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: alesancor1/pats-action
-          ref: ${{ env.PATS_ACTION_REF }}
-          path: .pats-action
-          persist-credentials: false
-
-      - name: Render report
-        id: report
-        uses: ./.pats-action/actions/report
-        with:
-          artifact-name: pats-report-head
-
-      - name: Download base report
-        continue-on-error: true # base run failed -> n/a
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: pats-report-base
-          path: base
-
-      - name: Read base score
-        id: base
-        run: echo "overall=$(jq -r '.report.overall // empty' base/pats-report.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
-
-      - name: Comment
-        uses: ./.pats-action/actions/comment
-        with:
-          overall: ${{ steps.report.outputs.overall }}
-          base-overall: ${{ steps.base.outputs.overall }}
-          key: /tests/skills
-
-      - name: Check for regression
-        env:
-          MAX_REGRESSION: "0.1" # 10%
-          OVERALL: ${{ steps.report.outputs.overall }}
-          BASE_OVERALL: ${{ steps.base.outputs.overall }}
-        run: bash .pats-action/.github/scripts/gate.sh
+    with:
+      environment: pats-forks
+      allow-unsafe-pr-checkout: true
+      working-directory: tests/skills
+      pats-channel: latest/candidate
+      run-args: -S slicer-ci -j -1
+      score-args: -S slicer-ci
+      max-regression: "0.1" # 10%
