@@ -1,0 +1,6 @@
+verdict: request-changes
+defects:
+  - id: libcrypto-deps
+    severity: blocking
+    what: on 26.04 libcrypto.so.3 links libz and libzstd (the package depends on zlib1g and libzstd1), but the libcrypto slice pulls only libc6_libs, so libcrypto cannot load. the spread test even asserts libz.so.1 and libzstd.so.1 in that rootfs, so it would fail
+    locators: [zlib1g_libs, libzstd1_libs]
