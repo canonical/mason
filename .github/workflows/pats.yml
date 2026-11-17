@@ -15,6 +15,8 @@ concurrency:
 
 jobs:
   pats:
+    # a pr from a fork gets no secrets, so its run could only fail.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     uses: alesancor1/pats-action/.github/workflows/Pats.yaml@2627a0237b9c45a12a95b293ded38881aa45c9fe # main
     permissions:
       contents: read
@@ -22,8 +24,8 @@ jobs:
     with:
       working-directory: tests/skills
       pats-channel: latest/candidate
-      run-args: -S slicer -j -1
-      score-args: -S slicer
+      run-args: -S slicer-ci -j -1
+      score-args: -S slicer-ci
       max-regression: "0.1" # 10%
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
