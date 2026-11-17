@@ -7,6 +7,14 @@ name: pats
 
 on:
   pull_request:
+    # what can move the score: the skills stage copies in, and the eval.
+    # pats-forks.yml keeps the same list.
+    paths:
+      - skills/**
+      - tests/skills/**
+      - "!tests/skills/README.md"
+      - .github/workflows/pats.yml
+      #
   workflow_dispatch:
 
 concurrency:
