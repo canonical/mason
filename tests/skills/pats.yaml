@@ -159,7 +159,14 @@ candidates:
       model: deepseek/deepseek-v4.1-flash
     glm-5.3-flash-noskill:
       model: z-ai/glm-5.3-flash
-    # the kept points at another effort
+    # the kept points at another effort. off: no reasoning at all (checked in a
+    # throwaway project: pi gets thinkingLevel off, 0 reasoning tokens).
+    deepseek-v4.1-flash-off:
+      model: deepseek/deepseek-v4.1-flash
+      effort: "off"
+    glm-5.3-flash-off:
+      model: z-ai/glm-5.3-flash
+      effort: "off"
     deepseek-v4.1-flash-high:
       model: deepseek/deepseek-v4.1-flash
       effort: high
