@@ -4,6 +4,8 @@ You are in a checkout of canonical/chisel-releases (your current directory). The
 
 This is an automated eval: work autonomously, do not ask questions, and do not open a PR. Produce the revised files and stop.
 
+Network access goes through a filtering proxy. A refused request (a 403, or a refused connection) is final: carry on with what you can reach, and do not retry it through mirrors, other hosts or rewritten URLs.
+
 ---
 
 # Review -- `slices/libssl3t64.yaml` and `tests/spread/integration/libssl3t64/` (ubuntu-26.04)
