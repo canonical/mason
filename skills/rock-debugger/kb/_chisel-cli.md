@@ -1,0 +1,55 @@
+# Chisel: the Tool and its CLI
+
+[Chisel](https://github.com/canonical/chisel) builds minimal Ubuntu root filesystems by extracting named _slices_ of `.deb` packages instead of whole packages. It is a Go tool that consumes a _chisel release_ (a branch of [chisel-releases](https://github.com/canonical/chisel-releases)) as its source of truth.
+
+Docs: <https://ubuntu.com/chisel/docs/latest/>
+
+## Commands
+
+```bash
+chisel cut --release <ref> --root <dir> [--arch <a>] <pkg>_<slice> ...   # materialise rootfs
+chisel find <pattern>                                                     # search slices
+chisel info <pkg>_<slice>                                                 # inspect slice
+chisel debug check-release-archives --release <ref>                       # download all pkgs, report cross-package path conflicts
+```
+
+Slices are addressed as `<package_name>_<slice_name>` -- the underscore separates package from slice (underscores are not allowed in Debian package names).
+
+## `--release`
+
+Accepts:
+
+- `ubuntu-XX.XX` -- an online release branch.
+- a directory path -- anything containing a `/`, e.g. `./` for the current checkout.
+- omitted -- inferred from the host's `/etc/lsb-release` (`DISTRIB_ID` / `DISTRIB_RELEASE`), not `/etc/os-release`, and fetched from the chisel-releases repository, so the checkout's own package slices files are not used.
+
+On a devel (unstable) or EOL (unmaintained) branch, add `--ignore=unstable` / `--ignore=unmaintained` or `cut` errors out.
+
+## Cutting from a checkout
+
+```bash
+mkdir -p rootfs
+chisel cut --release ./ --root rootfs/ <pkg>_<slice> ...
+```
+
+`--root` must be an existing directory: chisel stops with `target directory does not exist` instead of creating it.
+
+## Inspecting the Repo Without a Full Checkout
+
+```bash
+# List live release branches
+git ls-remote --heads https://github.com/canonical/chisel-releases.git 'ubuntu-*' \
+  | awk '{print $2}' | sed 's|refs/heads/||'
+
+# Read release manifest
+curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/ubuntu-24.04/chisel.yaml
+
+# Read a slices file
+curl -fsSL https://raw.githubusercontent.com/canonical/chisel-releases/ubuntu-24.04/slices/bash.yaml
+
+# Sparse clone (slices + chisel.yaml only)
+git clone --filter=blob:none --no-checkout --depth 1 \
+  -b ubuntu-24.04 https://github.com/canonical/chisel-releases.git /tmp/cr
+git -C /tmp/cr sparse-checkout set slices chisel.yaml
+git -C /tmp/cr checkout
+```
