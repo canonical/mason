@@ -59,9 +59,7 @@ jobs:
   pats:
     needs: plan
     if: needs.plan.outputs.suite-args != ''
-    # TODO: back to alesancor1/pats-action once the fork's branch lands there
-    # (https://github.com/alesancor1/pats-action/pull/1).
-    uses: lczyk/pats-action/.github/workflows/Pats.yaml@82e6d1f25ff1ac9dba8f39555d5147b17673a01c # feat/pull-request-target
+    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@db3ef09cdd071eff2aea79d68a0d0c2c6eb9b342 # main
     permissions:
       contents: read
       pull-requests: write
