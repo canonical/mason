@@ -37,58 +37,41 @@ sandboxes:
         - packages.debian.org
         - snapshot.debian.org
       # chisel-releases holds the answers. a hit lands in the pair's metadata.json
-      # as a cheat signal. orientation's `git ls-remote` (info/refs) and its raw
-      # chisel.yaml fetches stay open; on raw only slices/ and tests/ are answers.
+      # as a cheat signal. `chisel-releases**` takes the repo, its .git and its
+      # renamed copies (forks, snapshots). the exceptions keep open what the skills
+      # point at: `git ls-remote` (info/refs) and the top-level docs and manifests.
       # a glob's `*` stays in one path segment, so it pins the owner and leaves
       # e.g. chisel-docs/.../chisel-releases/ open; `**` takes all below.
       # objects.githubusercontent.com is not allowed: its paths can't be filtered by repo.
       deny: &deny
         - .oaiusercontent.com # codex's own startup fetch, not the agent's
-        - "github.com/*/chisel-releases"
-        - "github.com/*/chisel-releases/**"
-        - "github.com/*/chisel-releases.git"
-        - "github.com/*/chisel-releases.git/git-upload-pack"
-        # below .git only info/refs stays open. deny beats allow, so the rest is
-        # one segment (HEAD) and three or more (raw/<ref>/<path>, objects/..).
-        - "github.com/*/chisel-releases.git/*"
-        - "github.com/*/chisel-releases.git/*/*/**"
-        - "raw.githubusercontent.com/*/chisel-releases/**/slices/**"
-        - "raw.githubusercontent.com/*/chisel-releases/**/tests/**"
-        - "codeload.github.com/*/chisel-releases"
-        - "codeload.github.com/*/chisel-releases/**"
-        - "api.github.com/repos/*/chisel-releases"
-        - "api.github.com/repos/*/chisel-releases/**"
+        - match: "github.com/*/chisel-releases**"
+          except:
+            - "GET /*/chisel-releases*/info/refs?service=git-upload-pack"
+            - "GET /*/chisel-releases/blob/*/README.md"
+            - "GET /*/chisel-releases/blob/*/CONTRIBUTING.md"
+        - match: "raw.githubusercontent.com/*/chisel-releases**"
+          except:
+            - "/*/chisel-releases/**/chisel.yaml"
+            - "/*/chisel-releases/**/spread.yaml"
+            - "/*/chisel-releases/**/README.md"
+            - "/*/chisel-releases/**/CONTRIBUTING.md"
+        - "codeload.github.com/*/chisel-releases**"
+        - "api.github.com/repos/*/chisel-releases**"
         # the numeric routes reach a repo by id: canonical's and any fork's,
         # with no name to filter on, so all of them.
         - "api.github.com/repositories/**"
-        # renamed copies (forks, snapshots, workflow tests) hold the same slices.
-        - "github.com/*/chisel-releases-*"
-        - "github.com/*/chisel-releases-*/**"
-        - "raw.githubusercontent.com/*/chisel-releases-*/**"
-        - "codeload.github.com/*/chisel-releases-*/**"
-        - "api.github.com/repos/*/chisel-releases-*"
-        - "api.github.com/repos/*/chisel-releases-*/**"
         # chisel-releases mirrored on the packaging forges.
-        - "git.launchpad.net/chisel-releases*"
-        - "git.launchpad.net/chisel-releases*/**"
-        - "git.launchpad.net/**/chisel-releases*"
-        - "git.launchpad.net/**/chisel-releases*/**"
-        - "code.launchpad.net/chisel-releases*"
-        - "code.launchpad.net/chisel-releases*/**"
-        - "code.launchpad.net/**/chisel-releases*"
-        - "code.launchpad.net/**/chisel-releases*/**"
-        - "api.launchpad.net/chisel-releases*"
-        - "api.launchpad.net/chisel-releases*/**"
-        - "api.launchpad.net/**/chisel-releases*"
-        - "api.launchpad.net/**/chisel-releases*/**"
-        - "launchpad.net/chisel-releases*"
-        - "launchpad.net/chisel-releases*/**"
-        - "launchpad.net/**/chisel-releases*"
-        - "launchpad.net/**/chisel-releases*/**"
-        - "salsa.debian.org/chisel-releases*"
-        - "salsa.debian.org/chisel-releases*/**"
-        - "salsa.debian.org/**/chisel-releases*"
-        - "salsa.debian.org/**/chisel-releases*/**"
+        - "git.launchpad.net/chisel-releases**"
+        - "git.launchpad.net/**/chisel-releases**"
+        - "code.launchpad.net/chisel-releases**"
+        - "code.launchpad.net/**/chisel-releases**"
+        - "api.launchpad.net/chisel-releases**"
+        - "api.launchpad.net/**/chisel-releases**"
+        - "launchpad.net/chisel-releases**"
+        - "launchpad.net/**/chisel-releases**"
+        - "salsa.debian.org/chisel-releases**"
+        - "salsa.debian.org/**/chisel-releases**"
         # denied anyway (not allowed), named so they stay denied: the slice
         # navigator shows the answers, and the rest serve github content.
         - canonical.github.io
@@ -121,26 +104,12 @@ sandboxes:
         - .softwareheritage.org
         - web.archive.org
         - gist.githubusercontent.com
-        # the skills under test come installed, or not at all (-noskill agents).
-        - "github.com/*/mason"
-        - "github.com/*/mason/**"
-        - "github.com/*/mason.git/git-upload-pack"
-        - "raw.githubusercontent.com/*/mason/**"
-        - "codeload.github.com/*/mason/**"
-        - "api.github.com/repos/*/mason/**"
-        # the bare repo paths `/**` doesn't reach, and the upstream and
-        # rockcrafters copies by name.
-        - "github.com/*/mason.git"
-        - "codeload.github.com/*/mason"
-        - "api.github.com/repos/*/mason"
-        - "github.com/canonical/mason/**"
-        - "github.com/rockcrafters/mason/**"
-        - "raw.githubusercontent.com/canonical/mason/**"
-        - "raw.githubusercontent.com/rockcrafters/mason/**"
-        - "codeload.github.com/canonical/mason/**"
-        - "codeload.github.com/rockcrafters/mason/**"
-        - "api.github.com/repos/canonical/mason/**"
-        - "api.github.com/repos/rockcrafters/mason/**"
+        # the skills under test come installed, or not at all (-noskill agents):
+        # canonical's, rockcrafters' and any fork.
+        - "github.com/*/mason**"
+        - "raw.githubusercontent.com/*/mason**"
+        - "codeload.github.com/*/mason**"
+        - "api.github.com/repos/*/mason**"
   items:
     docker:
       driver: docker
