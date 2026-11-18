@@ -36,8 +36,10 @@ function _clone() {
 }
 
 # _scrub_agents: upstream's AGENTS.md tells agents to install the skills under
-# test. both arms drop those lines, so the only difference is the install.
+# test, and its copilot instructions point at a reviewer skill ci installs.
+# both arms drop them, so the only difference is the install.
 function _scrub_agents() {
+    rm -f .github/copilot-instructions.md
     [ -f AGENTS.md ] || return 0
     grep -viE 'mason|tessl|skill' AGENTS.md >AGENTS.md.tmp || true
     mv AGENTS.md.tmp AGENTS.md
