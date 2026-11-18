@@ -48,15 +48,10 @@ sandboxes:
         - "github.com/*/chisel-releases/**"
         - "github.com/*/chisel-releases.git"
         - "github.com/*/chisel-releases.git/git-upload-pack"
-        # info/refs stays open, but the proxy matches the raw path: a `..`
-        # anywhere would step past the rules above. and no dumb-http fetches.
-        - "github.com/*/chisel-releases.git/info/refs/**"
-        - "github.com/*/chisel-releases.git/HEAD"
-        - "github.com/*/chisel-releases.git/objects/**"
-        - "github.com/**/../**"
-        - "raw.githubusercontent.com/**/../**"
-        - "codeload.github.com/**/../**"
-        - "api.github.com/**/../**"
+        # below .git only info/refs stays open. deny beats allow, so the rest is
+        # one segment (HEAD) and three or more (raw/<ref>/<path>, objects/..).
+        - "github.com/*/chisel-releases.git/*"
+        - "github.com/*/chisel-releases.git/*/*/**"
         - "raw.githubusercontent.com/*/chisel-releases/**/slices/**"
         - "raw.githubusercontent.com/*/chisel-releases/**/tests/**"
         - "codeload.github.com/*/chisel-releases"
