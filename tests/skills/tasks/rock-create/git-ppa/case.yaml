@@ -1,0 +1,10 @@
+# a PPA package: chisel can't read PPAs -> ubuntu@ base, whole debs and a
+# package-repositories entry. the PPA moves, so the version is a pattern.
+name: git
+release: ubuntu-24.04
+flavour: unchiselled
+version-pattern: '^\d+\.\d+$'
+service: false
+workload: [git]
+ppa: git-core/ppa
+binary: /usr/bin/git

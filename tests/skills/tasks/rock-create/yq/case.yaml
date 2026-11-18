@@ -1,0 +1,11 @@
+# Go source build at a pinned tag; chiselled runtime.
+name: yq
+release: ubuntu-24.04
+flavour: chiselled
+version: "4.44.3"
+service: false
+workload: []
+plugin: go
+source: github.com/mikefarah/yq
+source-tag: v4.44.3
+binary: yq

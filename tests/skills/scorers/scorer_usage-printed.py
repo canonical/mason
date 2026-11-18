@@ -17,10 +17,12 @@ from _lib import *
 # one phrase per load-bearing line of the usage block in
 # skills/mason/SKILL.md; drift there should fail here.
 _MARKERS = (
-    "agent kit for chisel / chisel-releases work",
+    "agent kit for chisel / chisel-releases and rocks work",
     "/chisel-slicer <pkg>",
     "/chisel-slice-reviewer <slices-file>",
     "/chisel-slice-porter <pkg>",
+    "/rock-crafter <app>",
+    "/rock-debugger",
     "slices/curl.yaml",
     "github.com/canonical/mason",
 )

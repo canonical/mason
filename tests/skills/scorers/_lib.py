@@ -14,6 +14,17 @@ plus per *case* (env PATS_SCORED_TASK_NAME):
     <case>.branch           the chisel-releases branch (recorded at clone time)
     <case>.format           the branch's manifest format (version-gated checks)
 
+a rock task's pair dir holds instead (bin/stage --rock, bin/collect --rock):
+
+    <case>.case.yaml          what the task expects (tasks/rock-*/<case>/case.yaml)
+    rockcraft.yaml            the rock the agent left
+    rockcraft.expected.yaml   rock-debug: the fixed file
+    rockcraft-test.yaml       the test suite config, if any (spread.yaml if not renamed)
+    tests.txt                 every spread task.yaml, each under a `# <path>` header
+    tests.expected.txt        rock-debug: the tests the project came with
+    rocks.txt                 the packed *.rock files left in the project
+    git-log.txt, git-status.txt
+
 the *targets* are the stems of the `*.expected.yaml` files. single-target cases
 have exactly one; multi-target (denovo) cases have several. per-target scorers
 average across targets, so single-target is just the N=1 case.
@@ -33,8 +44,10 @@ __all__ = [
     "ORIENTATION_MARKERS",
     "OUT",
     "REJECTED_SLICE_NAMES",
+    "SLICE",
     "TASK",
     "avg",
+    "case",
     "content_paths",
     "declared_binaries",
     "emit",
@@ -46,9 +59,17 @@ __all__ = [
     "iter_contents",
     "mutate_map",
     "mutate_paths",
+    "packed",
+    "parts",
     "path_penalty",
     "produced",
+    "rock",
+    "rock_file",
+    "slices_used",
+    "stage_packages",
     "targets",
+    "tests_passed",
+    "tests_text",
     "transcript",
 ]
 
@@ -331,3 +352,73 @@ def fmt_compat(uses: Callable[[Any], bool], min_ok_fmt: int, exact_ok: int | Non
             return 1.0
         return 0.0 if uses(doc) else 1.0
     return avg(f)
+
+
+# --- rock tasks -----------------------------------------------------------------
+
+# <package>_<slice>: a stage-packages entry with an underscore is a slice.
+SLICE = re.compile(r"^[a-z0-9][a-z0-9.+-]*_[a-z0-9][a-z0-9-]*$")
+
+# a test run where every task passed: test-rock's summary line, or rockcraft's
+# own when the agent ran `rockcraft test` directly.
+_TESTS_PASSED = re.compile(r"tasks: \{passed: [1-9][0-9]*, failed: 0, aborted: 0\}|Testing successful\.")
+
+
+def case() -> dict:
+    """the rock task's expectations; NA for any other task."""
+    c = load(OUT / f"{TASK}.case.yaml")
+    if not isinstance(c, dict):
+        raise NA
+    return c
+
+
+def rock_file(name: str = "rockcraft.yaml") -> dict | None:
+    d = load(OUT / name)
+    return d if isinstance(d, dict) else None
+
+
+def rock() -> dict | None:
+    return rock_file()
+
+
+def parts(doc: dict | None) -> dict:
+    p = (doc or {}).get("parts")
+    return {k: (v if isinstance(v, dict) else {}) for k, v in p.items()} if isinstance(p, dict) else {}
+
+
+def stage_packages(doc: dict | None) -> list[str]:
+    return [str(x) for p in parts(doc).values() for x in (p.get("stage-packages") or [])]
+
+
+def slices_used(doc: dict | None) -> set[str]:
+    """slices in stage-packages, plus the args of any manual `chisel cut`."""
+    used = {s for s in stage_packages(doc) if SLICE.match(s)}
+    for p in parts(doc).values():
+        for k, v in p.items():
+            if str(k).startswith("override-") and isinstance(v, str) and "chisel cut" in v:
+                used.update(t for t in v.replace("\\\n", " ").split() if SLICE.match(t))
+    return used
+
+
+def tests_text() -> str | None:
+    p = OUT / "tests.txt"
+    return p.read_text(encoding="utf-8", errors="replace") if p.exists() else None
+
+
+def packed() -> float:
+    """1.0 a pack ran and left a .rock; 0.5 a pack ran but left none; 0 never packed."""
+    t = transcript()
+    cmds = "\n".join(t["commands"]) if t["parsed"] else t["raw"]
+    if "pack-rock.py" not in cmds and "rockcraft pack" not in cmds:
+        return 0.0
+    rocks = OUT / "rocks.txt"
+    return 1.0 if rocks.exists() and rocks.read_text().strip() else 0.5
+
+
+def tests_passed() -> float:
+    """1.0 a test run passed every task; 0.5 tests ran, not all passing; 0 never ran."""
+    t = transcript()
+    cmds = "\n".join(t["commands"]) if t["parsed"] else t["raw"]
+    if "test-rock.py" not in cmds and "rockcraft test" not in cmds:
+        return 0.0
+    return 1.0 if _TESTS_PASSED.search(t["raw"]) else 0.5

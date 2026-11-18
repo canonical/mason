@@ -1,0 +1,8 @@
+# archive service, every slice upstream.
+name: nginx
+release: ubuntu-24.04
+flavour: chiselled
+version: "1.24"
+service: true
+workload: [nginx_bins]
+binary: /usr/sbin/nginx

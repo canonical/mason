@@ -1,0 +1,8 @@
+# archive CLI tool, every slice upstream.
+name: hello
+release: ubuntu-24.04
+flavour: chiselled
+version: "2.10"
+service: false
+workload: [hello_bins]
+binary: /usr/bin/hello

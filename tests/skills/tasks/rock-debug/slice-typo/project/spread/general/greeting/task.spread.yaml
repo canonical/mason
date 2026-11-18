@@ -1,0 +1,5 @@
+summary: hello prints its greeting
+
+execute: |
+  docker run --rm hello:latest exec /usr/bin/hello | MATCH "Hello, world!"
+  docker run --rm hello:latest exec /usr/bin/hello --greeting=rock | MATCH "^rock$"

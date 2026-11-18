@@ -1,0 +1,12 @@
+prompt: |
+  Use the rock-debugger skill: the rock in the current directory packs, but its tests fail. Find out why and fix it.
+
+  This is an automated eval: work autonomously and do not ask questions. Stop with the final report.
+stage: stage --rock
+prepare: | # inside the vm, as root: let the agent user drive lxd (rockcraft's builds and tests)
+  snap wait system seed.loaded
+  lxd waitready --timeout=120
+  usermod -aG lxd pats
+collect: collect --rock
+timeout: 45m # a pack and a test run take minutes each
+step-sandbox: steps # the pats snap runs no host steps

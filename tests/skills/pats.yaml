@@ -57,40 +57,64 @@ sandboxes:
     steps:
       driver: docker
       egress: ~
-    # sudo and nesting let an agent run spread tests in nested containers.
-    # lxd:
-    #   driver: lxd
-    #   sudo: true
-    #   config:
-    #     security.nesting: "true"
+    # the rock skills pack with rockcraft and test with `rockcraft test`, which
+    # both run lxd instances: a system container with nesting (no kvm needed,
+    # so it runs on a github runner) holding snapd, lxd and rockcraft. open
+    # egress -- rockcraft's own instances need the archive, the snap store and
+    # the sources they build, and no rock task has an answer to hide.
+    rock-lxd:
+      driver: lxd
+      provision: provision --rock
+      egress: ~
+      config:
+        security.nesting: "true"
+      limits:
+        cpu: 2
+        memory: 6GiB
+        disk: 30GiB
+      max-parallel: 2 # a 4-cpu / 16 GiB runner holds two packs at once
 
 # haiku and sonnet bracket the model range. codex-mini is a second harness.
 models:
   kind: agent
-  defaults:
+  defaults: &models-defaults
     harness: claude-cli-keyless
     effort: low
     sandbox: docker
   items:
-    haiku:
+    haiku: &haiku
       model: claude-haiku-4-5-20251001
-    sonnet:
+    sonnet: &sonnet
       model: claude-sonnet-5
-    codex-mini:
+    codex-mini: &codex-mini
       harness: codex-cli-keyless
       model: gpt-5.6-luna
+# the same models on the rock sandbox. agent names are unique across vectors
+# (`-a <name>` must name one agent), so the items share their bodies, not names.
+rock-models:
+  kind: agent
+  defaults: {<<: *models-defaults, sandbox: rock-lxd}
+  items:
+    haiku-rock: *haiku
+    sonnet-rock: *sonnet
+    codex-mini-rock: *codex-mini
 
 # billed per token against OPENROUTER_API_KEY. only the manual ci-* suites name
 # it, so a bare `pats run` leaves it out.
 openrouter:
   kind: agent
-  defaults:
+  defaults: &openrouter-defaults
     harness: opencode-openrouter
     sandbox: docker
     budget: 2 # usd per pair: stops a runaway loop, not a normal pair
   items:
-    deepseek-flash: # the id is openrouter's, without the openrouter/ prefix
+    deepseek-flash: &deepseek-flash # the id is openrouter's, without the openrouter/ prefix
       model: deepseek/deepseek-v4.1-flash
+rock-openrouter:
+  kind: agent
+  defaults: {<<: *openrouter-defaults, sandbox: rock-lxd, budget: 3}
+  items:
+    deepseek-flash-rock: *deepseek-flash
 
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
@@ -105,6 +129,12 @@ refusal:
 help:
   kind: task
   dir: tasks/help
+rock-create: # build a rock from scratch: archive, service, source, ppa, fallback
+  kind: task
+  dir: tasks/rock-create
+rock-debug: # a project with one fault (a failing pack or failing tests) to fix
+  kind: task
+  dir: tasks/rock-debug
 
 # scorers/scorer_<name>.py, helpers in scorers/_lib.py. first stdout line: [0,1] or `na`.
 slice-checks:
@@ -139,32 +169,77 @@ help-checks:
   items:
     usage-printed:
     mason-stops-clean:
+# rock scorers read the rock project collect-rock gathers; helpers in scorers/_rock.py.
+rock-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    rock-yaml-valid:
+    rock-packed:
+    rock-tests-passed:
+rock-create-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    rock-flavour:
+    rock-version:
+    rock-run-user:
+    rock-workload-present:
+    rock-service:
+    rock-source-build:
+    rock-ppa-repo:
+    rock-fallback-reported:
+    rock-tests-written:
+    rock-tests-functional:
+rock-debug-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    rock-fault-fixed:
+    rock-no-collateral:
+    rock-tests-intact:
+    rock-fix-committed:
 
 suites:
   kind: suite
   defaults:
     agents: models
   items:
-    slicer:
+    slicer: &slicer
       tasks:
         - knockout
         - denovo
       scorers: slice-checks
     # ci-<skill> is what ci runs when skills/<skill>/ changes
     # (.github/scripts/pats-suites.sh). manual, on the openrouter agents.
-    ci-chisel-slicer:
-      agents: openrouter
-      tasks:
-        - knockout
-        - denovo
-      scorers: slice-checks
-      manual: true
+    ci-chisel-slicer: {<<: *slicer, agents: openrouter, manual: true}
     # slice-checks need ground truth, which refusal has none of.
     slicer-refusal:
       tasks: refusal
       scorers:
         - refusal-checks
         - orientation-called
+    # rock tasks run in the rock-lxd sandbox: real rockcraft packs and tests.
+    rock-crafter: &rock-crafter
+      agents: rock-models
+      tasks: rock-create
+      scorers: [rock-checks, rock-create-checks]
+    rock-debugger: &rock-debugger
+      agents: rock-models
+      tasks: rock-debug
+      scorers: [rock-checks, rock-debug-checks]
+    # in ci a pack and a test run take minutes per pair, so a subset: one rock
+    # each from the archive and from source; one failing pack, one failing test.
+    ci-rock-crafter: 
+      <<: *rock-crafter
+      agents: rock-openrouter
+      tasks: [hello, yq]
+      manual: true
+    ci-rock-debugger:
+      <<: *rock-debugger
+      agents: rock-openrouter
+      tasks: [slice-typo, missing-workload-slice]
+      manual: true
     mason:
       tasks: help
       scorers: help-checks

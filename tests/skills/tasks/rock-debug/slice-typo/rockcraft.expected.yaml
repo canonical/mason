@@ -1,0 +1,19 @@
+name: hello
+title: GNU Hello
+version: "2.10"
+summary: The GNU hello world program, chiselled.
+description: |
+  A chiselled rock shipping GNU hello. Run it with `docker run --rm hello:2.10 exec hello`.
+license: GPL-3.0
+base: bare
+build-base: ubuntu@24.04
+run-user: _daemon_
+platforms:
+  amd64:
+
+parts:
+  hello:
+    plugin: nil
+    stage-packages:
+      - base-files_base
+      - hello_bins

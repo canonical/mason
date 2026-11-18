@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
-# copy what the agent wrote into the output dir for the scorers.
+# copy what the agent wrote into the output dir for the scorers: collect [--rock]
+# --rock: a rock task's project (the rock, its tests, the packed rocks, git).
 set -eu
+
+if [ "${1:-}" = --rock ]; then
+    out="$PATS_OUTPUT_DIR"
+    wd="$PATS_WORKDIR"
+    mkdir -p "$out"
+    for f in rockcraft.yaml rockcraft-test.yaml spread.yaml; do
+        if [ -f "$wd/$f" ]; then
+            cp "$wd/$f" "$out/$f"
+        fi
+    done
+    # every spread task, each under a `# <path>` header, for the test scorers.
+    if [ -d "$wd/spread" ]; then
+        (cd "$wd" && find spread -name task.yaml | sort | while read -r t; do
+            printf '# %s\n' "$t"
+            cat "$t"
+        done) >"$out/tests.txt"
+    fi
+    (cd "$wd" && ls -1 ./*.rock 2>/dev/null || true) >"$out/rocks.txt"
+    git -C "$wd" log --oneline >"$out/git-log.txt" 2>/dev/null || true
+    git -C "$wd" status --porcelain >"$out/git-status.txt" 2>/dev/null || true
+    exit 0
+fi
 
 case_id="$PATS_TASK_NAME"
 out="$PATS_OUTPUT_DIR"
