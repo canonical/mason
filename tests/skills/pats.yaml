@@ -344,7 +344,6 @@ slice-checks:
     orientation-called:
     spread-test-present:
     spread-exercises-binaries:
-    no-answer-fetch:
     hygiene: # the style and format checks, one vote (see its CHECKS)
 # layout against the ground truth. not for ports, which keep the source's.
 slice-shape:
