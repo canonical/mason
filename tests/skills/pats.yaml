@@ -26,6 +26,16 @@ sandboxes:
         - linux.die.net
         - www.kernel.org
         - lwn.net
+        - canonical-chisel.readthedocs-hosted.com
+        # packaging sources agents read: maintainer scripts, debian/ dirs, history
+        - launchpad.net
+        - git.launchpad.net
+        - code.launchpad.net
+        - api.launchpad.net
+        - sources.debian.org
+        - salsa.debian.org
+        - packages.debian.org
+        - snapshot.debian.org
       # chisel-releases holds the answers. a hit lands in the pair's metadata.json
       # as a cheat signal. orientation's `git ls-remote` (info/refs) and its raw
       # chisel.yaml fetches stay open; on raw only slices/ and tests/ are answers.
@@ -56,6 +66,66 @@ sandboxes:
         # the numeric routes reach a repo by id: canonical's and any fork's,
         # with no name to filter on, so all of them.
         - "api.github.com/repositories/**"
+        # renamed copies (forks, snapshots, workflow tests) hold the same slices.
+        - "github.com/*/chisel-releases-*"
+        - "github.com/*/chisel-releases-*/**"
+        - "raw.githubusercontent.com/*/chisel-releases-*/**"
+        - "codeload.github.com/*/chisel-releases-*/**"
+        - "api.github.com/repos/*/chisel-releases-*"
+        - "api.github.com/repos/*/chisel-releases-*/**"
+        # chisel-releases mirrored on the packaging forges.
+        - "git.launchpad.net/chisel-releases*"
+        - "git.launchpad.net/chisel-releases*/**"
+        - "git.launchpad.net/**/chisel-releases*"
+        - "git.launchpad.net/**/chisel-releases*/**"
+        - "code.launchpad.net/chisel-releases*"
+        - "code.launchpad.net/chisel-releases*/**"
+        - "code.launchpad.net/**/chisel-releases*"
+        - "code.launchpad.net/**/chisel-releases*/**"
+        - "api.launchpad.net/chisel-releases*"
+        - "api.launchpad.net/chisel-releases*/**"
+        - "api.launchpad.net/**/chisel-releases*"
+        - "api.launchpad.net/**/chisel-releases*/**"
+        - "launchpad.net/chisel-releases*"
+        - "launchpad.net/chisel-releases*/**"
+        - "launchpad.net/**/chisel-releases*"
+        - "launchpad.net/**/chisel-releases*/**"
+        - "salsa.debian.org/chisel-releases*"
+        - "salsa.debian.org/chisel-releases*/**"
+        - "salsa.debian.org/**/chisel-releases*"
+        - "salsa.debian.org/**/chisel-releases*/**"
+        # denied anyway (not allowed), named so they stay denied: the slice
+        # navigator shows the answers, and the rest serve github content.
+        - canonical.github.io
+        - .pages.dev
+        - .readthedocs.io
+        - canonical-chisel-releases.readthedocs-hosted.com
+        - canonical-chisel-releases-navigator.readthedocs-hosted.com
+        - .jsdelivr.net
+        - raw.githack.com
+        - rawcdn.githack.com
+        - .statically.io
+        - .gitmirror.com
+        - .ghproxy.com
+        - ghproxy.net
+        - gh-proxy.com
+        - .fastgit.org
+        - .gitcdn.link
+        - gitcdn.xyz
+        - gitee.com
+        - gitclone.com
+        - raw.github.com
+        - api.allorigins.win
+        - corsproxy.io
+        - api.codetabs.com
+        - thingproxy.freeboard.io
+        - r.jina.ai
+        - sourcegraph.com
+        - .grep.app
+        - searchcode.com
+        - .softwareheritage.org
+        - web.archive.org
+        - gist.githubusercontent.com
         # the skills under test come installed, or not at all (-noskill agents).
         - "github.com/*/mason"
         - "github.com/*/mason/**"
