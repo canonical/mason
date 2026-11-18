@@ -228,7 +228,8 @@ rock-create: # build a rock from scratch: archive, service, source, ppa, fallbac
 rock-debug: # a project with one fault (a failing pack or failing tests) to fix
   kind: task
   dir: tasks/rock-debug
-# parked: tasks every point scores ~1.0 on. only the manual easy suite runs them.
+# parked: tasks every point scores ~1.0 on, or about the same without the
+# skills as with them. only the manual easy suite runs them.
 easy-knockout:
   kind: task
   dir: tasks/easy/knockout
