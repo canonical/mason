@@ -11,7 +11,7 @@ sandboxes:
     provision: provision
     # task hosts only: pats adds each harness's own.
     egress:
-      allow:
+      allow: &allow
         - .ubuntu.com # apt mirrors, for deb-list
         - pypi.org # pyyaml for `uv run <helper>`
         - files.pythonhosted.org
@@ -32,7 +32,7 @@ sandboxes:
       # a glob's `*` stays in one path segment, so it pins the owner and leaves
       # e.g. chisel-docs/.../chisel-releases/ open; `**` takes all below.
       # objects.githubusercontent.com is not allowed: its paths can't be filtered by repo.
-      deny:
+      deny: &deny
         - .oaiusercontent.com # codex's own startup fetch, not the agent's
         - "github.com/*/chisel-releases"
         - "github.com/*/chisel-releases/**"
@@ -54,9 +54,30 @@ sandboxes:
         - "raw.githubusercontent.com/*/mason/**"
         - "codeload.github.com/*/mason/**"
         - "api.github.com/repos/*/mason/**"
+        # the bare repo paths `/**` doesn't reach, and the upstream and
+        # rockcrafters copies by name.
+        - "github.com/*/mason.git"
+        - "codeload.github.com/*/mason"
+        - "api.github.com/repos/*/mason"
+        - "github.com/canonical/mason/**"
+        - "github.com/rockcrafters/mason/**"
+        - "raw.githubusercontent.com/canonical/mason/**"
+        - "raw.githubusercontent.com/rockcrafters/mason/**"
+        - "codeload.github.com/canonical/mason/**"
+        - "codeload.github.com/rockcrafters/mason/**"
+        - "api.github.com/repos/canonical/mason/**"
+        - "api.github.com/repos/rockcrafters/mason/**"
   items:
     docker:
       driver: docker
+    # the openrouter candidates: the proxy holds the key, the agent gets a
+    # placeholder. the claude harnesses have no key binding, so not for them.
+    docker-keyproxy:
+      driver: docker
+      egress:
+        allow: *allow
+        deny: *deny
+        key-proxy: true
     # stage, collect and the scorers run here: the pats snap runs nothing on
     # the host. same image as the agent's; open egress, since stage clones
     # chisel-releases (which the agent's deny list blocks) and the uv scorers
@@ -130,11 +151,14 @@ candidates:
   defaults:
     harness: pi-openrouter
     effort: low
-    sandbox: docker
-    budget: 2 # usd per pair, the same for every point and effort
+    sandbox: docker-keyproxy
+    # usd per pair, the same for every point and effort. tokens and tools only
+    # catch a looping model: the longest pairs so far took 12M tokens, ~200 calls.
+    budget: {cost: 2, tokens: 15M, tools: 400}
   items:
-    deepseek-v4.1-flash:
-      model: deepseek/deepseek-v4.1-flash
+    # the 1017 snapshot, pinned. a new name, so runs on the 0910 one don't pool with it.
+    deepseek-v4.1-flash-1017:
+      model: deepseek/deepseek-v4.1-flash-1017
     glm-5.3:
       model: z-ai/glm-5.3
     glm-5.3-flash:
@@ -155,20 +179,17 @@ candidates:
       model: stepfun/step-3.7-flash
     # the kept points without the skills: stage installs none and bin/prompt
     # drops the skill from the prompt. the tessl-style no-skill baseline.
-    deepseek-v4.1-flash-noskill:
-      model: deepseek/deepseek-v4.1-flash
+    deepseek-v4.1-flash-1017-noskill:
+      model: deepseek/deepseek-v4.1-flash-1017
     glm-5.3-flash-noskill:
       model: z-ai/glm-5.3-flash
-    # the kept points at another effort. off: no reasoning at all (checked in a
-    # throwaway project: pi gets thinkingLevel off, 0 reasoning tokens).
-    deepseek-v4.1-flash-off:
-      model: deepseek/deepseek-v4.1-flash
+    # the kept points at another effort. off: no reasoning at all. pi sends
+    # glm low for off and minimal alike, so glm has no off point.
+    deepseek-v4.1-flash-1017-off:
+      model: deepseek/deepseek-v4.1-flash-1017
       effort: "off"
-    glm-5.3-flash-off:
-      model: z-ai/glm-5.3-flash
-      effort: "off"
-    deepseek-v4.1-flash-high:
-      model: deepseek/deepseek-v4.1-flash
+    deepseek-v4.1-flash-1017-high:
+      model: deepseek/deepseek-v4.1-flash-1017
       effort: high
     glm-5.3-flash-high:
       model: z-ai/glm-5.3-flash
