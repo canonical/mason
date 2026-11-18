@@ -10,15 +10,15 @@ when a seeded defect is blocking or should-fix, incomplete otherwise.
   1.0  the expected verdict
   0.5  the other non-approve verdict (incomplete vs request-changes)
   0.0  approve, or no verdict found
-the stated verdict is the one on a "verdict" line, else the last of the three
-words in the final message.
+the stated verdict is the one on a "verdict" line or right under a "verdict"
+heading, else the last of the three words in the final message.
 """
 import re
 
 from _lib import *
 
 _WORDS = r"(approve[ds]?|request[- _]changes|incomplete)"
-_LINE = re.compile(r"verdict[^a-z\n]{0,12}" + _WORDS, re.IGNORECASE)
+_LINE = re.compile(r"verdict[^a-z]{0,16}" + _WORDS, re.IGNORECASE)
 _ANY = re.compile(_WORDS, re.IGNORECASE)
 
 
