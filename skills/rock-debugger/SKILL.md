@@ -73,7 +73,8 @@ When the rock has a test suite (`rockcraft-test.yaml`, or a deprecated
 uv run "<skill-root>/scripts/_test-rock.py"
 ```
 
-Each failed task comes with the commands spread ran and their output.
+Each failed task, and each failed prepare or restore script, comes with the
+commands spread ran and their output.
 Diagnose it with `kb/rock-debugging.md`, "A failing test": fix the rock and go
 back to step 1, or fix a wrong assertion and re-run only that task. With no
 test suite, the work ends at a passing pack and the report says the rock is

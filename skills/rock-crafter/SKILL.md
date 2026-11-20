@@ -110,18 +110,18 @@ each kind of rock must prove. Scaffold the suite once, beside
 rockcraft init --profile=test --name <rock-name>
 ```
 
-Rename `spread.yaml` to `rockcraft-test.yaml` and drop its `project:` key.
-Replace the scaffolded placeholder task with tasks that prove the workload
+If it wrote `spread.yaml` rather than `rockcraft-test.yaml`, rename it and drop
+its `project:` key. Replace the scaffolded placeholder task with tasks that prove the workload
 works, then run them:
 
 ```bash
 uv run "<skill-root>/scripts/_test-rock.py"
 ```
 
-A failed task is a defect: fix the rock (check, pack, test again) or a wrong
-assertion, never weaken a test to make it pass. The tests are always written:
-a test run that is unavailable here is reported as remaining, never a reason
-to leave them out.
+A failed task or prepare script is a defect: fix the rock (check, pack, test
+again) or a wrong assertion, never weaken a test to make it pass. The tests
+are always written: a test run that is unavailable here is reported as
+remaining, never a reason to leave them out.
 
 ## completion gate
 

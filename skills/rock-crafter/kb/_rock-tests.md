@@ -11,7 +11,7 @@ docker there. Every task then exercises the rock through docker.
 `rockcraft.yaml` without touching it:
 
 ```
-rockcraft-test.yaml            # the scaffold writes spread.yaml: rename it and drop its `project:` key
+rockcraft-test.yaml            # an older rockcraft scaffolds spread.yaml: rename it and drop its `project:` key
 spread/.extension              # the craft backend -- leave as scaffolded
 spread/general/<task>/task.yaml
 ```

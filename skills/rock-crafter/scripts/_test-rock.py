@@ -7,11 +7,12 @@
 task's outcome.
 
 Before spending a test run it checks the suite is real: a rockcraft-test.yaml
-(not the deprecated spread.yaml), and no task still holding the scaffold's
+(not only the deprecated spread.yaml), and no task still holding the scaffold's
 placeholder. Then it runs every task -- or only the given spread expressions --
-and reports the failed tasks with the error spread printed for them. A task
-that fails is a defect of the rock or of its test; tasks that never ran (no
-test VM, no network) are unavailable, not failed.
+and reports the failed tasks, and the prepare / restore scripts that failed,
+with the error spread printed for them. Either is a defect of the rock or of
+its tests; tasks that never ran for another reason (no test VM, no network)
+are unavailable, not failed.
 
 Usage: test-rock.py [<spread-expression> ...]
   e.g. test-rock.py craft:ubuntu-24.04:spread/general/greeting
@@ -40,8 +41,13 @@ PLACEHOLDER = "Put your test code here"
 
 # spread's per-task error block and summary lines (spread >= the one rockcraft
 # 1.21 bundles); rockcraft prefixes every spread line with ":: ".
-ERROR = re.compile(r"Error executing (\S+) \(")
+ERROR = r"Error {verb} (\S+) \("
 SUMMARY = re.compile(r"(Successful|Failed|Aborted) tasks: (\d+)")
+# a prepare / restore script that died on the network is not a defect of the rock.
+OFFLINE = re.compile(
+    r"Could not resolve|Temporary failure in name resolution|Network is unreachable"
+    r"|unable to contact snap store|[Cc]onnection timed out"
+)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 CODES = {
@@ -49,25 +55,31 @@ CODES = {
     "deprecated-spread-yaml": "spread.yaml is deprecated for rockcraft test: rename it to rockcraft-test.yaml and drop `project:`",
     "placeholder": "a task still holds the scaffold's placeholder instead of real checks",
     "task-failed": "a spread task failed: the rock or its test is wrong",
+    "setup-failed": "a prepare / restore script failed: tasks behind a failed prepare never ran",
 }
 
 
 def lint(report: common.Report) -> None:
     """problems that make a test run pointless."""
-    if Path("spread.yaml").exists():
+    if Path("rockcraft-test.yaml").exists():
+        pass  # rockcraft reads it first; a spread.yaml beside it is not its suite
+    elif Path("spread.yaml").exists():
         report.add("block", "deprecated-spread-yaml", "spread.yaml")
-    elif not Path("rockcraft-test.yaml").exists():
+    else:
         report.add("block", "no-suite", "rockcraft-test.yaml")
     for task in sorted(Path("spread").glob("**/task.yaml")):
         if PLACEHOLDER in task.read_text(encoding="utf-8", errors="replace"):
             report.add("block", "placeholder", task)
 
 
-def failures(lines: list[str]) -> dict[str, list[str]]:
-    """task -> the error block spread printed for it (between its ----- rules)."""
+def failures(lines: list[str], verb: str = "executing") -> dict[str, list[str]]:
+    """task -> the error block spread printed for it (between its ----- rules).
+    verb: executing (the task), or preparing / restoring (a task, suite or
+    project script around it)."""
+    error = re.compile(ERROR.format(verb=verb))
     out: dict[str, list[str]] = {}
     for i, line in enumerate(lines):
-        m = ERROR.search(line)
+        m = error.search(line)
         if not m:
             continue
         block, rules = [], 0
@@ -111,12 +123,21 @@ def main() -> int:
             counts[m.group(1).lower()] = int(m.group(2))
     for task, block in failures(lines).items():
         report.add("block", "task-failed", task, output=" | ".join(block) or None)
+    for step in ("preparing", "restoring"):
+        for what, block in failures(lines, step).items():
+            if OFFLINE.search("\n".join(block)):
+                report.mark_unavailable(
+                    "test", f"{what}: {step} could not reach the network"
+                )
+                continue
+            report.add("block", "setup-failed", what, step=step,
+                       output=" | ".join(block) or None)  # fmt: skip
     report.data["tasks"] = common.Flow(
         passed=counts.get("successful", 0),
         failed=counts.get("failed", 0),
         aborted=counts.get("aborted", 0),
     )
-    if counts.get("aborted"):
+    if counts.get("aborted") and not failures(lines, "preparing"):
         report.mark_unavailable(
             "test", f"{counts['aborted']} task(s) aborted before running"
         )
