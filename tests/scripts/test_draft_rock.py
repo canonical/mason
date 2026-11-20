@@ -126,39 +126,25 @@ def test_detect(tmp_path, files, local, want):
 def test_meta_go(tmp_path):
     m = dr.meta(tree(tmp_path, {
         "go.mod": "module github.com/mikefarah/yq/v4\n\ngo 1.22\n",
-        "LICENSE": "MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n",
         "README.md": "# yq\n\na lightweight and portable command-line YAML processor\n",
     }))  # fmt: skip
     assert (m["name"], m["go"], m["bins"]) == ("yq", "1.22", ["yq"])
-    assert m["license_file"] == "MIT"
     assert m["description"] == "a lightweight and portable command-line YAML processor"
 
 
 def test_meta_python(tmp_path):
     m = dr.meta(tree(tmp_path, {
         "pyproject.toml": '[project]\nname = "tool"\ndescription = "does things"\n'
-        'license = {text = "Apache-2.0"}\n\n[project.scripts]\ntool = "tool:main"\n',
+        '[project.scripts]\ntool = "tool:main"\n',
     }))  # fmt: skip
-    assert (m["name"], m["description"], m["license"], m["bins"]) == ("tool", "does things", "Apache-2.0", ["tool"])
+    assert (m["name"], m["description"], m["bins"]) == ("tool", "does things", ["tool"])
 
 
 def test_meta_npm(tmp_path):
     pj = {"name": "srv", "description": "a server", "license": "MIT", "bin": {"srv": "x.js"}, "engines": {"node": ">=20.1"}}
     m = dr.meta(tree(tmp_path, {"package.json": json.dumps(pj)}))
-    assert (m["name"], m["license"], m["bins"], m["node"]) == ("srv", "MIT", ["srv"], "20.1")
-
-
-def test_meta_npm_legacy_licence_object(tmp_path):
-    pj = {"name": "srv", "license": {"type": "MIT", "url": "https://x"}}
-    assert dr.meta(tree(tmp_path, {"package.json": json.dumps(pj)}))["license"] == "MIT"
-
-
-def test_licence_must_be_one_rockcraft_knows(monkeypatch):
-    monkeypatch.setattr(dr, "REVIEW", [])
-    assert (dr.licence("MIT"), dr.licence("proprietary")) == ("MIT", "proprietary")
-    assert dr.REVIEW == []
-    assert (dr.licence("BSD"), dr.licence(None)) == (None, None)
-    assert ["'BSD'" in dr.REVIEW[0], "not detected" in dr.REVIEW[1]] == [True, True]
+    assert (m["name"], m["bins"], m["node"]) == ("srv", ["srv"], "20.1")
+    assert "license" not in m
 
 
 # --- whole drafts, offline -------------------------------------------------------
@@ -182,7 +168,7 @@ def offline(tmp_path, monkeypatch):
         monkeypatch.setattr(rl, "resolve_release", lambda text: NOBLE)
         monkeypatch.setattr(rl, "slices_of", lambda rel, pkg: SLICES.get(pkg))
     monkeypatch.setattr(dr.rl, "package", lambda pkg, rel, arch="amd64", ppa=None: HELLO if pkg == "hello" else None)
-    monkeypatch.setattr(dr.rl, "deb_facts", lambda st: (["/usr/bin/hello"], "GPL-3.0"))
+    monkeypatch.setattr(dr.rl, "deb_binaries", lambda st: ["/usr/bin/hello"])
     return tmp_path
 
 
@@ -209,13 +195,11 @@ def test_archive_draft_passes_check(offline, monkeypatch, capsys):
     assert check_codes(offline / "rockcraft.yaml") == []
 
 
-def test_unknown_licence_drafts_the_placeholder(offline, monkeypatch, capsys):
-    monkeypatch.setattr(dr.rl, "deb_facts", lambda st: (["/usr/bin/hello"], "BSD"))
+def test_draft_leaves_the_licence_to_the_user(offline, monkeypatch, capsys):
     code, doc = draft(monkeypatch, capsys, "hello", "--release", "24.04")
-    assert (code, doc["license"]) == (0, None)
-    assert any("'BSD'" in note for note in doc["review"])
-    # the one thing a fresh draft does not pass check-rock on
-    assert check_codes(offline / "rockcraft.yaml") == ["license-unknown"]
+    assert (code, "license" in doc) == (0, False)
+    assert "license" not in yaml.safe_load((offline / "rockcraft.yaml").read_text())
+    assert check_codes(offline / "rockcraft.yaml") == []
 
 
 def test_source_dot_is_named_after_its_directory(offline, monkeypatch, capsys):

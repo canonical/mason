@@ -5,7 +5,7 @@ When this knowledge base and upstream disagree, upstream wins:
 (rocks published by Canonical) > this knowledge base.
 
 - Rockcraft docs: <https://ubuntu.com/containers/rockcraft/docs/stable/>
-  - `reference/rockcraft.yaml/` -- every key and its constraints
+  - `reference/rockcraft-yaml/` -- every key and its constraints
   - `reference/plugins/` -- build plugins and their keys
   - `reference/commands/#test` -- `rockcraft test` and `init --profile=test`
   - `reference/extensions/` -- framework extensions (flask, django, fastapi,

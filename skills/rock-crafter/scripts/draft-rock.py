@@ -1,17 +1,17 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyyaml", "spdx"]
+# dependencies = ["pyyaml"]
 # ///
 """draft-rock: write a first-draft rockcraft.yaml, deterministically.
 
-Does the discovery -- versions, licence, build system, runtime slices -- so
-the agent only makes the judgement calls. A fresh draft passes check-rock.py,
-but for a licence it could not detect. It builds nothing, and cannot know a C project's library dependencies or a
-service's configuration: what to review is listed under `review`.
+Does the discovery -- versions, build system, runtime slices -- so the agent
+only makes the judgement calls. A fresh draft passes check-rock.py. It builds
+nothing, and cannot know a C project's library dependencies or a service's
+configuration: what to review is listed under `review`.
 
 What it decides:
-  archive  version XX.YY, SPDX licence and description from the archive;
+  archive  version XX.YY and description from the archive;
            slices: <pkg>_bins (else every non-copyright slice) + base-files_base
   ppa      chisel only reads the Ubuntu archive -> base ubuntu@XX.XX, the
            package as a whole deb, a package-repositories entry for the PPA
@@ -19,9 +19,9 @@ What it decides:
            framework extension for local flask / django / fastapi / expressjs /
            spring-boot projects, else the build plugin (go, rust, uv / python,
            npm, maven, gradle, meson, cmake, autotools, make); version = the
-           tag; licence from LICENSE / project metadata; runtime = the
-           ecosystem's slices (interpreter versions read off the archive), all
-           checked to exist -- any missing -> ubuntu@ base + whole debs
+           tag; runtime = the ecosystem's slices (interpreter versions read
+           off the archive), all checked to exist -- any missing -> ubuntu@
+           base + whole debs
   always   run-user: _daemon_
 
 Usage:
@@ -52,8 +52,6 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import spdx
-
 try:
     import _common as common
     import _rocklib as rl
@@ -83,17 +81,6 @@ CODES = {
 
 def note(msg: str) -> None:
     REVIEW.append(msg)
-
-
-def licence(lic: str | None) -> str | None:
-    """the detected licence if rockcraft knows it (`proprietary`, or an id of the
-    SPDX list it reads); else nothing, and a note to set it."""
-    known = {rec["id"].strip().lower() for rec in spdx.licenses()}
-    if lic and (lic == "proprietary" or lic.strip().lower() in known):
-        return lic
-    found = f"{lic!r} is not an SPDX id rockcraft knows" if lic else "not detected"
-    note(f"license: {found} -- set the SPDX id by hand")
-    return None
 
 
 # --- yaml emitter (deterministic, no pyyaml) -----------------------------------
@@ -255,18 +242,15 @@ def detect(tree: Path, local: bool) -> tuple[str, str]:
 
 
 def meta(tree: Path) -> dict:
-    """name / description / licence / binaries from project metadata."""
+    """name / description / binaries from project metadata."""
     m: dict = {"bins": []}
     pj = read(tree / "package.json")
     if pj:
         try:
             d = json.loads(pj)
-            lic = d.get("license")
             m.update(
                 name=d.get("name"),
                 description=d.get("description"),
-                # the legacy {"type": <id>, "url": ...} form still turns up
-                license=lic.get("type") if isinstance(lic, dict) else lic,
                 node=re.sub(
                     r"[^\d.].*$",
                     "",
@@ -291,11 +275,6 @@ def meta(tree: Path) -> dict:
             mm = re.search(rf'^{k}\s*=\s*"([^"]*)"', b, re.MULTILINE)
             if mm and not m.get(k):
                 m[k] = mm.group(1)
-        mm = re.search(
-            r'^license\s*=\s*(?:"([^"]*)"|\{\s*text\s*=\s*"([^"]*)")', b, re.MULTILINE
-        )
-        if mm and not m.get("license"):
-            m["license"] = mm.group(1) or mm.group(2)
         scripts = re.search(
             r"^\[project\.scripts\](.*?)(?=^\[|\Z)", t, re.MULTILINE | re.DOTALL
         )
@@ -333,14 +312,6 @@ def meta(tree: Path) -> dict:
         pom,
     )
     m["java"] = (jv.group(1) or jv.group(2)) if jv else None
-    for lic in sorted(tree.glob("[LlCcUu][IiOoNn][CcPpLl]*")):
-        if (
-            re.match(r"(licen[cs]e|copying|unlicense)", lic.name, re.IGNORECASE)
-            and lic.is_file()
-        ):
-            m["license_file"] = rl.license_from_text(read(lic))
-            if m["license_file"]:
-                break
     readme = next(
         (p for p in tree.glob("[Rr][Ee][Aa][Dd][Mm][Ee]*") if p.is_file()), None
     )
@@ -539,11 +510,9 @@ def draft(report: common.Report) -> int:
                 ).lower(),
             ).strip("-")
             version = a.version or (tag_version(tag) if tag else "0.1")
-            lic = licence(rl.spdx(m.get("license")) or m.get("license_file"))
             report.data["source"] = common.Flow(url=src_arg, tag=tag)
             report.data[kind] = what
             report.data["version"] = version
-            report.data["license"] = lic
             report.data["binaries"] = m["bins"] or None
             summary = short(m.get("description") or f"{name} built from source")
             if kind == "extension":
@@ -556,7 +525,6 @@ def draft(report: common.Report) -> int:
                     "version": version,
                     "summary": summary,
                     "description": summary,
-                    "license": lic or "TODO-SPDX",
                     "base": "bare",
                     "build-base": rel.base,
                     "run-user": "_daemon_",
@@ -582,8 +550,7 @@ def draft(report: common.Report) -> int:
                 return report.emit()
             entries[p] = st
         main = entries[pkgs[0]]
-        bins, lic = rl.deb_facts(main)
-        lic = licence(lic)
+        bins = rl.deb_binaries(main)
         version = a.version or rl.upstream_version(main["Version"])
         dl = main.get("Description", "").splitlines()
         summary = short(dl[0] if dl else pkgs[0])
@@ -594,7 +561,6 @@ def draft(report: common.Report) -> int:
         name = a.name or pkgs[0]
         report.data["package"] = common.Flow(name=pkgs[0], version=main["Version"])
         report.data["version"] = version
-        report.data["license"] = lic
         report.data["binaries"] = bins or None
         report.data["depends"] = main.get("Depends") or None
         if a.ppa:
@@ -679,7 +645,6 @@ def draft(report: common.Report) -> int:
         "version": version,
         "summary": summary,
         "description": desc + "\n",
-        "license": lic or "TODO-SPDX",
     }
     doc.update(
         {"base": "bare", "build-base": rel.base} if chiselled else {"base": rel.base}

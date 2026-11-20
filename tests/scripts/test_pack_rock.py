@@ -72,6 +72,19 @@ def test_diagnose_scriptlet_strips_ansi():
 def test_diagnose_invalid_yaml_has_no_step():
     d = pr.diagnose(YAML_LOG)
     assert (d["category"], d["step"], d["part"]) == ("invalid-yaml", None, None)
+    # nothing else names what rockcraft rejected
+    assert d["evidence"] == ["Bad rockcraft.yaml content:", "- extra inputs are not permitted (in field 'colour')"]
+
+
+def test_diagnose_invalid_yaml_keeps_every_rejection():
+    listed = [f"- problem {i} (in field 'f{i}')" for i in range(8)]
+    d = pr.diagnose("\n".join(["Bad rockcraft.yaml content:", *listed, "Full execution log: '/tmp/y.log'"]))
+    assert d["evidence"] == ["Bad rockcraft.yaml content:", *listed]
+
+
+def test_diagnose_other_categories_take_no_bullets():
+    d = pr.diagnose("Staging hello\nFailed to organize\n- not a rejection\n")
+    assert (d["category"], d["evidence"]) == ("organize-mismatch", ["Failed to organize"])
 
 
 def test_diagnose_unknown_keeps_tail():

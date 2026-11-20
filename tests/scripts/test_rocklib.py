@@ -1,4 +1,4 @@
-"""rocklib: release resolution, Packages parsing, versions, licences, slices."""
+"""rocklib: release resolution, Packages parsing, versions, slices."""
 
 from __future__ import annotations
 
@@ -128,43 +128,11 @@ def test_upstream_version(debver, short, full):
     assert rl.upstream_version(debver, full=True) == full
 
 
-def test_deb_facts_without_dpkg_deb_is_unavailable(monkeypatch):
+def test_deb_binaries_without_dpkg_deb_is_unavailable(monkeypatch):
     monkeypatch.setattr(rl.shutil, "which", lambda name: None)
     monkeypatch.setattr(rl, "fetch", lambda url: pytest.fail("fetched a .deb it cannot read"))
     with pytest.raises(rl.Unavailable, match="dpkg-deb"):
-        rl.deb_facts({"Package": "hello", "_url": "http://archive/hello.deb"})
-
-
-@pytest.mark.parametrize(
-    ("name", "want"),
-    [
-        ("GPL-3.0-or-later", "GPL-3.0"),
-        ("GPL-2+", "GPL-2.0"),
-        ("Expat", "MIT"),
-        ("MIT OR Apache-2.0", "MIT"),
-        ("(Apache-2.0)", "Apache-2.0"),
-        ("BSD-3-Clause", "BSD-3-Clause"),
-        ("not a licence!", None),
-        (None, None),
-    ],
-)
-def test_spdx(name, want):
-    assert rl.spdx(name) == want
-
-
-@pytest.mark.parametrize(
-    ("text", "want"),
-    [
-        ("Files: debian/*\nLicense: MIT\n\nFiles: *\nLicense: GPL-3+\n", "GPL-3.0"),
-        ("see /usr/share/common-licenses/Apache-2.0.\n", "Apache-2.0"),
-        ("// SPDX-License-Identifier: MPL-2.0\n", "MPL-2.0"),
-        ("Permission is hereby granted, free of charge, to any person\nobtaining a copy", "MIT"),
-        ("GNU General Public License as published by the FSF; either version 2", "GPL-2.0"),
-        ("all rights reserved", None),
-    ],
-)
-def test_license_from_text(text, want):
-    assert rl.license_from_text(text) == want
+        rl.deb_binaries({"Package": "hello", "_url": "http://archive/hello.deb"})
 
 
 def test_slice_names():

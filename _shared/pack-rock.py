@@ -78,7 +78,7 @@ TAXONOMY = {
 
 # the fix strategy per category -- the `codes` legend of the report.
 CODES = {
-    "invalid-yaml": "rockcraft rejected the file or the command line; check-rock.py names every problem",
+    "invalid-yaml": "rockcraft rejected the file or the command line; the evidence lists what it rejected",
     "missing-chisel-slice": (
         "a slice name rockcraft could not cut: use the real name (`fix`); a package with no "
         "slices at all needs them authored, never whole debs on base: bare"
@@ -126,8 +126,14 @@ def diagnose(text: str) -> dict:
                 if m:
                     step, part = STEP_NAME[m.group(1)], m.group(2)
                     break
-            return {"category": cat, "step": step, "part": part,
-                    "evidence": [lines[i].strip() for i in hits[:6]], "log": log}  # fmt: skip
+            evidence = [lines[i].strip() for i in hits[:6]]
+            if cat == "invalid-yaml":
+                # rockcraft lists what it rejected as "- ..." lines under the heading
+                for ln in lines[hits[0] + 1 :]:
+                    if not ln.startswith("- "):
+                        break
+                    evidence.append(ln.strip())
+            return {"category": cat, "step": step, "part": part, "evidence": evidence, "log": log}  # fmt: skip
     tail = [ln.strip() for ln in lines if ln.strip()][-8:]
     return {
         "category": "unknown",

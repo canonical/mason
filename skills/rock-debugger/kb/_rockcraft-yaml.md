@@ -31,7 +31,7 @@ version: "<XX.YY>"         # quoted -- see Version below
 summary: <one line, < 80 chars>
 description: |
   <what the rock contains and how to use it>
-license: <SPDX id>
+license: <SPDX id>         # optional -- only when the user states one
 base: bare                 # or ubuntu@XX.YY -- see kb/_rock-slices.md
 build-base: ubuntu@XX.YY   # required with base: bare
 run-user: _daemon_         # non-root, see kb/_pebble-services.md
@@ -40,10 +40,6 @@ platforms:
 services: ...              # kb/_pebble-services.md
 parts: ...
 ```
-
-- `license:` must be an SPDX id rockcraft's licence list knows (`GPL-3.0`,
-  `Apache-2.0`, `MIT`, ...) or `proprietary`; `-or-later` / `-only` forms are
-  rejected as `Bad rockcraft.yaml content`.
 
 ## Version
 

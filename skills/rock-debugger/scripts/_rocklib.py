@@ -241,125 +241,30 @@ def upstream_version(debver: str, full: bool = False) -> str:
     )
 
 
-def deb_facts(stanza: dict) -> tuple[list[str], str | None]:
-    """(binaries, SPDX licence) from the downloaded .deb (needs dpkg-deb)."""
+def deb_binaries(stanza: dict) -> list[str]:
+    """the executables the downloaded .deb ships (needs dpkg-deb)."""
     if not shutil.which("dpkg-deb"):
         raise Unavailable("dpkg-deb is not installed (it reads the package's files)")
     data = fetch(stanza["_url"])
     if not data:
-        return [], None
+        return []
     with tempfile.TemporaryDirectory() as tmp:
         deb = Path(tmp, "p.deb")
         deb.write_bytes(data)
         listing = subprocess.run(
             ["dpkg-deb", "-c", str(deb)], capture_output=True, text=True, check=False
         ).stdout
-        bins = sorted(
-            {
-                ln.split()[5][1:]
-                for ln in listing.splitlines()
-                if len(ln.split()) > 5
-                and ln.split()[5].startswith(
-                    ("./usr/bin/", "./usr/sbin/", "./bin/", "./sbin/")
-                )
-                and not ln.split()[5].endswith("/")
-            }
-        )
-        subprocess.run(
-            ["dpkg-deb", "-x", str(deb), tmp], capture_output=True, check=False
-        )
-        cr = Path(tmp, "usr/share/doc", stanza["Package"], "copyright")
-        return bins, (
-            license_from_text(cr.read_text(errors="replace")) if cr.is_file() else None
-        )
-
-
-# --- licences ------------------------------------------------------------------
-
-# DEP-5 / short names -> the plain SPDX ids rockcraft accepts (no -only / -or-later).
-_SHORT = {
-    "gpl-2": "GPL-2.0",
-    "gpl-2+": "GPL-2.0",
-    "gpl-3": "GPL-3.0",
-    "gpl-3+": "GPL-3.0",
-    "lgpl-2": "LGPL-2.0",
-    "lgpl-2+": "LGPL-2.0",
-    "lgpl-2.1": "LGPL-2.1",
-    "lgpl-2.1+": "LGPL-2.1",
-    "lgpl-3": "LGPL-3.0",
-    "lgpl-3+": "LGPL-3.0",
-    "agpl-3": "AGPL-3.0",
-    "agpl-3+": "AGPL-3.0",
-    "bsd-2-clause": "BSD-2-Clause",
-    "bsd-3-clause": "BSD-3-Clause",
-    "expat": "MIT",
-    "mit": "MIT",
-    "apache-2.0": "Apache-2.0",
-    "apache-2": "Apache-2.0",
-    "isc": "ISC",
-    "mpl-2.0": "MPL-2.0",
-    "zlib": "Zlib",
-    "artistic": "Artistic-1.0",
-    "psf-2": "Python-2.0",
-    "public-domain": "CC0-1.0",
-    "unlicense": "Unlicense",
-    "bsl-1.0": "BSL-1.0",
-}
-_PROSE = (
-    (r"GNU Affero General Public License.{0,80}version 3", "AGPL-3.0"),
-    (r"GNU Lesser General Public License.{0,80}version 3", "LGPL-3.0"),
-    (r"GNU Lesser General Public License.{0,80}version 2\.1", "LGPL-2.1"),
-    (r"GNU General Public License.{0,80}version 3", "GPL-3.0"),
-    (r"GNU General Public License.{0,80}version 2", "GPL-2.0"),
-    (r"Apache License,? Version 2\.0", "Apache-2.0"),
-    (r"Mozilla Public License,? (?:Version|v\.?) ?2\.0", "MPL-2.0"),
-    (
-        r"Permission is hereby granted, free of charge, to any person obtaining a copy",
-        "MIT",
-    ),
-    (
-        r"Permission to use, copy, modify, and(?:/or)? distribute this software for any purpose",
-        "ISC",
-    ),
-    (
-        r"Redistribution and use in source and binary forms.{0,600}Neither the name",
-        "BSD-3-Clause",
-    ),
-    (r"Redistribution and use in source and binary forms", "BSD-2-Clause"),
-)
-
-
-def spdx(name: str | None) -> str | None:
-    """normalise an SPDX-ish id (`GPL-3.0-or-later`, `GPL-3+`, `MIT`) to what
-    rockcraft accepts."""
-    if not name:
-        return None
-    n = name.strip().strip("\"'()")
-    n = re.split(r"\s+(?:OR|AND|WITH)\s+|\s*/\s*", n)[0].strip(
-        "()"
-    )  # first id of an expression
-    n = re.sub(r"-(?:or-later|only)$", "", n)
-    return _SHORT.get(n.lower(), n if re.fullmatch(r"[A-Za-z0-9.+-]+", n) else None)
-
-
-def license_from_text(text: str) -> str | None:
-    """SPDX id from a debian/copyright (DEP-5 or prose) or a LICENSE file."""
-    m = re.search(
-        r"^Files:\s*\*\s*$.*?^License:\s*(\S+)", text, re.MULTILINE | re.DOTALL
-    ) or re.search(r"^License:\s*(\S+)", text, re.MULTILINE)
-    if m and m.group(1).lower() in _SHORT:
-        return _SHORT[m.group(1).lower()]
-    m = re.search(r"/usr/share/common-licenses/([A-Za-z0-9.+-]+)", text)
-    if m and m.group(1).lower().rstrip(".") in _SHORT:
-        return _SHORT[m.group(1).lower().rstrip(".")]
-    m = re.search(r"SPDX-License-Identifier:\s*([A-Za-z0-9.+-]+)", text)
-    if m:
-        return spdx(m.group(1))
-    flat = " ".join(text.split())
-    for pat, sid in _PROSE:
-        if re.search(pat, flat, re.IGNORECASE):
-            return sid
-    return None
+    return sorted(
+        {
+            ln.split()[5][1:]
+            for ln in listing.splitlines()
+            if len(ln.split()) > 5
+            and ln.split()[5].startswith(
+                ("./usr/bin/", "./usr/sbin/", "./bin/", "./sbin/")
+            )
+            and not ln.split()[5].endswith("/")
+        }
+    )
 
 
 # --- slices --------------------------------------------------------------------

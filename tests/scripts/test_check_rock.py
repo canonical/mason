@@ -87,8 +87,6 @@ def test_good_rock_is_clean():
         (changed(**{"build-base": None}), "bare-needs-build-base"),
         (changed(version=2.12), "version-type"),
         (changed(version="2.12.1"), "version-granularity"),
-        (changed(license="GPL-3.0-or-later"), "license-form"),
-        (changed(license="TODO-SPDX"), "license-unknown"),
         (changed(parts={"p": "nil"}), "bad-type"),
         (changed(**{"run-user": None}), "root-user"),
         (changed(platforms={"x86_64": None}), "bad-platform"),
@@ -117,8 +115,6 @@ def test_codes_all_covered():
         {"contact": "a@b.c", "issues": "https://x/issues", "source-code": "https://x"},
         {"build-slices": ["base-files_base"]},
         {"license": None},
-        {"license": "proprietary"},
-        {"license": "mit"},
         {"summary": "", "description": ""},
         {"version": None, "adopt-info": "hello"},
         {"build-base": "devel"},
@@ -129,10 +125,13 @@ def test_what_rockcraft_accepts_is_clean(extra):
     assert run(changed(**extra)).findings == {}
 
 
+def test_licence_is_left_to_rockcraft():
+    assert run(changed(license="not-an-spdx-id")).findings == {}
+
+
 @pytest.mark.parametrize(
     ("extra", "code"),
     [
-        ({"license": "BSD"}, "license-unknown"),
         ({"name": ""}, "missing-key"),
         ({"version": None}, "missing-key"),
         ({"platforms": {"my-label": None}}, "bad-platform"),
@@ -237,7 +236,7 @@ def test_release_unavailable_still_reports(monkeypatch):
     monkeypatch.setattr(cr.rl, "resolve_release", down)
     assert run(GOOD).status == "unavailable"
     # findings beat unavailable: a blocker still fails the check
-    report = run(changed(license="GPL-3+"))
+    report = run(changed(version=2.12))
     assert report.status == "failed"
     assert report.unavailable
 
