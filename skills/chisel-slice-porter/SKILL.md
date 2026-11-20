@@ -14,8 +14,9 @@ Adapt the source slices and tests to the user's target release checkout.
 
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; run helpers with the checkout as working directory.
-- Run `uv run "<skill-root>/scripts/orientation.py"` first. If no checkout is
-  present, ask where it is; do not clone or guess one.
+- Run `uv run "<skill-root>/scripts/orientation.py"` first. If it reports no
+  `chisel-releases` section, no checkout is present: ask where it is; do not
+  clone or guess one.
 - Confirm the checkout's release is the requested target. Work on its current
   branch and preserve unrelated changes. Read source branches with `git show`
   or upstream URLs; do not switch branches as part of the port.

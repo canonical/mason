@@ -355,6 +355,25 @@ def test_branch_format_origin_fallback() -> None:
         assert "essential-list" in codes(doc, "block"), doc
 
 
+def other_sources(d: Path) -> dict[str, str]:
+    """Environment that points orientation's Ubuntu and rockcraft sources at
+    local files, so that a run of the real script stays off the network."""
+    meta = d / "meta-release"
+    block = "Dist: forty\nVersion: 40.04 LTS\nSupported: 1\n"
+    meta.write_text(block, encoding="utf-8")
+    (d / "meta-release-development").write_text(block, encoding="utf-8")
+    schema = d / "rockcraft.json"
+    schema.write_text(
+        '{"properties": {"base": {"enum": ["bare", "ubuntu@40.04"]},'
+        ' "build-base": {"anyOf": [{"enum": ["ubuntu@40.04"]}]}}}',
+        encoding="utf-8",
+    )
+    return {
+        "UBUNTU_META_RELEASE_URL": meta.as_uri(),
+        "ROCKCRAFT_SCHEMA_URL": schema.as_uri(),
+    }
+
+
 def test_orientation_release_discovery() -> None:
     # hermetic end-to-end for the live-release table: point discovery at a local
     # repo (no network) with a future-eol branch (listed) and a past-eol branch
@@ -369,6 +388,7 @@ def test_orientation_release_discovery() -> None:
         origin, clone = d / "origin", d / "clone"
         env = {
             **os.environ,
+            **other_sources(d),
             "GIT_CONFIG_GLOBAL": "/dev/null",
             "GIT_CONFIG_SYSTEM": "/dev/null",
             "CHISEL_RELEASES_URL": str(origin),
@@ -434,18 +454,20 @@ def test_orientation_release_discovery() -> None:
         assert r.returncode == 0, out
         # the whole report is YAML, so it parses as data, not just reads as prose
         doc = yaml.safe_load(out)
-        assert doc["end-of-life"] == "2999-01-01", out
-        assert doc["manifest format"] == "v3", out
+        assert doc["chisel-releases"]["end-of-life"] == "2999-01-01", out
+        assert doc["chisel-releases"]["manifest format"] == "v3", out
         assert doc["tools"]["git"]["present"] is True, out
         assert doc["status"] == "passed", out
-        # discovery table: live branches only, formats normalised. a branch whose
-        # end-of-life has passed is not listed at all -- nor is one that declares
-        # no end-of-life, since it cannot be shown to be live.
-        assert doc["live releases"]["ubuntu-40.04"] == {
+        # every branch is listed, formats normalised, and one whose end-of-life
+        # has passed says so rather than going missing.
+        assert doc["releases"]["40.04"]["chisel-releases"] == {
+            "branch": "ubuntu-40.04",
             "format": "v3",
             "end-of-life": "2999-01-01",
+            "maintained": True,
         }, out
-        assert "ubuntu-30.10" not in doc["live releases"], out
+        assert doc["releases"]["30.10"]["chisel-releases"]["maintained"] is False, out
+        assert doc["releases"]["40.04"]["ubuntu"]["lts"] is True, out
 
 
 def test_check_test() -> None:
@@ -931,7 +953,11 @@ def test_orientation_edge_cases() -> None:
             b"format: v3\n# \xff\xfe not utf-8\narchives:\n  ubuntu:\n    version: '44.04'\n"
             b"    suites:\n      - foo\n      - foo-updates\nmaintenance:\n  end-of-life: 2999-01-01\n"
         )
-        env = {**os.environ, "CHISEL_RELEASES_URL": str(Path(td) / "nowhere")}
+        env = {
+            **os.environ,
+            **other_sources(Path(td)),
+            "CHISEL_RELEASES_URL": str(Path(td) / "nowhere"),
+        }
         r = subprocess.run(
             [sys.executable, str(SCRIPTS / "orientation.py")],
             cwd=str(d),
@@ -946,8 +972,9 @@ def test_orientation_edge_cases() -> None:
         assert doc["status"] == "unavailable", out
         assert {u["check"] for u in doc["unavailable"]} == {"release discovery"}, out
         assert doc["working dir"].endswith('q"d'), out
-        assert doc["suites"] is None, out  # block list: nothing on the key's own line
-        assert doc["ubuntu version"] == "44.04", out
-        assert doc["maintained"] is True, out
-        assert doc["existing slices"] == 1, out
-        assert doc["live releases"] == {}, out
+        checkout = doc["chisel-releases"]
+        assert checkout["suites"] is None, out  # block list: nothing on the key's own line
+        assert checkout["ubuntu version"] == "44.04", out
+        assert checkout["maintained"] is True, out
+        assert checkout["existing slices"] == 1, out
+        assert not any("chisel-releases" in row for row in doc["releases"].values()), out

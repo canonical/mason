@@ -179,10 +179,18 @@ def tools(names: tuple[str, ...]) -> dict[str, Flow]:
     return out
 
 
-def git(args: list[str]) -> str | None:
-    """stdout of a git command, or None when git is missing or the command fails."""
+def git(args: list[str], timeout: float | None = None) -> str | None:
+    """stdout of a git command, or None when git is missing or the command fails.
+    With a timeout, running out of it raises subprocess.TimeoutExpired: a query
+    that did not end is not a query that answered no."""
     try:
-        r = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+        r = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
     except OSError:
         return None
     return r.stdout if r.returncode == 0 else None
@@ -226,17 +234,21 @@ def derived_base(report: Report) -> str | None:
     return ref
 
 
-def base_ref(base: str) -> str | None:
+def base_ref(base: str, timeout: float | None = None) -> str | None:
     """The spelling of `base` this checkout resolves: its remote-tracking ref
     on any remote (origin first), else the local branch. None when nothing
     here can be diffed against."""
     tracking = (
-        git(["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{base}"])
+        git(
+            ["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{base}"],
+            timeout,
+        )
         or ""
     ).split()
     tracking.sort(key=lambda ref: (not ref.startswith("origin/"), ref))
     for ref in [*tracking, base]:
-        if git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]) is not None:
+        query = ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]
+        if git(query, timeout) is not None:
             return ref
     return None
 

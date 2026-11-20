@@ -16,8 +16,8 @@ State the scope and any assumption needed to interpret the request.
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; keep the checkout as working directory.
 - Run `uv run "<skill-root>/scripts/orientation.py"` first. The working
-  directory is the checkout; without one, stop and report that. Do not clone
-  or guess one.
+  directory is the checkout; without one (no `chisel-releases` section in its
+  report), stop and report that. Do not clone or guess one.
 - Confirm that the files and manifest being checked match the review's revision
   and target release. Use read-only git and upstream reads; do not switch branches
   or edit the checkout. If the requested revision is not available to a helper,

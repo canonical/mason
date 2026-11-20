@@ -50,20 +50,23 @@ pack or fails its tests goes to step 6, under "fixing a failure".
 ## 1. orient
 
 ```bash
-uv run "<skill-root>/scripts/orient-rock.py"
+uv run "<skill-root>/scripts/orientation.py"
 ```
 
 Run it first, every time: it reports the tools on this machine, the rock
-already in the project and the release to default to. Without rockcraft a new
-rock is blocked -- say so and stop; an existing rock can still be linted.
+already in the project (`rock`), and per Ubuntu release what Ubuntu,
+chisel-releases and the installed rockcraft each say (`releases`). When
+`tools` shows no rockcraft, a new rock is blocked -- say so and stop; an
+existing rock can still be linted.
 
 ## 2. gather
 
-If orientation found a `rockcraft.yaml`, ask: overwrite it, or fix it (step
-6)? Settle -- asking once, grouped, only for what is missing: **what goes in**
+If orientation reports a `rock`, ask: overwrite it, or fix it (step 6)?
+Settle -- asking once, grouped, only for what is missing: **what goes in**
 (Ubuntu archive packages, packages from a PPA, or a project to build: git URL
 or local dir, and a tag if not the latest release); the **release** (default:
-the one orientation reports); **service or CLI** -- for a service, its
+orientation's `default rock base`; a release the user names must be one
+rockcraft takes as a base); **service or CLI** -- for a service, its
 foreground command line, absolute binary first (e.g.
 `/usr/sbin/nginx -g 'daemon off;'`).
 

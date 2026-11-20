@@ -31,6 +31,7 @@ Missing runtime tools/backends or unreachable documentation can leave checks
 pending after the files are written and statically checked. They never excuse
 omitting tests. Incomplete release discovery leaves forward-port coverage
 unverified; it does not establish that a release is EOL or that no ports remain.
+The same holds for a branch whose maintenance orientation reports as unknown.
 
 ## Completion and reports
 

@@ -23,9 +23,10 @@ Author slices against the user's `canonical/chisel-releases` checkout.
 
   In the remaining commands, replace `<skill-root>` with that absolute path.
 - **Checkout root** contains `chisel.yaml`, `slices/`, and `tests/spread/`.
-  Repository paths below are relative to it. Run orientation first. If no
-  checkout is present, stop and ask where it is; do not clone one or guess a
-  path. Confirm the target release matches the request.
+  Repository paths below are relative to it. Run orientation first. If it
+  reports no `chisel-releases` section, no checkout is present: stop and ask
+  where it is; do not clone one or guess a path. Confirm the target release
+  matches the request.
 - Work on the checked-out branch and preserve unrelated changes. Leave PR
   creation to the user.
 - Read `kb/verification.md` for blockers, check status and completion.
