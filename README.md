@@ -14,7 +14,7 @@
 [![skills.sh](https://skills.sh/b/canonical/mason)](https://skills.sh/canonical/mason)
 [![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fcanonical%2Fmason)](https://tessl.io/registry/canonical/mason)
 
-Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chisel), [`chisel-releases`](https://github.com/canonical/chisel-releases) and [`rockcraft`](https://documentation.ubuntu.com/rockcraft/stable/) -- cross-agent skills and scripts for authoring and reviewing package slices files, and for building rocks.
+Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chisel), [`chisel-releases`](https://github.com/canonical/chisel-releases) and [`rockcraft`](https://ubuntu.com/containers/rockcraft/docs) -- cross-agent skills and scripts for authoring and reviewing package slices files, and for building rocks.
 
 Install with:
 

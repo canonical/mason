@@ -4,7 +4,7 @@ When this knowledge base and upstream disagree, upstream wins:
 **tool behaviour** (rockcraft / chisel / pebble) > **docs** > **conventions**
 (rocks published by Canonical) > this knowledge base.
 
-- Rockcraft docs: <https://documentation.ubuntu.com/rockcraft/stable/>
+- Rockcraft docs: <https://ubuntu.com/containers/rockcraft/docs/stable/>
   - `reference/rockcraft.yaml/` -- every key and its constraints
   - `reference/plugins/` -- build plugins and their keys
   - `reference/commands/#test` -- `rockcraft test` and `init --profile=test`
