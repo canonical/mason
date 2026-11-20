@@ -12,8 +12,9 @@ services:
     # on-failure: shutdown   # typical for single-service rocks
 ```
 
-- `command` starts with an absolute path. `[ <default-args> ]` are overridable
-  via `docker run <img> --args <svc> <args>`; without brackets the args are fixed.
+- `command` starts with an absolute path. `docker run <img> --args <svc> <args>`
+  replaces `[ <default-args> ]`; args outside the brackets always stay, and
+  with no brackets `--args` appends to them.
 - `entrypoint-service: <svc>` makes the rock behave like a classic single-binary
   image (`docker run <img> --flag` passes args to it).
 - Top-level and per-service `environment:` set env vars; `checks:` adds Pebble
