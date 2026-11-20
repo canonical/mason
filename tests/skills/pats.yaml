@@ -220,6 +220,24 @@ candidates:
       model: nvidia/nemotron-3.5-super-vl
     step-3.7-flash:
       model: stepfun/step-3.7-flash
+    gpt-oss-20b:
+      model: openai/gpt-oss-20b
+    gpt-oss-120b:
+      model: openai/gpt-oss-120b
+    ling-3.0-flash:
+      model: inclusionai/ling-3.0-flash
+    ling-3.1-flash:
+      model: inclusionai/ling-3.1-flash
+    qwen3.7-flash:
+      model: qwen/qwen3.7-flash
+    gemini-2.5-flash-lite:
+      model: google/gemini-2.5-flash-lite
+    gemini-3.1-flash-lite:
+      model: google/gemini-3.1-flash-lite
+    gpt-6-luna:
+      model: openai/gpt-6-luna
+    claude-haiku-5.5:
+      model: anthropic/claude-haiku-5.5
     # the kept points without the skills: stage installs none and bin/prompt
     # drops the skill from the prompt. the tessl-style no-skill baseline.
     deepseek-v4.1-flash-1017-noskill:
