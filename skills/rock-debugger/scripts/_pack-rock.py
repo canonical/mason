@@ -126,14 +126,14 @@ def diagnose(text: str) -> dict:
                 if m:
                     step, part = STEP_NAME[m.group(1)], m.group(2)
                     break
-            # rockcraft lists what it rejected as "- ..." lines under the match
-            listed = []
-            for ln in lines[hits[0] + 1 :]:
-                if not ln.lstrip().startswith("- "):
-                    break
-                listed.append(ln.strip())
-            return {"category": cat, "step": step, "part": part,
-                    "evidence": [lines[i].strip() for i in hits[:6]] + listed[:6], "log": log}  # fmt: skip
+            evidence = [lines[i].strip() for i in hits[:6]]
+            if cat == "invalid-yaml":
+                # rockcraft lists what it rejected as "- ..." lines under the heading
+                for ln in lines[hits[0] + 1 :]:
+                    if not ln.startswith("- "):
+                        break
+                    evidence.append(ln.strip())
+            return {"category": cat, "step": step, "part": part, "evidence": evidence, "log": log}  # fmt: skip
     tail = [ln.strip() for ln in lines if ln.strip()][-8:]
     return {
         "category": "unknown",
