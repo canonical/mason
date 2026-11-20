@@ -22,6 +22,7 @@ a rock task's pair dir holds instead (bin/stage --rock, bin/collect --rock):
     rockcraft-test.yaml       the test suite config, if any (spread.yaml if not renamed)
     tests.txt                 every spread task.yaml, each under a `# <path>` header
     tests.expected.txt        rock-debug: the tests the project came with
+    rockcraft-test.expected.yaml  rock-debug: the suite config the project came with
     rocks.txt                 the packed *.rock files left in the project
     git-log.txt, git-status.txt
 

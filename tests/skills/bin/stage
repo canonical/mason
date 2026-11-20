@@ -80,6 +80,9 @@ function _rock() {
                 cat "$t"
             done >"$OUT/tests.expected.txt"
         fi
+        if [ -f rockcraft-test.yaml ]; then
+            cp rockcraft-test.yaml "$OUT/rockcraft-test.expected.yaml"
+        fi
     fi
     git init --quiet -b main
     printf '%s\n' .claude/ .agents/ >>.git/info/exclude
