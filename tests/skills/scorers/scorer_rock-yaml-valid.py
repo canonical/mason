@@ -8,7 +8,7 @@ requires (plus build-base with base: bare). the fraction present; 0 when there
 is no file or it does not parse."""
 from _lib import *
 
-_REQUIRED = ("name", "version", "summary", "description", "license", "base", "platforms", "parts")
+_REQUIRED = ("name", "version", "summary", "description", "base", "platforms", "parts")
 
 
 def score() -> float:
