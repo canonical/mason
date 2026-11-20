@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import gzip
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -242,6 +243,8 @@ def upstream_version(debver: str, full: bool = False) -> str:
 
 def deb_facts(stanza: dict) -> tuple[list[str], str | None]:
     """(binaries, SPDX licence) from the downloaded .deb (needs dpkg-deb)."""
+    if not shutil.which("dpkg-deb"):
+        raise Unavailable("dpkg-deb is not installed (it reads the package's files)")
     data = fetch(stanza["_url"])
     if not data:
         return [], None

@@ -1,13 +1,13 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyyaml"]
+# dependencies = ["pyyaml", "spdx"]
 # ///
 """draft-rock: write a first-draft rockcraft.yaml, deterministically.
 
 Does the discovery -- versions, licence, build system, runtime slices -- so
-the agent only makes the judgement calls. A fresh draft passes check-rock.py.
-It builds nothing, and cannot know a C project's library dependencies or a
+the agent only makes the judgement calls. A fresh draft passes check-rock.py,
+but for a licence it could not detect. It builds nothing, and cannot know a C project's library dependencies or a
 service's configuration: what to review is listed under `review`.
 
 What it decides:
@@ -52,6 +52,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import spdx
+
 try:
     import _common as common
     import _rocklib as rl
@@ -81,6 +83,17 @@ CODES = {
 
 def note(msg: str) -> None:
     REVIEW.append(msg)
+
+
+def licence(lic: str | None) -> str | None:
+    """the detected licence if rockcraft knows it (`proprietary`, or an id of the
+    SPDX list it reads); else nothing, and a note to set it."""
+    known = {rec["id"].strip().lower() for rec in spdx.licenses()}
+    if lic and (lic == "proprietary" or lic.strip().lower() in known):
+        return lic
+    found = f"{lic!r} is not an SPDX id rockcraft knows" if lic else "not detected"
+    note(f"license: {found} -- set the SPDX id by hand")
+    return None
 
 
 # --- yaml emitter (deterministic, no pyyaml) -----------------------------------
@@ -248,10 +261,12 @@ def meta(tree: Path) -> dict:
     if pj:
         try:
             d = json.loads(pj)
+            lic = d.get("license")
             m.update(
                 name=d.get("name"),
                 description=d.get("description"),
-                license=d.get("license"),
+                # the legacy {"type": <id>, "url": ...} form still turns up
+                license=lic.get("type") if isinstance(lic, dict) else lic,
                 node=re.sub(
                     r"[^\d.].*$",
                     "",
@@ -517,18 +532,19 @@ def draft(report: common.Report) -> int:
                 r"[^a-z0-9-]+",
                 "-",
                 (
-                    m.get("name") or Path(src_arg.rstrip("/")).name.removesuffix(".git")
+                    m.get("name")
+                    or (
+                        tree.resolve() if local else Path(src_arg.rstrip("/"))
+                    ).name.removesuffix(".git")
                 ).lower(),
             ).strip("-")
             version = a.version or (tag_version(tag) if tag else "0.1")
-            lic = rl.spdx(m.get("license")) or m.get("license_file")
+            lic = licence(rl.spdx(m.get("license")) or m.get("license_file"))
             report.data["source"] = common.Flow(url=src_arg, tag=tag)
             report.data[kind] = what
             report.data["version"] = version
             report.data["license"] = lic
             report.data["binaries"] = m["bins"] or None
-            if not lic:
-                note("license: not detected -- set the SPDX id by hand")
             summary = short(m.get("description") or f"{name} built from source")
             if kind == "extension":
                 note(
@@ -567,6 +583,7 @@ def draft(report: common.Report) -> int:
             entries[p] = st
         main = entries[pkgs[0]]
         bins, lic = rl.deb_facts(main)
+        lic = licence(lic)
         version = a.version or rl.upstream_version(main["Version"])
         dl = main.get("Description", "").splitlines()
         summary = short(dl[0] if dl else pkgs[0])
@@ -580,8 +597,6 @@ def draft(report: common.Report) -> int:
         report.data["license"] = lic
         report.data["binaries"] = bins or None
         report.data["depends"] = main.get("Depends") or None
-        if not lic:
-            note("license: not detected -- set the SPDX id by hand")
         if a.ppa:
             note(
                 "PPA packages can't be chiselled (chisel only reads the Ubuntu archive) -> ubuntu@ base, whole debs"
