@@ -28,6 +28,7 @@ manifest names and the revision a change is compared against.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -145,6 +146,37 @@ class Report:
 def usage(text: str) -> int:
     print(text, file=sys.stderr)
     return USAGE
+
+
+_TOOL_VERSION = re.compile(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?")
+
+
+def tools(names: tuple[str, ...]) -> dict[str, Flow]:
+    """Which of the named tools this machine has, and the version of each."""
+    # --version only. a bare "<tool> version" fallback would be a real
+    # invocation -- spread would read spread.yaml and treat it as a job filter --
+    # and a report of what is installed must stay read-only.
+    out = {}
+    for t in names:
+        if not shutil.which(t):
+            out[t] = Flow(present=False, version=None)
+            continue
+        try:
+            text = subprocess.run(
+                [t, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            text = ""
+        m = _TOOL_VERSION.search(text)
+        # present but unversioned is a fact of its own: chisel prints "unknown"
+        # on an unstamped build, spread has no version flag at all. null is
+        # reserved for a tool that is not here to have a version.
+        out[t] = Flow(present=True, version=m.group(0) if m else "unknown")
+    return out
 
 
 def git(args: list[str]) -> str | None:

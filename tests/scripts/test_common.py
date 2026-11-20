@@ -262,3 +262,28 @@ def test_fetch_hint_creates_the_tracking_ref(common, tmp_path, monkeypatch) -> N
 def test_base_ref_outside_git_is_none(common, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     assert common.base_ref("ubuntu-26.04") is None
+
+
+def test_tools_reports_presence_and_version(common, monkeypatch) -> None:
+    class Ran:
+        stdout = "rockcraft 1.12.0\n"
+
+    monkeypatch.setattr(
+        common.shutil, "which", lambda t: "/bin/" + t if t != "absent" else None
+    )
+    monkeypatch.setattr(common.subprocess, "run", lambda *a, **kw: Ran)
+    assert common.tools(("rockcraft", "absent")) == {
+        "rockcraft": {"present": True, "version": "1.12.0"},
+        "absent": {"present": False, "version": None},
+    }
+
+
+def test_tools_keeps_a_tool_that_prints_no_version(common, monkeypatch) -> None:
+    def hangs(*a, **kw):
+        raise subprocess.TimeoutExpired(a[0], 10)
+
+    monkeypatch.setattr(common.shutil, "which", lambda t: "/bin/" + t)
+    monkeypatch.setattr(common.subprocess, "run", hangs)
+    assert common.tools(("spread",)) == {
+        "spread": {"present": True, "version": "unknown"}
+    }
