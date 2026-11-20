@@ -2,3 +2,4 @@
 prompt-cmd: prompt
 stage: stage --branch ubuntu-26.04 --review libjansson4
 timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps
