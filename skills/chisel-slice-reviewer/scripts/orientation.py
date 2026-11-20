@@ -25,7 +25,6 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import re
-import shutil
 import subprocess
 import sys
 import urllib.request
@@ -37,46 +36,26 @@ TOOLS = ("chisel", "dpkg-deb", "file", "spread", "uv", "python3", "git")
 DEFAULT_URL = "https://github.com/canonical/chisel-releases.git"
 RAW = "https://raw.githubusercontent.com/canonical/chisel-releases"
 
-_VERSION = re.compile(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?")
 _FORMAT = re.compile(r"^format:[ \t]*(.*)$", re.MULTILINE)
 _SUITES = re.compile(r"suites:[ \t]*(.*)$", re.MULTILINE)
 _COMPONENTS = re.compile(r"components:[ \t]*(.*)$", re.MULTILINE)
 _EOL = re.compile(r"^[ \t]*end-of-life:[ \t]*(.*)$", re.MULTILINE)
 
 
-def run(cmd: list[str], timeout: int = 20, require_ok: bool = True) -> str | None:
-    """stdout of a command, or None if it is missing, hangs, or (unless
-    require_ok is off) exits non-zero."""
+def run(cmd: list[str], timeout: int = 20) -> str | None:
+    """stdout of a command, or None if it is missing, hangs or exits non-zero."""
     try:
         r = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout, check=False
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    return r.stdout if r.returncode == 0 or not require_ok else None
+    return r.stdout if r.returncode == 0 else None
 
 
 def first(pattern: re.Pattern[str], text: str) -> str:
     m = pattern.search(text)
     return m.group(1).strip() if m else ""
-
-
-def tools() -> dict[str, common.Flow]:
-    # --version only. a bare "<tool> version" fallback would be a real
-    # invocation -- spread would read spread.yaml and treat it as a job filter --
-    # and orientation must stay read-only.
-    out = {}
-    for t in TOOLS:
-        if not shutil.which(t):
-            out[t] = common.Flow(present=False, version=None)
-            continue
-        text = run([t, "--version"], timeout=10, require_ok=False) or ""
-        m = _VERSION.search(text)
-        # present but unversioned is a fact of its own: chisel prints "unknown"
-        # on an unstamped build, spread has no version flag at all. null is
-        # reserved for a tool that is not here to have a version.
-        out[t] = common.Flow(present=True, version=m.group(0) if m else "unknown")
-    return out
 
 
 def inline_list(value: str) -> list[str] | None:
@@ -208,7 +187,7 @@ def main() -> int:
     today = _dt.datetime.now(tz=_dt.timezone.utc).astimezone().date().isoformat()
     report = common.Report({})
     report.data["working dir"] = os.getcwd()
-    report.data["tools"] = tools()
+    report.data["tools"] = common.tools(TOOLS)
     checkout(today, report)
     live_releases(today, report)
     return report.emit()

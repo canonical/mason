@@ -1,10 +1,11 @@
 ---
 name: rockcrafter
 description: >-
-  Builds and fixes rocks (OCI images) with rockcraft and chisel. Drafts,
-  checks, packs and tests a rockcraft.yaml from Ubuntu archive or PPA packages,
-  or from a project built from source (Go, Rust, Python, Node, Java, C/C++,
-  rockcraft framework extensions), with spread tests run by `rockcraft test`.
+  Builds and fixes rocks (OCI images) with rockcraft and chisel. Starts a
+  rockcraft.yaml with `rockcraft init`, then fills in, checks, packs and tests
+  it, from Ubuntu archive or PPA packages, or from a project built from source
+  (Go, Rust, Python, Node, Java, C/C++, rockcraft framework extensions), with
+  spread tests run by `rockcraft test`.
   Classifies a failing pack or test and applies targeted fixes until the rock
   packs and its tests pass. Use when the user wants to build a rock or write a
   rockcraft.yaml, when a rock does not pack or its tests fail, or the user
@@ -15,7 +16,7 @@ description: >-
 
 Build [rocks](https://ubuntu.com/containers/rockcraft/docs) in the user's
 project, and fix the ones that fail to pack or fail their tests. **Do the work
-yourself** -- do not hand the task to a subagent (the slice hand-over in step 3
+yourself** -- do not hand the task to a subagent (the slice hand-over in step 4
 is the one exception).
 
 ## roots and boundaries
@@ -43,56 +44,84 @@ reached -- report it, do not work around it, and never read it as evidence
 **Slicing never blocks delivery**: when slices can't be authored, ship an
 unchiselled rock and say so.
 
-A new rock starts at step 1. A rock that already exists and fails to pack or
-fails its tests starts at step 5, under "fixing a failure".
+Every rock starts at step 1. After it, a rock that already exists and fails to
+pack or fails its tests goes to step 6, under "fixing a failure".
 
-## 1. gather
-
-If a `rockcraft.yaml` already exists, ask: overwrite it, or fix it (step 5)?
-Settle -- asking once, grouped, only for what is missing: **what goes in**
-(Ubuntu archive packages, packages from a PPA, or a project to build: git URL
-or local dir, and a tag if not the latest release); the **release** (default:
-the newest supported LTS, which the draft reports); **service or CLI** -- for a
-service, its foreground command line, absolute binary first (e.g.
-`/usr/sbin/nginx -g 'daemon off;'`).
-
-## 2. draft
+## 1. orient
 
 ```bash
-uv run "<skill-root>/scripts/draft-rock.py" hello --release 24.04                                       # archive
-uv run "<skill-root>/scripts/draft-rock.py" git --ppa git-core/ppa --release 24.04                      # PPA
-uv run "<skill-root>/scripts/draft-rock.py" https://github.com/jqlang/jq --tag jq-1.7.1 --release 24.04 # source
+uv run "<skill-root>/scripts/orient-rock.py"
 ```
 
-Swap in the real names; add `--service "<cmd>"` for a service. The draft is
-complete -- do not retype or restructure it. A `missing-slices` failure goes
-to step 3; other failures name what to correct.
+Run it first, every time: it reports the tools on this machine, the rock
+already in the project and the release to default to. Without rockcraft a new
+rock is blocked -- say so and stop; an existing rock can still be linted.
 
-## 3. missing slices
+## 2. gather
 
-Ask the user **once**: author the slices, or build unchiselled?
+If orientation found a `rockcraft.yaml`, ask: overwrite it, or fix it (step
+6)? Settle -- asking once, grouped, only for what is missing: **what goes in**
+(Ubuntu archive packages, packages from a PPA, or a project to build: git URL
+or local dir, and a tag if not the latest release); the **release** (default:
+the one orientation reports); **service or CLI** -- for a service, its
+foreground command line, absolute binary first (e.g.
+`/usr/sbin/nginx -g 'daemon off;'`).
 
-- **Unchiselled**: re-draft with `--unchiselled`; the report says unchiselled.
+## 3. start the file
+
+```bash
+rockcraft init --name <rock-name>                         # any rock
+rockcraft init --name <rock-name> --profile <profile>     # a framework application
+```
+
+Rockcraft writes the first `rockcraft.yaml`; never write one from scratch.
+`rockcraft init --help` lists the profiles and options of the installed
+version. Use a framework profile when the project is an application its
+extension supports (`kb/rock-upstream-sources.md`), else the default. Init
+does not overwrite, so first remove a `rockcraft.yaml` the user asked to
+replace. In a project that is not a git repository, pass `--vcs none` when
+init offers it, so that it does not start one.
+
+## 4. packages
+
+```bash
+uv run "<skill-root>/scripts/rock-packages.py" hello --release 24.04
+uv run "<skill-root>/scripts/rock-packages.py" git --ppa git-core/ppa --release 24.04
+```
+
+Run it for every Ubuntu package the rock stages: the workload from the archive
+or a PPA, and the runtime a source build needs (`kb/rock-slices.md`). Take
+versions, executables and slice names from its report, never from memory. A
+`package-not-found` is a name to correct. For `missing-slices`, ask the user
+**once**: author the slices, or build unchiselled?
+
+- **Unchiselled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
+  the report says unchiselled.
 - **Author**: needs the chisel-slicer skill installed beside this one
   (`<skill-root>/../chisel-slicer/SKILL.md`); without it the user installs it,
   or the rock goes unchiselled.
   Use the user's chisel-releases checkout or a fork, branched off the target
   release. In it, follow chisel-slicer's `SKILL.md` for each missing package
-  (a subagent is fine here). Then re-draft with
-  `--chisel-release <checkout> --force`. After a successful pack, push the
-  branch and point the part at the fork (`kb/rock-slices.md`; chisel itself in
-  `kb/chisel-cli.md`); if you cannot push, keep the local source and
-  report the push as remaining. If authoring fails, go unchiselled and say why.
+  (a subagent is fine here). Then run rock-packages again with
+  `--chisel-release <checkout>` and cut the slices from the checkout
+  (`kb/rock-slices.md`; chisel itself in `kb/chisel-cli.md`). After a
+  successful pack, push the branch and point the part at the fork; if you
+  cannot push, keep the local source and report the push as remaining. If
+  authoring fails, go unchiselled and say why.
 
-## 4. adjust
+## 5. fill in
 
-Edit only what the draft cannot know: what its `review` lists, config files,
-writable dirs for a service, a non-privileged port. Keep every existing key.
-Read `kb/rockcraft-yaml.md` for keys and parts, `kb/pebble-services.md` for
-services and the non-root user, and `kb/rock-slices.md` before adding runtime
-slices.
+Edit the file init wrote: keep its structure, replace every placeholder (the
+summary, the description, the sample part) and add only what the rock needs.
+Read `kb/rockcraft-yaml.md` for keys, the version and parts,
+`kb/rock-slices.md` for the base and what to stage, and
+`kb/pebble-services.md` for services and the non-root user. A source build
+takes its plugin and that plugin's keys from upstream's reference
+(`kb/rock-upstream-sources.md`), pinned to the tag the user named, else the
+newest release tag. A service also needs its config files, its writable dirs
+and a non-privileged port.
 
-## 5. check and pack
+## 6. check and pack
 
 ```bash
 uv run "<skill-root>/scripts/check-rock.py"
@@ -103,7 +132,7 @@ Fix every `block` from check-rock and re-run it until it passes -- these are
 cheaper than a pack -- then pack: packing needs rockcraft, not docker. A
 failed pack goes to "fixing a failure".
 
-## 6. test
+## 7. test
 
 Read `kb/rock-tests.md` before writing tests: it owns layout, depth and what
 each kind of rock must prove. Scaffold the suite once, beside
@@ -159,8 +188,9 @@ untested.
   written, or the fixes are in, and check-rock passed, but the pack or the
   test run is unavailable (no rockcraft, no test VM, unreachable network).
   Name what remains.
-- **Blocked**: a failure you cannot fix in scope, or one only a forbidden
-  change would fix. State it and the change you recommend.
+- **Blocked**: a new rock without rockcraft installed, a failure you cannot
+  fix in scope, or one only a forbidden change would fix. State it and the
+  change you recommend.
 
 A packed rock is not proof the workload runs; only passing tests are.
 
@@ -175,6 +205,7 @@ Summarise for the user (or the parent agent when delegated):
   task), the cause, and the change made -- to the rock or to a wrong assertion
 - checks passed, failed or unavailable, and what remains (push, upstreaming
   slices, an unrun test suite)
-- for a new rock, what you changed from the draft, and why
+- for a new rock, the choices the user did not make (release, profile or
+  plugin, slices), and why
 
 Keep it concise; do not dump file contents or raw logs.
