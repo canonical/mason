@@ -65,7 +65,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: ${{ fromJSON(needs.plan.outputs.suites) }}
-    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@46fd80c3f26c21268164005ada2c51dca3b38202 # v0.1.0
+    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@00933df528d645e36e593387128a1c7fc5465678 # main, past v0.1.0
     permissions:
       contents: read
       pull-requests: write
