@@ -1,0 +1,9 @@
+# back port: 24.04's login still ships faillog, lastlog, newgrp, sg and
+# login.defs, which 26.04 dropped.
+# key.yaml holds the adaptations the port must make. the target's own slice
+# (knocked out) is supporting evidence only.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-24.04 --source ubuntu-26.04 --knockout login
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

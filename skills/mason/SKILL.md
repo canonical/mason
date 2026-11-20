@@ -35,11 +35,11 @@ skills:
   /rock-debugger                    fix a rock whose pack or tests fail
 
 usage:
-  /chisel-slicer curl
-  /chisel-slice-reviewer slices/curl.yaml
-  /chisel-slice-porter curl ubuntu-24.04 ubuntu-26.04
-  /rock-crafter "build a rock for nginx on ubuntu 24.04"
-  or plain language: "write a slice for curl", "review slices/curl.yaml"
+  /chisel-slicer jq
+  /chisel-slice-reviewer slices/jq.yaml
+  /chisel-slice-porter jq ubuntu-24.04 ubuntu-26.04
+  /rock-crafter "build a rock for redis on ubuntu 24.04"
+  or plain language: "write a slice for jq", "review slices/jq.yaml"
 
 docs: https://github.com/canonical/mason
 ```

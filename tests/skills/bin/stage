@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# set up the workdir on the host: stage [--branch <b>] [--knockout <slice>]... [--rock]
-# --branch clones chisel-releases at <b>. --knockout takes that slice out as
-# ground truth. each <target>.silver.yaml beside the task.yaml is ground truth
-# for a target written from scratch. --rock stages a rock task instead: the
-# task's project/ (if any) becomes the workdir, one git commit, and its
-# case.yaml, rockcraft.expected.yaml and tests are ground truth. installs the
-# skills for the harness.
+# set up the workdir on the host:
+#   stage [--branch <b>] [--source <b>] [--review <pkg>] [--knockout <slice>]... [--rock]
+# --branch clones chisel-releases at <b>. --source adds another release branch
+# as a local branch of the same name, for ports: egress keeps the agent off
+# chisel-releases. --knockout takes that slice out as ground truth. each
+# <target>.silver.yaml beside the task.yaml is ground truth for a target written
+# from scratch. --review swaps <pkg>'s slice for the <pkg>.review.yaml beside
+# the task.yaml, uncommitted, with upstream's spread test, or with a test of
+# only the <pkg>.review.test.yaml beside it when there is one.
+# --rock stages a rock task instead: the task's project/ (if any) becomes the
+# workdir, one git commit, and its case.yaml, rockcraft.expected.yaml and tests
+# are ground truth. installs the skills for the harness, except for a -noskill
+# baseline agent.
 set -eu
 
 REPO_ROOT="$(cd "$PATS_ROOT/../.." && pwd)"
@@ -29,6 +35,16 @@ function _clone() {
     printf '%s\n' "$fmt" >"$OUT/$CASE.format"
 }
 
+# _scrub_agents: upstream's AGENTS.md tells agents to install the skills under
+# test, and its copilot instructions point at a reviewer skill ci installs.
+# both arms drop them, so the only difference is the install.
+function _scrub_agents() {
+    rm -f .github/copilot-instructions.md
+    [ -f AGENTS.md ] || return 0
+    grep -viE 'mason|tessl|skill' AGENTS.md >AGENTS.md.tmp || true
+    mv AGENTS.md.tmp AGENTS.md
+}
+
 # _drop: a target's slice and spread test, for the agent to write.
 function _drop() {
     rm -f "slices/$1.yaml"
@@ -46,9 +62,52 @@ function _reinit_git() {
     "${git[@]}" commit --quiet -m "chisel-releases base (target slices removed)"
 }
 
+# _consumers: the <pkg>_<slice> names other slices files depend on, which a
+# rewrite of <pkg> has to keep. scorers filter the loose grep.
+function _consumers() {
+    grep -rhoE "[a-z0-9.+-]*_[a-z0-9-]+" slices/ 2>/dev/null |
+        grep -F "$1_" | sort -u >"$OUT/$1.consumers" || true
+}
+
+# _refs: package names a slices file mentions as <pkg>_<slice>, loosely.
+function _refs() {
+    grep -oE "[a-z0-9.+-]+_[a-z0-9-]+" "$1" | cut -d_ -f1 | sort -u
+}
+
+# _providers: the slices files ground truth's dependencies reach, transitively,
+# so a scorer can tell another set of slices ships the same paths.
+function _providers() {
+    local t="$1" dir="$OUT/$1.providers" queue p seen
+    mkdir -p "$dir"
+    seen=" $t "
+    queue="$(_refs "$OUT/$t.expected.yaml")"
+    while [ -n "$queue" ]; do
+        p="${queue%%$'\n'*}"
+        if [ "$p" = "$queue" ]; then queue=""; else queue="${queue#*$'\n'}"; fi
+        case "$seen" in (*" $p "*) continue ;; esac
+        seen="$seen$p "
+        [ -n "$p" ] && [ -f "slices/$p.yaml" ] || continue
+        cp "slices/$p.yaml" "$dir/"
+        queue="$queue"$'\n'"$(_refs "slices/$p.yaml")"
+    done
+}
+
+# _add_source: upstream's <branch> as a local branch of the same name.
+function _add_source() {
+    local src="$1" tmp
+    tmp="$(mktemp -d)"
+    git clone --quiet --depth 1 --branch "$src" \
+        https://github.com/canonical/chisel-releases.git "$tmp/src"
+    git fetch --quiet --depth 1 "$tmp/src" "$src:$src"
+    rm -rf "$tmp"
+}
+
 # _install: claude reads .claude/skills/, the other harnesses .agents/skills/.
 function _install() {
     local dest=".agents/skills"
+    case "$PATS_AGENT_NAME" in
+        (*-noskill) return 0 ;;
+    esac
     case "$PATS_AGENT_HARNESS" in
         (claude-*) dest=".claude/skills" ;;
     esac
@@ -91,10 +150,12 @@ function _rock() {
 }
 
 function main() {
-    local branch="" knockout="" rock=0 silver t
+    local branch="" source="" review="" knockout="" rock=0 silver t keep=""
     while [ $# -gt 0 ]; do
         case "$1" in
             (--branch) branch="$2"; shift 2 ;;
+            (--source) source="$2"; shift 2 ;;
+            (--review) review="$2"; shift 2 ;;
             (--knockout) knockout="$knockout $2"; shift 2 ;;
             (--rock) rock=1; shift ;;
             (*) _fail "unknown argument: $1" ;;
@@ -103,22 +164,46 @@ function main() {
     mkdir -p "$PATS_WORKDIR" "$OUT"
     if [ -n "$branch" ]; then
         _clone "$branch"
+        _scrub_agents
         # shellcheck disable=SC2086
         for t in $knockout; do
             [ -f "slices/$t.yaml" ] || _fail "no slices/$t.yaml on $branch to knock out"
             cp "slices/$t.yaml" "$OUT/$t.expected.yaml"
             _drop "$t"
+            _consumers "$t"
+            _providers "$t"
         done
         for silver in "$PATS_TASK_DIR"/*.silver.yaml; do
             [ -e "$silver" ] || continue
             t="$(basename "$silver" .silver.yaml)"
             cp "$silver" "$OUT/$t.expected.yaml"
             _drop "$t"
+            _providers "$t"
         done
+        if [ -n "$review" ]; then
+            [ -f "$PATS_TASK_DIR/$review.review.yaml" ] || _fail "no $review.review.yaml beside the task"
+            keep="$(mktemp -d)"
+            mkdir "$keep/test"
+            if [ -f "$PATS_TASK_DIR/$review.review.test.yaml" ]; then
+                cp "$PATS_TASK_DIR/$review.review.test.yaml" "$keep/test/task.yaml"
+            elif [ -d "tests/spread/integration/$review" ]; then
+                cp -R "tests/spread/integration/$review/." "$keep/test"
+            fi
+            _drop "$review"
+        fi
         rm -rf "tests/spread/integration/$CASE"
         _reinit_git "$branch"
-    elif [ -n "$knockout" ]; then
-        _fail "--knockout needs --branch"
+        if [ -n "$source" ]; then
+            _add_source "$source"
+        fi
+        # review: the proposed files land uncommitted on the clean base.
+        if [ -n "$review" ]; then
+            cp "$PATS_TASK_DIR/$review.review.yaml" "slices/$review.yaml"
+            cp -R "$keep/test" "tests/spread/integration/$review"
+            rm -rf "$keep"
+        fi
+    elif [ -n "$knockout" ] || [ -n "$source" ] || [ -n "$review" ]; then
+        _fail "--knockout, --source and --review need --branch"
     fi
     _install
     if [ "$rock" = 1 ]; then

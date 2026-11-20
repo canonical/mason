@@ -1,0 +1,5 @@
+# control: the upstream file, unchanged. key.yaml expects no defects.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --review bsdextrautils
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

@@ -11,7 +11,7 @@ sandboxes:
     provision: provision
     # task hosts only: pats adds each harness's own.
     egress:
-      allow:
+      allow: &allow
         - .ubuntu.com # apt mirrors, for deb-list
         - pypi.org # pyyaml for `uv run <helper>`
         - files.pythonhosted.org
@@ -26,30 +26,101 @@ sandboxes:
         - linux.die.net
         - www.kernel.org
         - lwn.net
+        - canonical-chisel.readthedocs-hosted.com
+        # packaging sources agents read: maintainer scripts, debian/ dirs, history
+        - launchpad.net
+        - git.launchpad.net
+        - code.launchpad.net
+        - api.launchpad.net
+        - sources.debian.org
+        - salsa.debian.org
+        - packages.debian.org
+        - snapshot.debian.org
       # chisel-releases holds the answers. a hit lands in the pair's metadata.json
-      # as a cheat signal. orientation's `git ls-remote` (info/refs) and its raw
-      # chisel.yaml fetches stay open; on raw only slices/ and tests/ are answers.
+      # as a cheat signal. `chisel-releases**` takes the repo, its .git and its
+      # renamed copies (forks, snapshots). the exceptions keep open what the skills
+      # point at: `git ls-remote` (info/refs) and the top-level docs and manifests.
       # a glob's `*` stays in one path segment, so it pins the owner and leaves
       # e.g. chisel-docs/.../chisel-releases/ open; `**` takes all below.
       # objects.githubusercontent.com is not allowed: its paths can't be filtered by repo.
-      deny:
+      deny: &deny
         - .oaiusercontent.com # codex's own startup fetch, not the agent's
-        - "github.com/*/chisel-releases"
-        - "github.com/*/chisel-releases/**"
-        - "github.com/*/chisel-releases.git"
-        - "github.com/*/chisel-releases.git/git-upload-pack"
-        - "raw.githubusercontent.com/*/chisel-releases/**/slices/**"
-        - "raw.githubusercontent.com/*/chisel-releases/**/tests/**"
-        - "codeload.github.com/*/chisel-releases"
-        - "codeload.github.com/*/chisel-releases/**"
-        - "api.github.com/repos/*/chisel-releases"
-        - "api.github.com/repos/*/chisel-releases/**"
+        - match: "github.com/*/chisel-releases**"
+          except:
+            - "GET /*/chisel-releases*/info/refs?service=git-upload-pack"
+            - "GET /*/chisel-releases/blob/*/README.md"
+            - "GET /*/chisel-releases/blob/*/CONTRIBUTING.md"
+        - match: "raw.githubusercontent.com/*/chisel-releases**"
+          except:
+            - "/*/chisel-releases/**/chisel.yaml"
+            - "/*/chisel-releases/**/spread.yaml"
+            - "/*/chisel-releases/**/README.md"
+            - "/*/chisel-releases/**/CONTRIBUTING.md"
+        - "codeload.github.com/*/chisel-releases**"
+        - "api.github.com/repos/*/chisel-releases**"
         # the numeric routes reach a repo by id: canonical's and any fork's,
         # with no name to filter on, so all of them.
         - "api.github.com/repositories/**"
+        # chisel-releases mirrored on the packaging forges.
+        - "git.launchpad.net/chisel-releases**"
+        - "git.launchpad.net/**/chisel-releases**"
+        - "code.launchpad.net/chisel-releases**"
+        - "code.launchpad.net/**/chisel-releases**"
+        - "api.launchpad.net/chisel-releases**"
+        - "api.launchpad.net/**/chisel-releases**"
+        - "launchpad.net/chisel-releases**"
+        - "launchpad.net/**/chisel-releases**"
+        - "salsa.debian.org/chisel-releases**"
+        - "salsa.debian.org/**/chisel-releases**"
+        # denied anyway (not allowed), named so they stay denied: the slice
+        # navigator shows the answers, and the rest serve github content.
+        - canonical.github.io
+        - .pages.dev
+        - .readthedocs.io
+        - canonical-chisel-releases.readthedocs-hosted.com
+        - canonical-chisel-releases-navigator.readthedocs-hosted.com
+        - .jsdelivr.net
+        - raw.githack.com
+        - rawcdn.githack.com
+        - .statically.io
+        - .gitmirror.com
+        - .ghproxy.com
+        - ghproxy.net
+        - gh-proxy.com
+        - .fastgit.org
+        - .gitcdn.link
+        - gitcdn.xyz
+        - gitee.com
+        - gitclone.com
+        - raw.github.com
+        - api.allorigins.win
+        - corsproxy.io
+        - api.codetabs.com
+        - thingproxy.freeboard.io
+        - r.jina.ai
+        - sourcegraph.com
+        - .grep.app
+        - searchcode.com
+        - .softwareheritage.org
+        - web.archive.org
+        - gist.githubusercontent.com
+        # the skills under test come installed, or not at all (-noskill agents):
+        # canonical's, rockcrafters' and any fork.
+        - "github.com/*/mason**"
+        - "raw.githubusercontent.com/*/mason**"
+        - "codeload.github.com/*/mason**"
+        - "api.github.com/repos/*/mason**"
   items:
     docker:
       driver: docker
+    # the openrouter candidates: the proxy holds the key, the agent gets a
+    # placeholder. the claude harnesses have no key binding, so not for them.
+    docker-keyproxy:
+      driver: docker
+      egress:
+        allow: *allow
+        deny: *deny
+        key-proxy: true
     # stage, collect and the scorers run here: the pats snap runs nothing on
     # the host. same image as the agent's; open egress, since stage clones
     # chisel-releases (which the agent's deny list blocks) and the uv scorers
@@ -116,6 +187,86 @@ rock-openrouter:
   items:
     deepseek-flash-rock: *deepseek-flash
 
+# cheap openrouter candidates for the model study. pi is minimal, so its own
+# prompt says little next to the skill's. run only through the manual study suites.
+candidates:
+  kind: agent
+  defaults:
+    harness: pi-openrouter
+    effort: low
+    sandbox: docker-keyproxy
+    # usd per pair, the same for every point and effort. tokens and tools only
+    # catch a looping model: the longest pairs so far took 12M tokens, ~200 calls.
+    budget: {cost: 2, tokens: 15M, tools: 400}
+  items:
+    # the 1017 snapshot, pinned. a new name, so runs on the 0910 one don't pool with it.
+    deepseek-v4.1-flash-1017:
+      model: deepseek/deepseek-v4.1-flash-1017
+    glm-5.3:
+      model: z-ai/glm-5.3
+    glm-5.3-flash:
+      model: z-ai/glm-5.3-flash
+    mimo-v2.6-flash:
+      model: xiaomi/mimo-v2.6-flash
+    mimo-v2.6-pro:
+      model: xiaomi/mimo-v2.6-pro
+    qwen3.8-flash:
+      model: qwen/qwen3.8-flash
+    qwen3.7-plus:
+      model: qwen/qwen3.7-plus
+    minimax-m3:
+      model: minimax/minimax-m3
+    nemotron-3.5-super:
+      model: nvidia/nemotron-3.5-super-vl
+    step-3.7-flash:
+      model: stepfun/step-3.7-flash
+    gpt-oss-20b:
+      model: openai/gpt-oss-20b
+    gpt-oss-120b:
+      model: openai/gpt-oss-120b
+    ling-3.0-flash:
+      model: inclusionai/ling-3.0-flash
+    ling-3.1-flash:
+      model: inclusionai/ling-3.1-flash
+    qwen3.7-flash:
+      model: qwen/qwen3.7-flash
+    gemini-2.5-flash-lite:
+      model: google/gemini-2.5-flash-lite
+    gemini-3.1-flash-lite:
+      model: google/gemini-3.1-flash-lite
+    gpt-6-luna:
+      model: openai/gpt-6-luna
+    claude-haiku-5.5:
+      model: anthropic/claude-haiku-5.5
+    # the kept points without the skills: stage installs none and bin/prompt
+    # drops the skill from the prompt. the tessl-style no-skill baseline.
+    deepseek-v4.1-flash-1017-noskill:
+      model: deepseek/deepseek-v4.1-flash-1017
+    glm-5.3-flash-noskill:
+      model: z-ai/glm-5.3-flash
+    # the kept points at another effort. off: no reasoning at all. pi sends
+    # glm low for off and minimal alike, so glm has no off point.
+    deepseek-v4.1-flash-1017-off:
+      model: deepseek/deepseek-v4.1-flash-1017
+      effort: "off"
+    deepseek-v4.1-flash-1017-high:
+      model: deepseek/deepseek-v4.1-flash-1017
+      effort: high
+    glm-5.3-flash-high:
+      model: z-ai/glm-5.3-flash
+      effort: high
+
+# judges only score (agent scorers), never run tasks. opus on the claude login.
+judges:
+  kind: agent
+  defaults:
+    harness: claude-cli-keyless
+    effort: low
+    sandbox: docker
+  items:
+    judge-opus:
+      model: claude-opus-5-5
+
 # one dir per task: task.yaml (the prompt inline) and any ground truth.
 knockout: # the real slice is taken out and must be rewritten
   kind: task
@@ -123,18 +274,38 @@ knockout: # the real slice is taken out and must be rewritten
 denovo: # several targets from scratch, against silver files
   kind: task
   dir: tasks/denovo
-refusal:
-  kind: task
-  dir: tasks/refusal
 help:
   kind: task
   dir: tasks/help
+reviewer: # seeded defects in a real slice (key.yaml), plus an unchanged control
+  kind: task
+  dir: tasks/reviewer
+porter: # a slice ported from another release branch, against the target's own
+  kind: task
+  dir: tasks/porter
 rock-create: # build a rock from scratch: archive, service, source, ppa, fallback
   kind: task
   dir: tasks/rock-create
 rock-debug: # a project with one fault (a failing pack or failing tests) to fix
   kind: task
   dir: tasks/rock-debug
+# parked: tasks every point scores ~1.0 on, or about the same without the
+# skills as with them. only the manual easy suite runs them.
+easy-knockout:
+  kind: task
+  dir: tasks/easy/knockout
+easy-denovo:
+  kind: task
+  dir: tasks/easy/denovo
+easy-porter:
+  kind: task
+  dir: tasks/easy/porter
+easy-refusal:
+  kind: task
+  dir: tasks/easy/refusal
+easy-reviewer:
+  kind: task
+  dir: tasks/easy/reviewer
 
 # scorers/scorer_<name>.py, helpers in scorers/_lib.py. first stdout line: [0,1] or `na`.
 slice-checks:
@@ -149,20 +320,43 @@ slice-checks:
     copyright-essential:
     mutate-present:
     mutate-paths:
-    slice-count-not-inflated:
-    structural-distance:
+    deps-recall: # ground truth's cross-package essentials kept
+    consumers-kept: # slice names other slices files depend on
     chisel-cut:
     orientation-called:
     spread-test-present:
     spread-exercises-binaries:
-    no-answer-fetch:
     hygiene: # the style and format checks, one vote (see its CHECKS)
+# layout against the ground truth. not for ports, which keep the source's.
+slice-shape:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    slice-count-not-inflated:
+    structural-distance:
 refusal-checks:
   kind: scorer
   defaults: *py-scorer
   items:
     refuses-nonexistent:
     refusal-verified:
+port-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    port-key: # the adaptations in the task's key.yaml
+review-checks:
+  kind: scorer
+  defaults: *py-scorer
+  items:
+    review-verdict:
+    review-read-only:
+    review-findings: # judged: seeded-defect recall x precision of the rest
+      score: ~
+      agent: judge-opus
+      prompt-file: judges/review-findings.md
+      stage: judge-stage-review
+      timeout: 10m
 help-checks:
   kind: scorer
   defaults: *py-scorer
@@ -209,16 +403,12 @@ suites:
       tasks:
         - knockout
         - denovo
-      scorers: slice-checks
+      scorers:
+        - slice-checks
+        - slice-shape
     # ci-<skill> is what ci runs when skills/<skill>/ changes
     # (.github/scripts/pats-suites.sh). manual, on the openrouter agents.
     ci-chisel-slicer: {<<: *slicer, agents: openrouter, manual: true}
-    # slice-checks need ground truth, which refusal has none of.
-    slicer-refusal:
-      tasks: refusal
-      scorers:
-        - refusal-checks
-        - orientation-called
     # rock tasks run in the rock-lxd sandbox: real rockcraft packs and tests.
     rock-crafter: &rock-crafter
       agents: rock-models
@@ -243,3 +433,73 @@ suites:
     mason:
       tasks: help
       scorers: help-checks
+    porter:
+      tasks: porter
+      scorers:
+        - port-checks
+        - slice-checks
+    reviewer:
+      tasks: reviewer
+      scorers:
+        - review-checks
+        - orientation-called
+
+# the candidates over every task. manual, so a bare `pats run` leaves them out:
+# pats run -S study [-a <candidate>] [-t <task>]
+study:
+  kind: suite
+  defaults:
+    agents: candidates
+    manual: true
+  items:
+    study-slicer:
+      tasks:
+        - knockout
+        - denovo
+      scorers:
+        - slice-checks
+        - slice-shape
+    study-mason:
+      tasks: help
+      scorers: help-checks
+    study-porter:
+      tasks: porter
+      scorers:
+        - port-checks
+        - slice-checks
+    study-reviewer:
+      tasks: reviewer
+      scorers:
+        - review-checks
+        - orientation-called
+
+# the parked easy tasks, kept runnable: pats run -S easy [-a <agent>]
+easy:
+  kind: suite
+  defaults:
+    agents: models
+    manual: true
+  items:
+    easy-slicer:
+      tasks:
+        - easy-knockout
+        - easy-denovo
+      scorers:
+        - slice-checks
+        - slice-shape
+    # slice-checks need ground truth, which refusal has none of.
+    easy-refusal:
+      tasks: easy-refusal
+      scorers:
+        - refusal-checks
+        - orientation-called
+    easy-porter:
+      tasks: easy-porter
+      scorers:
+        - port-checks
+        - slice-checks
+    easy-reviewer:
+      tasks: easy-reviewer
+      scorers:
+        - review-checks
+        - orientation-called

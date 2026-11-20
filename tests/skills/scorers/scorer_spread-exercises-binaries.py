@@ -3,7 +3,10 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""spread-exercises-binaries: spread bundle references the sliced binaries."""
+"""spread-exercises-binaries: spread bundle references the sliced binaries.
+
+na without a spread test: spread-test-present already scores that, and one
+miss shouldn't count twice."""
 from _lib import *
 
 
@@ -19,7 +22,7 @@ def score() -> float:
     bundle_path = OUT / f"{TASK}.spread.txt"
     bundle = bundle_path.read_text(encoding="utf-8") if bundle_path.exists() else ""
     if not bundle:
-        return 0.0
+        raise NA
     return sum(1 for b in bins if b in bundle) / len(bins)
 
 emit(score)

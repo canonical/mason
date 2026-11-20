@@ -1,0 +1,28 @@
+package: base-passwd
+
+essential:
+  - base-passwd_copyright
+
+slices:
+  # The update-passwd(8) tool keeps the system's /etc/passwd and /etc/group
+  # in sync with the Debian account defaults.
+  bins:
+    essential:
+      - base-passwd_data
+      - libc6_libs
+      - libdebconfclient0_libs
+      - libselinux1_libs
+    contents:
+      /usr/sbin/update-passwd:
+
+  # Default lists of system users and groups used as the reference for
+  # /etc/passwd and /etc/group; consumed by update-passwd and by packages
+  # needing well-known account names.
+  data:
+    contents:
+      /usr/share/base-passwd/group.master:
+      /usr/share/base-passwd/passwd.master:
+
+  copyright:
+    contents:
+      /usr/share/doc/base-passwd/copyright:

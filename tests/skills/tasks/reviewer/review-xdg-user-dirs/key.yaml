@@ -1,0 +1,6 @@
+verdict: request-changes
+defects:
+  - id: dangling-dash-bin
+    severity: blocking
+    what: scripts depends on dash_bin, which does not exist (dash's slice is dash_bins)
+    locators: [dash_bin]

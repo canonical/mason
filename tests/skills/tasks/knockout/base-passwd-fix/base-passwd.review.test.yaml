@@ -1,0 +1,26 @@
+summary: Integration tests for base-passwd
+
+execute: |
+  # base-passwd_bins: fresh rootfs so a missing dep can't hide behind another test.
+  rootfs="$(install-slices base-passwd_bins)"
+
+  chroot "$rootfs" /usr/sbin/update-passwd --version 2>&1 | grep -F "update-passwd"
+
+  # Exercise a real operation: the tool reads /etc/passwd and /etc/group,
+  # which the chroot lacks. It must report the missing files rather than
+  # failing on an unresolved shared library.
+  out="$(chroot "$rootfs" /usr/sbin/update-passwd --dry-run 2>&1)"
+  echo "$out" | grep -Fiq "etc/passwd"
+
+  # A rootfs with /etc/passwd and /etc/group seeded from the shipped
+  # masters must pass a full dry run: no differences, exit status 0.
+  cp "$rootfs/usr/share/base-passwd/passwd.master" "$rootfs/etc/passwd"
+  cp "$rootfs/usr/share/base-passwd/group.master" "$rootfs/etc/group"
+  chroot "$rootfs" /usr/sbin/update-passwd --dry-run
+
+  # base-passwd_data: fresh rootfs; assert the master lists ship well-known
+  # system accounts that consumers (passwd, cron) rely on.
+  rootfs="$(install-slices base-passwd_data)"
+  grep -Fxq "root:x:0:0:root:/root:/bin/bash" "$rootfs/usr/share/base-passwd/passwd.master"
+  grep -Fxq "root:x:0:" "$rootfs/usr/share/base-passwd/group.master"
+  grep -Fxq "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin" "$rootfs/usr/share/base-passwd/passwd.master"

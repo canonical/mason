@@ -23,7 +23,7 @@ _MARKERS = (
     "/chisel-slice-porter <pkg>",
     "/rock-crafter <app>",
     "/rock-debugger",
-    "slices/curl.yaml",
+    "slices/jq.yaml",
     "github.com/canonical/mason",
 )
 

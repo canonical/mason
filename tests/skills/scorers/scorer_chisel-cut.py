@@ -5,24 +5,14 @@
 # ///
 """chisel-cut: did the agent validate its slices by running `chisel cut`?
 
-reads the run transcript and correlates each `chisel cut` / `try-cut` invocation
-to its result:
+correlates each `chisel cut` / `try-cut` command to its result:
   0.0  never ran chisel cut (no validation attempted)
   0.5  ran it but no invocation succeeded (every cut errored)
   1.0  ran it and at least one cut exited cleanly
 
-four transcript formats, tried in order:
-  - claude (stdout.log, ndjson stream-json): tool_use/tool_result correlation
-    (claude lines carry "message"/"session_id" keys).
-  - opencode (stdout.log, `--format json` events): each tool_use event carries
-    both the command and its result (part.state), no correlation needed
-    (opencode lines carry a "part" object + camel-case "sessionID").
-  - codex (stdout.log, jsonl): item.completed events whose item is a
-    command_execution -- command, aggregated_output and exit_code on one object.
-  - plain text (stderr.log/stdout.log, ANSI): `$ <command>` blocks scanned for
-    failure markers. fallback for old opencode runs predating --format json.
+old plain-text transcripts fall back to `$ <command>` blocks scanned for failure
+markers.
 """
-import json
 import re
 
 from _lib import *
@@ -46,118 +36,11 @@ def _is_cut_cmd(cmd: str) -> bool:
     return "chisel cut" in cmd or "try-cut" in cmd
 
 
-def _jsonl(path):
-    """yield parsed json objects from a jsonl file, skipping non-json lines."""
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            continue
-
-
-def _score_claude() -> float | None:
-    """stream-json tool_use/tool_result correlation. None if stdout.log has no
-    claude-shaped events."""
-    cut_ids: dict[str, str] = {}
-    results: dict[str, tuple[bool, str]] = {}
-    saw_claude = False
-
-    for ev in _jsonl(OUT / "stdout.log"):
-        if "message" in ev or "session_id" in ev:
-            saw_claude = True
-        msg = ev.get("message")
-        for c in ((msg if isinstance(msg, dict) else {}).get("content") or []):
-            if not isinstance(c, dict):
-                continue
-            if c.get("type") == "tool_use" and c.get("name") == "Bash":
-                cmd = str((c.get("input") or {}).get("command", ""))
-                if _is_cut_cmd(cmd):
-                    cut_ids[c.get("id")] = cmd
-            elif c.get("type") == "tool_result":
-                cont = c.get("content")
-                if isinstance(cont, list):
-                    text = " ".join(b.get("text", "") for b in cont if isinstance(b, dict))
-                else:
-                    text = str(cont or "")
-                results[c.get("tool_use_id")] = (bool(c.get("is_error")), text)
-
-    if not saw_claude:
-        return None
-    if not cut_ids:
-        return 0.0
-    for tid in cut_ids:
-        r = results.get(tid)
-        if r is None:
-            continue
-        is_err, text = r
-        if _cut_ok(is_err, text):
-            return 1.0
-    return 0.5
-
-
-def _score_opencode() -> float | None:
-    """opencode --format json: a tool_use event is self-contained -- the part's
-    state carries input.command, output/error, and status. None if stdout.log
-    has no opencode-shaped events."""
-    saw_oc = False
-    cuts: list[tuple[bool, str]] = []  # (is_err, output)
-
-    for ev in _jsonl(OUT / "stdout.log"):
-        part = ev.get("part")
-        if not isinstance(part, dict):
-            continue
-        saw_oc = True
-        if ev.get("type") != "tool_use":
-            continue
-        state = part.get("state") or {}
-        cmd = str((state.get("input") or {}).get("command", ""))
-        if not _is_cut_cmd(cmd):
-            continue
-        out = str(state.get("output") or state.get("error") or "")
-        cuts.append((state.get("status") == "error", out))
-
-    if not saw_oc:
-        return None
+def _score_calls(cs: list[dict]) -> float:
+    cuts = [c for c in cs if _is_cut_cmd(c["command"])]
     if not cuts:
         return 0.0
-    for is_err, text in cuts:
-        if _cut_ok(is_err, text):
-            return 1.0
-    return 0.5
-
-
-def _score_codex() -> float | None:
-    """codex jsonl: item.completed events carrying a command_execution item,
-    which is self-contained -- command, aggregated_output and exit_code all on
-    the one object. None if stdout.log has no codex-shaped events."""
-    saw_codex = False
-    cuts: list[tuple[bool, str]] = []
-
-    for ev in _jsonl(OUT / "stdout.log"):
-        item = ev.get("item")
-        if not isinstance(item, dict) or not str(ev.get("type", "")).startswith("item."):
-            continue
-        saw_codex = True
-        if ev.get("type") != "item.completed" or item.get("type") != "command_execution":
-            continue
-        if not _is_cut_cmd(str(item.get("command", ""))):
-            continue
-        # exit_code is None on the in_progress twin; completed always has one.
-        cuts.append((item.get("exit_code") not in (0, None), str(item.get("aggregated_output") or "")))
-
-    if not saw_codex:
-        return None
-    if not cuts:
-        return 0.0
-    for is_err, text in cuts:
-        if _cut_ok(is_err, text):
-            return 1.0
-    return 0.5
+    return 1.0 if any(c["done"] and _cut_ok(c["error"], c["output"]) for c in cuts) else 0.5
 
 
 def _score_text() -> float:
@@ -200,9 +83,9 @@ def _score_text() -> float:
 
 
 def score() -> float:
-    for s in (_score_claude(), _score_opencode(), _score_codex()):
-        if s is not None:
-            return s
+    c = calls()
+    if c["parsed"]:
+        return _score_calls(c["calls"])
     return _score_text()
 
 

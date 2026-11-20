@@ -1,0 +1,6 @@
+# natural-defect review: a cheap writer's slices file and spread test from the
+# ca-certificates knockout, unedited. review-ca-certificates/key.yaml lists the defects.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-24.04 --review ca-certificates
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

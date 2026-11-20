@@ -1,0 +1,3 @@
+# 24.04's login still ships what 26.04 moved out of it.
+present: [/usr/bin/login, /usr/sbin/nologin, /usr/bin/faillog, /usr/bin/lastlog, /usr/bin/newgrp, /usr/bin/sg, /etc/login.defs, /etc/pam.d/login]
+essential: [libc6_libs, libpam0g_libs, libpam-modules_libs]

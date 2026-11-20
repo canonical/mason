@@ -1,0 +1,8 @@
+# writer half of a writer / reviewer pair: a cheap writer's own knockout
+# output plus another model's real review of it, to be fixed. scored like the
+# base-passwd knockout, against upstream.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-24.04 --knockout base-passwd --review base-passwd
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

@@ -1,0 +1,7 @@
+# hard: postinst runs update-alternatives for libblas.so.3, which upstream
+# replaces with per-arch symlinks.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-24.04 --knockout libblas3
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

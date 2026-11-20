@@ -9,6 +9,7 @@ pats score
 
 - `pats.yaml` -- sandboxes, agents, scorers, suites
 - `tasks/<vector>/<task>/` -- one task each: `task.yaml` (the prompt inline), any ground truth
+- `tasks/easy/<vector>/` -- parked tasks every model passes, or that score about the same without the skills. only `pats run -S easy` runs them
 - `bin/` -- the steps tasks share (`stage`, `collect`) and the sandbox's `provision`
 - `scorers/` -- one uv script per scorer, helpers in `_lib.py`
 

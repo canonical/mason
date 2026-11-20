@@ -1,0 +1,38 @@
+package: ca-certificates
+
+essential:
+  - ca-certificates_copyright
+
+slices:
+  bins:
+    essential:
+      - ca-certificates_data
+      - openssl_bins
+    contents:
+      /usr/sbin/update-ca-certificates:
+
+  data:
+    contents:
+      /etc/ssl/certs/ca-certificates.crt: {text: "", mutable: true}
+      /usr/share/ca-certificates/mozilla/: {until: mutate}
+      /usr/share/ca-certificates/mozilla/**: {until: mutate}
+    mutate: |
+      certs = []
+      for cert in content.list("/usr/share/ca-certificates/mozilla/"):
+        certs.append(content.read("/usr/share/ca-certificates/mozilla/" + cert))
+      content.write("/etc/ssl/certs/ca-certificates.crt", "".join(certs))
+
+  data-with-certs:
+    essential:
+      - ca-certificates_data
+    contents:
+      /etc/ca-certificates.conf: {text: "", mutable: true}
+      /usr/share/ca-certificates/mozilla/:
+      /usr/share/ca-certificates/mozilla/**:
+    mutate: |
+      certs = content.list("/usr/share/ca-certificates/mozilla/")
+      content.write("/etc/ca-certificates.conf", "\n".join(["mozilla/" + c for c in certs]) + "\n")
+
+  copyright:
+    contents:
+      /usr/share/doc/ca-certificates/copyright:

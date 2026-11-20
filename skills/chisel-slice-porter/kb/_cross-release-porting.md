@@ -7,7 +7,7 @@ Package slices files for the same package differ across Ubuntu release branches.
 | Category | Example | What changes |
 |----------|---------|-------------|
 | **usrmerge** | `/bin/bash` -> `/usr/bin/bash` | Ubuntu 24.04+ moved binaries from `/bin/` to `/usr/bin/`. Update `contents` paths per release |
-| **t64 transition** | `libssl3` -> `libssl3t64` | Ubuntu 24.04+ renamed libraries for 64-bit `time_t`. Update `essential` deps and copyright refs |
+| **t64 transition** | `libfoo1` -> `libfoo1t64` | Ubuntu 24.04+ renamed libraries for 64-bit `time_t`. Update `essential` deps and copyright refs |
 | **Package splits/renames** | Transitional packages, new soname packages | May need entirely different slices file structure or filename |
 | **Soname bumps** | `librocksdb8.9` (24.04) -> `librocksdb9.10` (25.10) -> `librocksdb9.11` (26.04) | Old slices file deleted (archive no longer carries it); new slices file with new filename |
 | **Essential syntax** | List (`- foo_bar`) vs map (`foo_bar:`) | Gated by the branch's `chisel.yaml` `format:`. v3 branches **must** use map syntax in `essential:` (the list form is a parse error, and `v3-essential:` is rejected -- fold its entries into `essential:`); v1/v2 use the list, with `v3-essential:` alongside it for arch gating |

@@ -1,0 +1,9 @@
+# forward port that only changes the manifest format: checks the model doesn't
+# over-edit.
+# key.yaml holds the adaptations the port must make. the target's own slice
+# (knocked out) is supporting evidence only.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --source ubuntu-24.04 --knockout sed
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

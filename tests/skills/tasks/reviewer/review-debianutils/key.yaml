@@ -1,0 +1,14 @@
+verdict: request-changes
+defects:
+  - id: savelog-deps
+    severity: blocking
+    what: savelog is a shell script that runs mv, ln, rm, chmod, date, sed and other coreutils tools, and its slice pulls only dash_bins, so it fails in a chisel rootfs. the spread test's savelog rotation would fail for the same reason
+    locators: [savelog, coreutils]
+  - id: which-symlink
+    severity: blocking
+    what: the which slice ships only /usr/bin/which.debianutils. /usr/bin/which is an alternative the deb does not contain, so nothing provides it, and tomcat10-common / tomcat11-common depend on debianutils_which to call which by name
+    locators: [/usr/bin/which]
+  - id: no-bin-path
+    severity: blocking
+    what: savelog and which.debianutils start with #!/bin/sh, and neither slice pulls base-files_bin, so a rootfs of either slice alone has no /bin and the scripts can't start. upstream lists base-files_bin for both
+    locators: [base-files_bin]

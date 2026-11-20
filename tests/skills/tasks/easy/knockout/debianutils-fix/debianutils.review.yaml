@@ -1,0 +1,29 @@
+package: debianutils
+
+essential:
+  debianutils_copyright:
+
+slices:
+  bins:
+    essential:
+      libc6_libs:
+    contents:
+      /usr/bin/ischroot:
+      /usr/bin/run-parts:
+      /usr/bin/tempfile:
+
+  scripts:
+    essential:
+      dash_bins:
+    contents:
+      /usr/bin/savelog:
+
+  which:
+    essential:
+      dash_bins:
+    contents:
+      /usr/bin/which.debianutils:
+
+  copyright:
+    contents:
+      /usr/share/doc/debianutils/copyright:
