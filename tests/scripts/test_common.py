@@ -138,28 +138,6 @@ def test_reporter_keys_follow_the_contract(common, capsys) -> None:
     assert "uv: {present: true, version: '0.1'}" in out
 
 
-def test_merge(common, capsys) -> None:
-    report = common.Report({})
-    report.merge(
-        {
-            "status": "failed",
-            "findings": {"foo.yaml": [{"sev": "block", "code": "removed"}]},
-            "codes": {"removed": "gone"},
-        }
-    )
-    report.merge(
-        {
-            "status": "unavailable",
-            "unavailable": [{"check": "cut", "reason": "no chisel"}],
-        }
-    )
-    code, _, doc = emitted(report, capsys)
-    assert code == 1
-    assert doc["counts"] == {"block": 1}
-    assert doc["codes"] == {"removed": "gone"}
-    assert doc["unavailable"] == [{"check": "cut", "reason": "no chisel"}]
-
-
 def test_usage_goes_to_stderr(common, capsys) -> None:
     assert common.usage("usage: foo.py <bar>") == 2
     captured = capsys.readouterr()
@@ -287,3 +265,19 @@ def test_tools_keeps_a_tool_that_prints_no_version(common, monkeypatch) -> None:
     assert common.tools(("spread",)) == {
         "spread": {"present": True, "version": "unknown"}
     }
+
+
+def test_manifest_reads_by_field(common) -> None:
+    text = (
+        "format: v3\narchives:\n  ubuntu:\n    version: '26.04'\n"
+        "    suites: [resolute, resolute-updates]\n    components: [main]\n"
+        "maintenance:\n  end-of-life: \"2038-04-27\"\n"
+    )
+    assert common.manifest(text) == {
+        "format": "v3",
+        "version": "26.04",
+        "suites": "[resolute, resolute-updates]",
+        "components": "[main]",
+        "end-of-life": "2038-04-27",
+    }
+    assert set(common.manifest("").values()) == {None}

@@ -7,17 +7,15 @@
 the directory you work in. Deterministic: it reports which tools this machine
 has, the git state, the chisel-releases checkout or rock project in the
 current directory (each only when it is there), and which Ubuntu releases
-Ubuntu, chisel-releases and the installed rockcraft each know. Work from
-this, not from guesses.
+Ubuntu, chisel-releases and the installed rockcraft each know.
 
 It lists and does not judge: whether a missing tool, a missing checkout or an
 unmaintained release blocks a task is for the skill to say. Nearly every value
 is read off the machine, the directory or an upstream source. The few that are
 derived or assumed instead are marked DERIVED where they are computed.
 
-The output is the YAML report described in common.py. It only reads, and
-everything it starts is bounded, so a dead network costs the release facts
-and nothing else.
+It only reads, and everything it starts is bounded, so a dead network costs
+the release facts that came over it and nothing else.
 
 Usage: orientation.py
 
@@ -35,11 +33,8 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import sys
-import time
-import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -49,18 +44,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common
 import yaml
 
-TOOLS = (
-    "chisel",
-    "rockcraft",
-    "dpkg-deb",
-    "file",
-    "spread",
-    "lxc",
-    "docker",
-    "uv",
-    "python3",
-    "git",
-)
+TOOLS = ("chisel", "rockcraft", "dpkg-deb", "file", "spread", "lxc", "docker", "uv", "python3", "git")  # fmt: skip
+SUITES = ("rockcraft-test.yaml", "spread.yaml")
+ROCK_KEYS = ("name", "version", "base", "build-base")
+
 # the three upstream sources. each can be pointed elsewhere (a mirror, a test
 # fixture) through the environment variable named beside it.
 DEFAULT_URL = "https://github.com/canonical/chisel-releases.git"  # CHISEL_RELEASES_URL
@@ -73,16 +60,10 @@ META_RELEASE = "https://changelogs.ubuntu.com/meta-release"
 ROCKCRAFT_SCHEMA = (
     "https://raw.githubusercontent.com/canonical/rockcraft/{version}/schema/rockcraft.json"
 )
-SUITES = ("rockcraft-test.yaml", "spread.yaml")
-ROCK_KEYS = ("name", "version", "base", "build-base")
-GIT_TIMEOUT = 20
-FETCH_TIMEOUT = 8
-DEADLINE = 45  # seconds for all release discovery together
+TIMEOUT = 20  # seconds, per command
+FETCH_TIMEOUT = 8  # seconds, per fetch
+DEADLINE = 45  # seconds, for all release discovery together
 
-_FORMAT = re.compile(r"^format:[ \t]*(.*)$", re.MULTILINE)
-_SUITES = re.compile(r"suites:[ \t]*(.*)$", re.MULTILINE)
-_COMPONENTS = re.compile(r"components:[ \t]*(.*)$", re.MULTILINE)
-_EOL = re.compile(r"^[ \t]*end-of-life:[ \t]*(.*)$", re.MULTILINE)
 _ABSENT = (FileNotFoundError, IsADirectoryError, NotADirectoryError)
 
 
@@ -90,7 +71,7 @@ class Failed(Exception):
     """A read that could not be made, as opposed to one that answered no."""
 
 
-def run(cmd: list[str], timeout: int = GIT_TIMEOUT) -> subprocess.CompletedProcess:
+def run(cmd: list[str], timeout: int = TIMEOUT) -> subprocess.CompletedProcess:
     """Run a read-only command. Failed when it cannot start or does not end."""
     try:
         return subprocess.run(
@@ -109,20 +90,9 @@ def fetch(url: str) -> str:
         raise Failed(f"{url}: {e}") from e
 
 
-def first(pattern: re.Pattern[str], text: str) -> str:
-    m = pattern.search(text)
-    return m.group(1).strip() if m else ""
-
-
-def inline_list(value: str) -> list[str] | None:
-    """A flow list like [a, b] written on the key's own line, else None."""
-    m = re.fullmatch(r"\[(.*)\]", value.strip())
-    return [v.strip() for v in m.group(1).split(",") if v.strip()] if m else None
-
-
-def read(path: str) -> str | None:
-    """The text of a file in the working directory, or None when no file by
-    that name is here. Any other failure to read it is Failed."""
+def here(path: str) -> str | None:
+    """The text of a file in the working directory, None when no file by that
+    name is here. Failed when it is there and cannot be read."""
     try:
         return Path(path).read_text(encoding="utf-8", errors="replace")
     except _ABSENT:
@@ -131,16 +101,24 @@ def read(path: str) -> str | None:
         raise Failed(f"{path}: {e}") from e
 
 
+def after(date: str | None, today: str) -> bool | None:
+    """Whether an ISO date is still ahead of today. None without a usable one."""
+    try:
+        return _dt.date.fromisoformat(date or "") > _dt.date.fromisoformat(today)
+    except ValueError:
+        return None
+
+
 # --- the working directory ---------------------------------------------------
 
 
 def git_state(report: common.Report) -> common.Flow:
-    if not shutil.which("git"):
-        return common.Flow(repository=None)
     state = common.Flow(repository=None)
+    if not shutil.which("git"):
+        return state
     try:
-        inside = run(["git", "rev-parse", "--is-inside-work-tree"])
         # git exits non-zero outside a repository: that is its answer
+        inside = run(["git", "rev-parse", "--is-inside-work-tree"])
         state["repository"] = inside.stdout.strip() == "true"
         if state["repository"]:
             branch = run(["git", "branch", "--show-current"])
@@ -152,59 +130,54 @@ def git_state(report: common.Report) -> common.Flow:
     return state
 
 
-def checkout(today: str, report: common.Report) -> None:
-    """Facts about ./chisel.yaml, under `chisel-releases`, when there is one."""
+def context(name: str, path: str, facts, report: common.Report) -> None:
+    """Report facts(text) under `name` when `path` is a file here. The key is
+    left out when it is not, and None when it is there but cannot be read."""
     try:
-        text = read("chisel.yaml")
+        text = here(path)
     except Failed as e:
-        report.data["chisel-releases"] = None
-        report.mark_unavailable("chisel-releases", str(e))
+        report.data[name] = None
+        report.mark_unavailable(name, str(e))
         return
-    if text is None:
-        return
+    if text is not None:
+        report.data[name] = facts(text, report)
 
+
+def flow_list(value: str | None) -> list[str] | None:
+    """A flow list like [a, b] written on the key's own line, else None."""
+    m = re.fullmatch(r"\[(.*)\]", value or "")
+    return [v.strip() for v in m.group(1).split(",") if v.strip()] if m else None
+
+
+def checkout(text: str, report: common.Report, today: str) -> dict:
+    m = common.manifest(text)
     # the base is a fact of the manifest, not of whatever branch is checked out
     base = common.target_base()
-    ref = None
+    ref = n = None
     try:
-        ref = common.base_ref(base, timeout=GIT_TIMEOUT) if base else None
+        ref = common.base_ref(base, timeout=TIMEOUT) if base else None
     except subprocess.TimeoutExpired as e:
         report.mark_unavailable("git", f"base ref: {e}")
-    eol = first(_EOL, text).strip("\"'")
-    try:
-        maintained = _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
-    except ValueError:
-        maintained = None
     try:
         n = len([f for f in os.listdir("slices") if not f.startswith(".")])
     except _ABSENT:
         n = 0
     except OSError as e:
-        n = None
         report.mark_unavailable("chisel-releases", f"slices/: {e}")
-    report.data["chisel-releases"] = {
+    return {
         "target base": base,
         "base ref": ref,
-        "ubuntu version": common.ubuntu_version(text),
-        "manifest format": first(_FORMAT, text) or None,
-        "suites": inline_list(first(_SUITES, text)),
-        "components": inline_list(first(_COMPONENTS, text)),
-        "end-of-life": eol or None,
-        "maintained": maintained,
+        "ubuntu version": m["version"],
+        "manifest format": m["format"],
+        "suites": flow_list(m["suites"]),
+        "components": flow_list(m["components"]),
+        "end-of-life": m["end-of-life"],
+        "maintained": after(m["end-of-life"], today),
         "existing slices": n,
     }
 
 
-def rock(report: common.Report) -> None:
-    """Facts about ./rockcraft.yaml, under `rock`, when there is one."""
-    try:
-        text = read("rockcraft.yaml")
-    except Failed as e:
-        report.data["rock"] = None
-        report.mark_unavailable("rock", str(e))
-        return
-    if text is None:
-        return
+def rock(text: str, report: common.Report) -> dict:
     try:
         doc = yaml.safe_load(text)
     except yaml.YAMLError:
@@ -215,21 +188,11 @@ def rock(report: common.Report) -> None:
         else {"parses": False}
     )
     try:
-        facts["test suites"] = [s for s in SUITES if is_file(s)]
+        facts["test suites"] = [s for s in SUITES if here(s) is not None]
     except Failed as e:
         facts["test suites"] = None
         report.mark_unavailable("rock", str(e))
-    report.data["rock"] = facts
-
-
-def is_file(path: str) -> bool:
-    """Whether a file by that name is here. Failed when that cannot be told."""
-    try:
-        return stat.S_ISREG(Path(path).stat().st_mode)
-    except _ABSENT:
-        return False
-    except OSError as e:
-        raise Failed(f"{path}: {e}") from e
+    return facts
 
 
 # --- releases ----------------------------------------------------------------
@@ -263,20 +226,20 @@ def branch_manifest(url: str, revision: str) -> str:
     return fetch(f"{RAW}/{revision}/chisel.yaml")
 
 
-def branch_facts(branch: str, manifest: str, today: str) -> common.Flow:
-    # normalise "v3" / "chisel-v1" / "1" -> "v1".."v3".
-    digits = re.search(r"[0-9]+", first(_FORMAT, manifest))
-    eol = first(_EOL, manifest).strip("\"'")
-    try:
-        maintained = _dt.date.fromisoformat(eol) > _dt.date.fromisoformat(today)
-    except ValueError:
-        eol = ""
-        maintained = False if expired_interim(branch, today) else None
+def branch_facts(branch: str, manifest: str | None, today: str) -> common.Flow:
+    """What a branch's manifest states. Every fact is None when it has none."""
+    m = common.manifest(manifest or "")
+    digits = re.search(r"[0-9]+", m["format"] or "")  # "chisel-v1" / "1" -> "v1"
+    maintained = after(m["end-of-life"], today)
+    if maintained is None:
+        m["end-of-life"] = None
+        if manifest is not None and expired_interim(branch, today):
+            maintained = False
     return common.Flow(
         {
             "branch": branch,
             "format": f"v{digits.group(0)}" if digits else None,
-            "end-of-life": eol or None,
+            "end-of-life": m["end-of-life"],
             "maintained": maintained,
         }
     )
@@ -289,12 +252,12 @@ def remote_branches(url: str) -> dict[str, str]:
     listed = run(["git", "ls-remote", "--heads", url, "ubuntu-*"], timeout=30)
     if listed.returncode:
         raise Failed(f"{url}: {listed.stderr.strip() or f'exit {listed.returncode}'}")
-    out = {}
-    for line in listed.stdout.splitlines():
-        rev, _, ref = line.partition("\t")
-        if ref.startswith("refs/heads/"):
-            out[ref.removeprefix("refs/heads/")] = rev
-    return out
+    refs = (line.partition("\t") for line in listed.stdout.splitlines())
+    return {
+        ref.removeprefix("refs/heads/"): rev
+        for rev, _, ref in refs
+        if ref.startswith("refs/heads/")
+    }
 
 
 def ubuntu_releases() -> dict[str, common.Flow]:
@@ -312,9 +275,8 @@ def ubuntu_releases() -> dict[str, common.Flow]:
                 codename=f["Dist"],
                 lts="LTS" in f["Version"],
                 supported=f.get("Supported") == "1",
+                **({"development": True} if devel else {}),
             )
-            if devel:
-                out[m.group(1)]["development"] = True
     return out
 
 
@@ -329,19 +291,21 @@ def rockcraft_version() -> str | None:
 
 
 def rockcraft_bases(version: str) -> dict[str, common.Flow]:
-    """version -> how the given rockcraft version accepts that release."""
+    """release -> how the given rockcraft version accepts it."""
     # the schema is read at the tag of the installed version, never at main:
     # another version's bases would be a guess about this one.
+    url = os.environ.get("ROCKCRAFT_SCHEMA_URL", ROCKCRAFT_SCHEMA)
     try:
-        url = os.environ.get("ROCKCRAFT_SCHEMA_URL", ROCKCRAFT_SCHEMA)
-        schema = json.loads(fetch(url.format(version=version)))
-        props = schema["properties"]
-        base = props["base"]["enum"]
-        build = [e for alt in props["build-base"]["anyOf"] for e in alt.get("enum", [])]
+        props = json.loads(fetch(url.format(version=version)))["properties"]
+        build = props["build-base"]["anyOf"]
+        accepted = {
+            "base": props["base"]["enum"],
+            "build-base": [e for alt in build for e in alt.get("enum", [])],
+        }
     except (ValueError, KeyError, TypeError) as e:
         raise Failed(f"rockcraft {version}: its schema does not read: {e!r}") from e
     out: dict[str, common.Flow] = {}
-    for key, names in (("base", base), ("build-base", build)):
+    for key, names in accepted.items():
         for name in names:
             m = re.fullmatch(r"ubuntu@(\d+\.\d+)", str(name))
             if m:
@@ -363,78 +327,64 @@ def default_rock_base(rows: dict[str, dict]) -> str | None:
     return None
 
 
-def release_key(version: str) -> tuple:
-    return tuple(int(x) if x.isdigit() else -1 for x in re.split(r"[.-]", version))
-
-
 def releases(today: str, report: common.Report) -> None:
     """One row per Ubuntu release, with what each of the three sources says.
     A source that does not know a release has no entry in its row."""
     url = os.environ.get("CHISEL_RELEASES_URL", DEFAULT_URL)
-    deadline = time.monotonic() + DEADLINE
-    ubuntu: dict = {}
-    branches: dict = {}
-    bases: dict = {}
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+
+    def answer(job, check: str, label: str = ""):
+        """A job's result, or None with the reason recorded."""
+        try:
+            return job.result(timeout=0)
+        except concurrent.futures.TimeoutError:
+            reason = "not read before the deadline"
+        except Failed as e:
+            reason = str(e)
+        report.mark_unavailable(check, f"{label}: {reason}" if label else reason)
+        return None
+
     try:
-        jobs = {pool.submit(ubuntu_releases): ("ubuntu releases", None)}
+        ubuntu = pool.submit(ubuntu_releases)
+        bases = None
+        manifests: dict = {}
         try:
             version = rockcraft_version()
-            if version:
-                jobs[pool.submit(rockcraft_bases, version)] = ("rockcraft bases", None)
+            bases = pool.submit(rockcraft_bases, version) if version else None
         except Failed as e:
             report.mark_unavailable("rockcraft bases", str(e))
         try:
             for branch, revision in sorted(remote_branches(url).items()):
-                job = pool.submit(branch_manifest, url, revision)
-                jobs[job] = ("release discovery", branch)
+                manifests[branch] = pool.submit(branch_manifest, url, revision)
         except Failed as e:
             report.mark_unavailable("release discovery", str(e))
-
-        concurrent.futures.wait(jobs, timeout=max(0.0, deadline - time.monotonic()))
-        for job, (check, branch) in jobs.items():
-            version = branch.removeprefix("ubuntu-") if branch else None
-            if not job.done():
-                what = branch or check
-                report.mark_unavailable(check, f"{what}: not read before the deadline")
-                problem = True
-            else:
-                problem = job.exception()
-                if isinstance(problem, Failed):
-                    reason = f"{branch}: {problem}" if branch else str(problem)
-                    report.mark_unavailable(check, reason)
-                elif problem:
-                    raise problem
-            if branch:
-                # a branch the remote lists is a fact even when its manifest
-                # could not be read: its other facts are then unknown
-                branches[version] = (
-                    common.Flow(
-                        {"branch": branch, "format": None, "end-of-life": None,
-                         "maintained": None}
-                    )
-                    if problem
-                    else branch_facts(branch, job.result(), today)
-                )  # fmt: skip
-            elif not problem and check == "ubuntu releases":
-                ubuntu = job.result()
-            elif not problem:
-                bases = job.result()
+        jobs = [ubuntu, *manifests.values(), *([bases] if bases else [])]
+        concurrent.futures.wait(jobs, timeout=DEADLINE)
+        sources = {
+            "ubuntu": answer(ubuntu, "ubuntu releases") or {},
+            # a branch the remote lists is a fact even when its manifest could
+            # not be read: its other facts are then unknown
+            "chisel-releases": {
+                branch.removeprefix("ubuntu-"): branch_facts(
+                    branch, answer(job, "release discovery", branch), today
+                )
+                for branch, job in manifests.items()
+            },
+            "rockcraft": (answer(bases, "rockcraft bases") if bases else None) or {},
+        }
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
-    listed = set(branches) | set(bases) | {v for v, u in ubuntu.items() if u["supported"]}
-    rows = {}
-    for version in sorted(listed, key=release_key):
-        row = {}
-        if version in ubuntu:
-            row["ubuntu"] = ubuntu[version]
-        if version in branches:
-            row["chisel-releases"] = branches[version]
-        if version in bases:
-            row["rockcraft"] = bases[version]
-        rows[version] = row
-    report.data["releases"] = rows
+    listed = {v for v, u in sources["ubuntu"].items() if u["supported"]}
+    listed |= set(sources["chisel-releases"]) | set(sources["rockcraft"])
+
+    def numeric(version: str) -> list[int]:
+        return [int(x) if x.isdigit() else -1 for x in version.split(".")]
+
+    report.data["releases"] = rows = {
+        version: {name: known[version] for name, known in sources.items() if version in known}
+        for version in sorted(listed, key=numeric)
+    }
     report.data["default rock base"] = default_rock_base(rows)
 
 
@@ -446,8 +396,8 @@ def main() -> int:
     report.data["working dir"] = os.getcwd()
     report.data["git"] = git_state(report)
     report.data["tools"] = common.tools(TOOLS)
-    checkout(today, report)
-    rock(report)
+    context("chisel-releases", "chisel.yaml", lambda t, r: checkout(t, r, today), report)
+    context("rock", "rockcraft.yaml", rock, report)
     releases(today, report)
     return report.emit()
 
