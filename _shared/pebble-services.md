@@ -13,7 +13,7 @@ services:
 ```
 
 - `command` starts with an absolute path. `[ <default-args> ]` are overridable
-  via `docker run <img> <args>`; without brackets the args are fixed.
+  via `docker run <img> --args <svc> <args>`; without brackets the args are fixed.
 - `entrypoint-service: <svc>` makes the rock behave like a classic single-binary
   image (`docker run <img> --flag` passes args to it).
 - Top-level and per-service `environment:` set env vars; `checks:` adds Pebble

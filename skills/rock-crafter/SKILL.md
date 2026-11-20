@@ -11,7 +11,7 @@ description: >-
 
 # rock-crafter
 
-Build [rocks](https://documentation.ubuntu.com/rockcraft/stable/) in the user's
+Build [rocks](https://ubuntu.com/containers/rockcraft/docs) in the user's
 project. **Do the work yourself** -- do not hand the task to a subagent (the
 slice hand-over in step 3 is the one exception).
 
