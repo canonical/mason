@@ -1,7 +1,7 @@
 #!/bin/sh
 # the pats sandbox plus what the skills run: dpkg-deb, pyyaml, uv, chisel.
 # provision --rock: also rockcraft, whose builds and `rockcraft test` run lxd
-# instances -- for the rock sandbox, an lxd vm with snapd.
+# instances -- for the rock sandbox, an lxd container with snapd.
 set -eu
 
 export DEBIAN_FRONTEND=noninteractive

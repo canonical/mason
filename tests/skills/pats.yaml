@@ -169,7 +169,7 @@ help-checks:
   items:
     usage-printed:
     mason-stops-clean:
-# rock scorers read the rock project collect-rock gathers; helpers in scorers/_rock.py.
+# rock scorers read the rock project `collect --rock` gathers.
 rock-checks:
   kind: scorer
   defaults: *py-scorer
@@ -230,7 +230,7 @@ suites:
       scorers: [rock-checks, rock-debug-checks]
     # in ci a pack and a test run take minutes per pair, so a subset: one rock
     # each from the archive and from source; one failing pack, one failing test.
-    ci-rock-crafter: 
+    ci-rock-crafter:
       <<: *rock-crafter
       agents: rock-openrouter
       tasks: [hello, yq]
