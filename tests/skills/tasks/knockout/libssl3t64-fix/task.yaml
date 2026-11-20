@@ -5,3 +5,4 @@ prompt-cmd: prompt
 stage: stage --branch ubuntu-26.04 --knockout libssl3t64 --review libssl3t64
 collect: collect
 timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps
