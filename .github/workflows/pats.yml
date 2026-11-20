@@ -65,7 +65,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: ${{ fromJSON(needs.plan.outputs.suites) }}
-    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@00933df528d645e36e593387128a1c7fc5465678 # v0.1.1
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@fdecd4cd24d3f23920d6e9b928324715c31505ff # v0.1.1 + lxd image cache (alesancor1/pats-action#6)
     permissions:
       contents: read
       pull-requests: write
@@ -77,7 +77,8 @@ jobs:
       pats-channel: latest/candidate
       name: ${{ matrix.suite }}
       init-args: -S ${{ matrix.suite }}
-      run-args: -S ${{ matrix.suite }} -j -1
+      run-args: -S ${{ matrix.suite }} -j -1 -v
+      image-cache: true # keeps the rock sandbox's lxd image between runs
       score-args: -S ${{ matrix.suite }}
       max-regression: "0.1" # 10%
     secrets:
