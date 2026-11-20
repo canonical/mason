@@ -27,7 +27,8 @@ not hand the task to a subagent. Work autonomously: no mid-task questions.
 - **Project root** is the current directory, holding `rockcraft.yaml`; with no
   `rockcraft.yaml` there, stop and ask where the rock is. Edit only
   `rockcraft.yaml`, its tests and project files a finding names; preserve unrelated
-  changes. Without git, copy `rockcraft.yaml` to `rockcraft.yaml.bak` before
+  changes. In a git project commit each fix once it works -- only the files it
+  touched. Without git, copy `rockcraft.yaml` to `rockcraft.yaml.bak` before
   the first edit.
 - `kb/rock-debugging.md` covers logs, the build instance and failing tests;
   `kb/_rock-tests.md` how the tests are laid out and run. For the fix
@@ -61,8 +62,7 @@ uv run "<skill-root>/scripts/_pack-rock.py"
 ```
 
 A failure names the category, step, part and the fix; apply it and go back to
-step 1. For `unknown`, read the log it names. In a git project a fix that
-makes the pack pass is committed.
+step 1. For `unknown`, read the log it names.
 
 ## 3. test
 
@@ -75,9 +75,9 @@ uv run "<skill-root>/scripts/_test-rock.py"
 
 Each failed task comes with the commands spread ran and their output.
 Diagnose it with `kb/rock-debugging.md`, "A failing test": fix the rock and go
-back to step 1, or fix a wrong assertion and re-run only that task. Commit
-each fix in a git project. With no test suite, the work ends at a passing pack
-and the report says the rock is untested.
+back to step 1, or fix a wrong assertion and re-run only that task. With no
+test suite, the work ends at a passing pack and the report says the rock is
+untested.
 
 ## 4. still failing
 

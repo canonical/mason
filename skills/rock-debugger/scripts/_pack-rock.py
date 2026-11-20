@@ -6,13 +6,12 @@
 """pack-rock: run `rockcraft pack -v` in the project and turn a failure into a
 diagnosis.
 
-On success the rock file is reported, and -- in a git project where a tracked
-rockcraft.yaml was edited -- the fix is committed (Conventional Commits).
-On failure the first error (later ones usually cascade) is classified against
-a fixed taxonomy; the finding names the failing step and part, the evidence
-lines, and the fix strategy. For a misnamed slice it looks up the package's
-real slices and names the closest one. It never edits rockcraft.yaml, and a
-packed rock is not proof the rock runs.
+On success the rock file is reported. On failure the first error (later ones
+usually cascade) is classified against a fixed taxonomy; the finding names the
+failing step and part, the evidence lines, and the fix strategy. For a
+misnamed slice it looks up the package's real slices and names the closest
+one. It never edits or commits anything, and a packed rock is not proof the
+rock runs.
 
 Usage: pack-rock.py
 
@@ -162,29 +161,11 @@ def slice_fixes(evidence: list[str], report: common.Report) -> dict[str, str]:
         except rl.Unavailable as e:
             report.mark_unavailable("slices", str(e))
             break
-        if have is None:
+        if not have:
             fixes[b] = f"no slices for {pkg} on {rel}"
         else:
             fixes[b] = difflib.get_close_matches(b, have, n=1, cutoff=0)[0]
     return fixes
-
-
-def commit() -> str | None:
-    """commit a fix to a git-tracked rockcraft.yaml (+ other tracked files) --
-    never the built .rock or untracked files; new projects are left alone."""
-    if common.git(["rev-parse", "--git-dir"]) is None:
-        return None
-    if common.git(["ls-files", "--error-unmatch", "rockcraft.yaml"]) is None:
-        return None
-    if not (
-        common.git(["status", "--porcelain", "--untracked-files=no"]) or ""
-    ).strip():
-        return None
-    msg = "fix(rock): make rockcraft pack succeed"
-    r = subprocess.run(
-        ["git", "commit", "-qam", msg], capture_output=True, text=True, check=False
-    )
-    return msg if r.returncode == 0 else f"commit failed: {r.stderr.strip()}"
 
 
 def main() -> int:
@@ -208,7 +189,6 @@ def main() -> int:
         report.data["rock"] = (
             re.findall(r"Packed (\S+\.rock)", ANSI.sub("", text)) or None
         )
-        report.data["commit"] = commit()
         return report.emit()
 
     d = diagnose(text)
