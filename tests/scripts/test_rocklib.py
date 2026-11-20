@@ -128,6 +128,13 @@ def test_upstream_version(debver, short, full):
     assert rl.upstream_version(debver, full=True) == full
 
 
+def test_deb_facts_without_dpkg_deb_is_unavailable(monkeypatch):
+    monkeypatch.setattr(rl.shutil, "which", lambda name: None)
+    monkeypatch.setattr(rl, "fetch", lambda url: pytest.fail("fetched a .deb it cannot read"))
+    with pytest.raises(rl.Unavailable, match="dpkg-deb"):
+        rl.deb_facts({"Package": "hello", "_url": "http://archive/hello.deb"})
+
+
 @pytest.mark.parametrize(
     ("name", "want"),
     [

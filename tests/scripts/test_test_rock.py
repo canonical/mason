@@ -50,6 +50,29 @@ ABORTED_RUN = """\
 :: Failed tasks: 0
 :: Aborted tasks: 2
 """
+# spread's own lines for a failed prepare / restore script (spread/runner.go)
+PREPARE_FAILED_RUN = """\
+:: 2026-11-10 10:00:01 Preparing craft:ubuntu-24.04:spread/general/ (Nov101000-1)...
+:: 2026-11-10 10:00:09 Error preparing craft:ubuntu-24.04:spread/general/ (Nov101000-1) :
+:: -----
+:: + sudo rockcraft.skopeo copy oci-archive:hello.rock docker-daemon:hello:latest
+:: error: no such image
+:: -----
+:: 2026-11-10 10:00:10 Successful tasks: 0
+:: 2026-11-10 10:00:10 Aborted tasks: 2
+:: 2026-11-10 10:00:10 Failed suite prepare: 1
+::     - craft:ubuntu-24.04:spread/general/
+"""
+RESTORE_FAILED_RUN = """\
+:: 2026-11-10 10:00:09 Error restoring craft:ubuntu-24.04:spread/general/greeting (Nov101000-1) :
+:: -----
+:: + docker rm web
+:: Error: no such container
+:: -----
+:: 2026-11-10 10:00:10 Successful tasks: 1
+:: 2026-11-10 10:00:10 Aborted tasks: 0
+:: 2026-11-10 10:00:10 Failed task restore: 1
+"""
 
 
 def test_failures_block_between_rules():
@@ -64,6 +87,12 @@ def test_failures_block_between_rules():
 
 def test_failures_none():
     assert tr.failures(PASSED_RUN.splitlines()) == {}
+
+
+def test_failures_by_verb():
+    lines = PREPARE_FAILED_RUN.splitlines()
+    assert tr.failures(lines) == {}
+    assert list(tr.failures(lines, "preparing")) == ["craft:ubuntu-24.04:spread/general/"]
 
 
 @pytest.fixture
@@ -94,6 +123,12 @@ def test_lint_no_suite(suite):
 def test_lint_deprecated_spread_yaml(suite):
     (suite / "rockcraft-test.yaml").rename(suite / "spread.yaml")
     assert lint_codes() == ["deprecated-spread-yaml"]
+
+
+def test_lint_both_suite_files(suite):
+    # rockcraft reads rockcraft-test.yaml first: a spread.yaml beside it is not its suite
+    (suite / "spread.yaml").write_text("project: other\n")
+    assert lint_codes() == []
 
 
 def test_lint_placeholder(suite):
@@ -137,6 +172,32 @@ def test_run_failed(suite):
 def test_run_aborted_is_unavailable(suite):
     code, doc = run(suite, ABORTED_RUN, 1)
     assert (code, doc["status"]) == (3, "unavailable")
+
+
+def test_run_prepare_failed(suite):
+    code, doc = run(suite, PREPARE_FAILED_RUN, 1)
+    assert (code, doc["status"]) == (1, "failed")
+    finding = doc["findings"]["craft:ubuntu-24.04:spread/general/"][0]
+    assert (finding["code"], finding["step"]) == ("setup-failed", "preparing")
+    assert "no such image" in finding["output"]
+    # the aborted tasks are explained by the finding, not a second unavailable check
+    assert "unavailable" not in doc
+    assert doc["tasks"] == {"passed": 0, "failed": 0, "aborted": 2}
+
+
+def test_run_restore_failed(suite):
+    code, doc = run(suite, RESTORE_FAILED_RUN, 1)
+    assert (code, doc["status"]) == (1, "failed")
+    finding = doc["findings"]["craft:ubuntu-24.04:spread/general/greeting"][0]
+    assert (finding["code"], finding["step"]) == ("setup-failed", "restoring")
+
+
+def test_run_prepare_offline_is_unavailable(suite):
+    out = PREPARE_FAILED_RUN.replace("error: no such image", "error: unable to contact snap store")
+    code, doc = run(suite, out, 1)
+    assert (code, doc["status"]) == (3, "unavailable")
+    assert "findings" not in doc
+    assert ["network" in u["reason"] for u in doc["unavailable"]] == [True]
 
 
 def test_run_no_verdict_is_unavailable(suite):

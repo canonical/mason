@@ -124,6 +124,13 @@ def test_slice_fixes_closest(project, monkeypatch):
     }
 
 
+def test_slice_fixes_package_with_no_slices(project, monkeypatch):
+    monkeypatch.setattr(pr.rl, "slices_of", lambda rel, pkg: [])
+    report = pr.common.Report(pr.CODES)
+    fixes = pr.slice_fixes(["slice hello_binz not found"], report)
+    assert fixes == {"hello_binz": "no slices for hello on ubuntu-24.04"}
+
+
 def test_slice_fixes_unavailable(project, monkeypatch):
     def down(rel, pkg):
         raise pr.rl.Unavailable("chisel-releases unreachable")
@@ -185,17 +192,19 @@ def git(cwd, *args):
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env={**os.environ, **GIT_ENV})
 
 
-def test_successful_pack_commits_tracked_fix(tmp_path):
+def test_successful_pack_commits_nothing(tmp_path):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     fake_rockcraft(bindir, "Packed hello_2.12_amd64.rock\n", 0)
     proj = tmp_path / "proj"
     proj.mkdir()
     (proj / "rockcraft.yaml").write_text("name: x\n")
+    (proj / "README").write_text("a\n")
     git(proj, "init", "-q")
-    git(proj, "add", "rockcraft.yaml")
+    git(proj, "add", "rockcraft.yaml", "README")
     git(proj, "commit", "-qm", "init")
     (proj / "rockcraft.yaml").write_text("name: y\n")
+    (proj / "README").write_text("b\n")
     proc = subprocess.run(
         [sys.executable, str(SCRIPT)], capture_output=True, text=True, cwd=proj,
         env={**os.environ, **GIT_ENV, "PATH": f"{bindir}:{os.environ['PATH']}"}, check=False,
@@ -203,7 +212,14 @@ def test_successful_pack_commits_tracked_fix(tmp_path):
     doc = yaml.safe_load(proc.stdout)
     assert (proc.returncode, doc["status"]) == (0, "passed")
     assert doc["rock"] == ["hello_2.12_amd64.rock"]
-    assert doc["commit"] == "fix(rock): make rockcraft pack succeed"
+    assert "commit" not in doc
+
+    def out(*args):
+        return subprocess.run(["git", *args], cwd=proj, check=True, capture_output=True, text=True).stdout
+
+    # the fix and the unrelated edit are both left for whoever made them
+    assert len(out("log", "--oneline").splitlines()) == 1
+    assert out("status", "--porcelain").splitlines() == [" M README", " M rockcraft.yaml"]
 
 
 def test_usage():

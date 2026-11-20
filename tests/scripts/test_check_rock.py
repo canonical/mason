@@ -88,6 +88,8 @@ def test_good_rock_is_clean():
         (changed(version=2.12), "version-type"),
         (changed(version="2.12.1"), "version-granularity"),
         (changed(license="GPL-3.0-or-later"), "license-form"),
+        (changed(license="TODO-SPDX"), "license-unknown"),
+        (changed(parts={"p": "nil"}), "bad-type"),
         (changed(**{"run-user": None}), "root-user"),
         (changed(platforms={"x86_64": None}), "bad-platform"),
         (changed(services={"s": {"command": "hello", "override": "replace"}}), "service-command"),
@@ -108,6 +110,46 @@ def test_codes_all_covered():
     assert {c for _, c in cases} == set(cr.CODES)
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"entrypoint-command": "/usr/bin/hello [ -g hi ]"},
+        {"contact": "a@b.c", "issues": "https://x/issues", "source-code": "https://x"},
+        {"build-slices": ["base-files_base"]},
+        {"license": None},
+        {"license": "proprietary"},
+        {"license": "mit"},
+        {"summary": "", "description": ""},
+        {"version": None, "adopt-info": "hello"},
+        {"build-base": "devel"},
+        {"platforms": {"my-label": {"build-on": ["amd64"], "build-for": ["amd64"]}}},
+    ],
+)
+def test_what_rockcraft_accepts_is_clean(extra):
+    assert run(changed(**extra)).findings == {}
+
+
+@pytest.mark.parametrize(
+    ("extra", "code"),
+    [
+        ({"license": "BSD"}, "license-unknown"),
+        ({"name": ""}, "missing-key"),
+        ({"version": None}, "missing-key"),
+        ({"platforms": {"my-label": None}}, "bad-platform"),
+        ({"platforms": ["amd64"]}, "bad-type"),
+        ({"services": ["s"]}, "bad-type"),
+        ({"services": {"s": "run"}}, "bad-type"),
+        ({"parts": ["p"]}, "bad-type"),
+        ({"parts": {"p": {"plugin": "nil", "stage-packages": "hello_bins"}}}, "bad-type"),
+        ({"parts": {"p": {"plugin": "nil", "stage-packages": ""}}}, "bad-type"),
+    ],
+)
+def test_what_rockcraft_rejects_blocks(extra, code):
+    report = run(changed(**extra))
+    assert code in {f["code"] for items in report.findings.values() for f in items}
+    assert report.status == "failed"
+
+
 def test_extensions_generate_parts():
     assert "missing-key" not in codes(changed(parts=None, extensions=["flask-framework"]))
 
@@ -126,6 +168,66 @@ def test_unknown_slice_in_chisel_cut():
 
 def test_cut_slices():
     assert cr.cut_slices("chisel cut --root x \\\n  a_b c_d\necho e_f\n") == ["a_b", "c_d"]
+    # a cut ends with its command, even inside an indented block
+    assert cr.cut_slices("if true; then\n  chisel cut --root x a_b\n  cp foo_bar baz_qux\nfi\n") == ["a_b"]
+
+
+def test_cuts_carry_their_release():
+    script = "chisel cut --release ubuntu-24.04 --root x a_b && chisel cut --release=./ --root y c_d\n# chisel cut e_f\n"
+    assert cr.cuts(script) == [("ubuntu-24.04", ["a_b"]), ("./", ["c_d"])]
+    assert cr.cuts("chisel cut --root x a_b") == [(None, ["a_b"])]
+
+
+FORK = {"plugin": "nil", "source": "https://github.com/u/chisel-releases.git", "source-type": "git"}
+
+
+def test_cut_from_a_fork_is_not_checked():
+    # the slices a fork adds are not upstream: nothing here can read them
+    script = 'chisel cut --release ./ --root "$CRAFT_PART_INSTALL" \\\n  base-files_base \\\n  figlet_bins\n'
+    assert run(changed(parts={"slices": {**FORK, "override-build": script}})).findings == {}
+
+
+def test_cut_from_a_checkout_is_checked_against_it(tmp_path, monkeypatch):
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    for tree in (tmp_path, sub):
+        (tree / "chisel.yaml").write_text("format: v1\n")
+    have = {(str(tmp_path), "figlet"): ["figlet_bins"], (str(sub), "figlet"): ["figlet_new"], ("ubuntu-24.04", "hello"): ["hello_bins"]}
+    monkeypatch.setattr(cr.rl, "slices_of", lambda rel, pkg: have.get((rel, pkg)))
+
+    def unknown(release, slices):
+        script = f'chisel cut --release "{release}" --root x {slices}\n'
+        parts = {
+            "new": {"plugin": "nil", "source": str(tmp_path), "source-type": "local", "override-build": script},
+            "old": {"plugin": "nil", "stage-packages": ["hello_bins", "hello_nope"]},
+        }
+        report = run(changed(parts=parts))
+        return sorted((f["slice"], f["release"]) for items in report.findings.values() for f in items)
+
+    # the checkout governs its own part's cut, the release everything else
+    upstream = ("hello_nope", "ubuntu-24.04")
+    assert unknown("./", "figlet_bins figlet_nope") == [("figlet_nope", str(tmp_path)), upstream]
+    assert unknown("$CRAFT_PART_SRC", "figlet_bins") == [upstream]
+    assert unknown("./sub", "figlet_new") == [upstream]
+    assert unknown("${CRAFT_PART_SRC}/sub", "figlet_bins") == [("figlet_bins", str(sub)), upstream]
+
+
+@pytest.mark.parametrize("part", [{}, {"source": "."}])
+def test_cut_from_no_checkout_falls_back_to_the_release(part):
+    # no chisel.yaml to read: a local tree that is not a checkout, or no source
+    script = "chisel cut --release ./ --root x hello_nope\n"
+    assert "unknown-slice" in codes(changed(parts={"p": {"plugin": "nil", **part, "override-build": script}}))
+
+
+def test_cut_naming_an_unknown_release(monkeypatch):
+    def slices_of(rel, pkg):
+        if rel != "ubuntu-24.04":
+            raise ValueError("unknown Ubuntu release")
+        return [f"{pkg}_base", f"{pkg}_bins"]
+
+    monkeypatch.setattr(cr.rl, "slices_of", slices_of)
+    script = "chisel cut --release=ubuntu-99.04 --root x base-files_base\n"
+    assert codes(changed(parts={"p": {"plugin": "nil", "override-build": script}})) == ["unknown-release"]
 
 
 def test_release_unavailable_still_reports(monkeypatch):

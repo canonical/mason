@@ -148,6 +148,19 @@ def test_meta_npm(tmp_path):
     assert (m["name"], m["license"], m["bins"], m["node"]) == ("srv", "MIT", ["srv"], "20.1")
 
 
+def test_meta_npm_legacy_licence_object(tmp_path):
+    pj = {"name": "srv", "license": {"type": "MIT", "url": "https://x"}}
+    assert dr.meta(tree(tmp_path, {"package.json": json.dumps(pj)}))["license"] == "MIT"
+
+
+def test_licence_must_be_one_rockcraft_knows(monkeypatch):
+    monkeypatch.setattr(dr, "REVIEW", [])
+    assert (dr.licence("MIT"), dr.licence("proprietary")) == ("MIT", "proprietary")
+    assert dr.REVIEW == []
+    assert (dr.licence("BSD"), dr.licence(None)) == (None, None)
+    assert ["'BSD'" in dr.REVIEW[0], "not detected" in dr.REVIEW[1]] == [True, True]
+
+
 # --- whole drafts, offline -------------------------------------------------------
 
 HELLO = {
@@ -194,6 +207,25 @@ def test_archive_draft_passes_check(offline, monkeypatch, capsys):
     assert rock["parts"]["hello"]["stage-packages"] == ["base-files_base", "hello_bins"]
     assert rock["services"]["hello"]["command"] == "/usr/bin/hello -g hi"
     assert check_codes(offline / "rockcraft.yaml") == []
+
+
+def test_unknown_licence_drafts_the_placeholder(offline, monkeypatch, capsys):
+    monkeypatch.setattr(dr.rl, "deb_facts", lambda st: (["/usr/bin/hello"], "BSD"))
+    code, doc = draft(monkeypatch, capsys, "hello", "--release", "24.04")
+    assert (code, doc["license"]) == (0, None)
+    assert any("'BSD'" in note for note in doc["review"])
+    # the one thing a fresh draft does not pass check-rock on
+    assert check_codes(offline / "rockcraft.yaml") == ["license-unknown"]
+
+
+def test_source_dot_is_named_after_its_directory(offline, monkeypatch, capsys):
+    proj = offline / "my-tool"
+    proj.mkdir()
+    (proj / "Makefile").write_text("all:\n")
+    monkeypatch.chdir(proj)
+    code, _ = draft(monkeypatch, capsys, ".", "--release", "24.04", "--version", "1.0")
+    assert code == 0
+    assert yaml.safe_load((proj / "rockcraft.yaml").read_text())["name"] == "my-tool"
 
 
 def test_ppa_draft_is_unchiselled(offline, monkeypatch, capsys):
