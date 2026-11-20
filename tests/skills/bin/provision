@@ -17,8 +17,10 @@ git config --system protocol.version 1
 curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 arch="$(dpkg --print-architecture)"
-ver="$(curl -fsSL https://api.github.com/repos/canonical/chisel/releases/latest |
-    sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"
+# the tag the latest release redirects to. the api rate-limits unauthenticated
+# callers by address, and ci runners share theirs.
+ver="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/canonical/chisel/releases/latest)"
+ver="${ver##*/}"
 curl -fsSL "https://github.com/canonical/chisel/releases/download/$ver/chisel_${ver}_linux_$arch.tar.gz" \
     -o /tmp/chisel.tgz
 tar -xzf /tmp/chisel.tgz -C /usr/local/bin chisel
