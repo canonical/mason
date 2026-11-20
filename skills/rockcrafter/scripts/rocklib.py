@@ -34,6 +34,7 @@ CACHE = Path.home() / ".cache" / "mason"
 UA = "Debian APT-HTTP/1.3"
 COMPONENTS = ("main", "universe", "restricted", "multiverse")
 RAW_SLICES = "https://raw.githubusercontent.com/canonical/chisel-releases/{branch}/slices/{pkg}.yaml"
+RAW_MANIFEST = "https://raw.githubusercontent.com/canonical/chisel-releases/{branch}/chisel.yaml"
 _mem: dict[str, bytes | None] = {}
 _failed: set[str] = set()  # urls that could not be reached (vs 404 = absent)
 
@@ -306,6 +307,16 @@ def read_sdf(release: str, pkg: str) -> str | None:
     if data is None and fetch_failed(url):
         raise Unavailable(f"chisel-releases unreachable ({url})")
     return data.decode() if data is not None else None
+
+
+def has_branch(branch: str) -> bool:
+    """whether chisel-releases has that branch, told by its manifest. a missing
+    slices file cannot tell: it is missing on a branch that is not there too."""
+    url = RAW_MANIFEST.format(branch=branch)
+    data = cached(url, max_age=3600)
+    if data is None and fetch_failed(url):
+        raise Unavailable(f"chisel-releases unreachable ({url})")
+    return data is not None
 
 
 def slices_of(release: str, pkg: str) -> list[str] | None:

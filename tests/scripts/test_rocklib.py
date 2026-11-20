@@ -153,3 +153,25 @@ v3-essential:
 """
     assert rl.slice_names(sdf) == ["bins", "copyright"]
     assert rl.slice_names("package: x\n") == []
+
+
+def test_has_branch_reads_the_manifest(monkeypatch):
+    asked = []
+
+    def cached(url, **kw):
+        asked.append(url)
+        return b"format: v1\n" if "ubuntu-24.04" in url else None
+
+    monkeypatch.setattr(rl, "cached", cached)
+    monkeypatch.setattr(rl, "fetch_failed", lambda url: False)
+    assert rl.has_branch("ubuntu-24.04") is True
+    # a 404 on the manifest is the branch not being there
+    assert rl.has_branch("ubuntu-26.10") is False
+    assert asked[0].endswith("/chisel-releases/ubuntu-24.04/chisel.yaml")
+
+
+def test_has_branch_unreachable_is_not_absence(monkeypatch):
+    monkeypatch.setattr(rl, "cached", lambda url, **kw: None)
+    monkeypatch.setattr(rl, "fetch_failed", lambda url: True)
+    with pytest.raises(rl.Unavailable):
+        rl.has_branch("ubuntu-24.04")
