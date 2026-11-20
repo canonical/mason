@@ -1,0 +1,12 @@
+prompt: |
+  Use the rock-crafter skill to build a rock for yq v4.44.3, built from source from https://github.com/mikefarah/yq (tag `v4.44.3`), on ubuntu@24.04, amd64 only. It is a CLI tool, not a service.
+
+  This is an automated eval: work autonomously and do not ask questions -- defaults are fine for anything not stated above. Write `rockcraft.yaml` and its tests in the current directory, pack the rock, run its tests, and stop with the final report.
+stage: stage --rock
+prepare: | # inside the sandbox, as root: let the agent user drive lxd (rockcraft's builds and tests)
+  snap wait system seed.loaded
+  lxd waitready --timeout=120
+  usermod -aG lxd pats
+collect: collect --rock
+timeout: 60m # a pack and a test run take minutes each
+step-sandbox: steps # the pats snap runs no host steps

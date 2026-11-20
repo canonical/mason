@@ -1,0 +1,21 @@
+name: app-config
+title: App config
+version: "1.0"
+summary: A chiselled rock shipping a generated JSON config.
+description: |
+  Ships /etc/app/config.json, minified at build time with jq.
+license: Apache-2.0
+base: bare
+build-base: ubuntu@24.04
+run-user: _daemon_
+platforms:
+  amd64:
+
+parts:
+  config:
+    plugin: nil
+    source: config
+    source-type: local
+    override-build: |
+      mkdir -p "${CRAFT_PART_INSTALL}/etc/app"
+      jq -c . config.json > "${CRAFT_PART_INSTALL}/etc/app/config.json"

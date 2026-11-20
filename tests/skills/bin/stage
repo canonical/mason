@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# set up the workdir on the host: stage [--branch <b>] [--knockout <slice>]...
+# set up the workdir on the host: stage [--branch <b>] [--knockout <slice>]... [--rock]
 # --branch clones chisel-releases at <b>. --knockout takes that slice out as
 # ground truth. each <target>.silver.yaml beside the task.yaml is ground truth
-# for a target written from scratch. installs the skills for the harness.
+# for a target written from scratch. --rock stages a rock task instead: the
+# task's project/ (if any) becomes the workdir, one git commit, and its
+# case.yaml, rockcraft.expected.yaml and tests are ground truth. installs the
+# skills for the harness.
 set -eu
 
 REPO_ROOT="$(cd "$PATS_ROOT/../.." && pwd)"
@@ -53,12 +56,47 @@ function _install() {
     cp -R "$REPO_ROOT/skills/." "$PATS_WORKDIR/$dest/"
 }
 
+# _rock: a rock task's project in the workdir, as one git commit (rock-debugger
+# commits its fixes, rockcraft init would make a repo anyway), and its ground
+# truth in the output dir. spread tasks are kept as task.spread.yaml in this repo:
+# a task.yaml under a pats task dir would be read as a nested pats task.
+function _rock() {
+    local git=(git -c core.hooksPath=/dev/null -c commit.gpgsign=false -c user.name=pats -c user.email=pats@local)
+    cp "$PATS_TASK_DIR/case.yaml" "$OUT/$CASE.case.yaml"
+    if [ -f "$PATS_TASK_DIR/rockcraft.expected.yaml" ]; then
+        cp "$PATS_TASK_DIR/rockcraft.expected.yaml" "$OUT/rockcraft.expected.yaml"
+    fi
+    cd "$PATS_WORKDIR"
+    if [ -d "$PATS_TASK_DIR/project" ]; then
+        cp -R "$PATS_TASK_DIR/project/." .
+        find . -name task.spread.yaml | while read -r t; do
+            mv "$t" "${t%task.spread.yaml}task.yaml"
+        done
+        # the tests as given, in collect's tests.txt form: whether the agent
+        # weakened them is scored against this.
+        if [ -d spread ]; then
+            find spread -name task.yaml | sort | while read -r t; do
+                printf '# %s\n' "$t"
+                cat "$t"
+            done >"$OUT/tests.expected.txt"
+        fi
+        if [ -f rockcraft-test.yaml ]; then
+            cp rockcraft-test.yaml "$OUT/rockcraft-test.expected.yaml"
+        fi
+    fi
+    git init --quiet -b main
+    printf '%s\n' .claude/ .agents/ >>.git/info/exclude
+    "${git[@]}" add -A
+    "${git[@]}" commit --quiet --allow-empty -m "rock project"
+}
+
 function main() {
-    local branch="" knockout="" silver t
+    local branch="" knockout="" rock=0 silver t
     while [ $# -gt 0 ]; do
         case "$1" in
             (--branch) branch="$2"; shift 2 ;;
             (--knockout) knockout="$knockout $2"; shift 2 ;;
+            (--rock) rock=1; shift ;;
             (*) _fail "unknown argument: $1" ;;
         esac
     done
@@ -83,6 +121,9 @@ function main() {
         _fail "--knockout needs --branch"
     fi
     _install
+    if [ "$rock" = 1 ]; then
+        _rock
+    fi
 }
 
 main "$@"

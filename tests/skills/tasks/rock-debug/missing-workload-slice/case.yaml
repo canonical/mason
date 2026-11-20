@@ -1,0 +1,6 @@
+# every slice exists and the rock packs, but the workload's binary was never
+# staged: only the test shows it (/usr/bin/hello is not in the rock).
+name: hello
+release: ubuntu-24.04
+fault: {kind: add-slice, good: hello_bins}
+tests: unchanged
