@@ -3,7 +3,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""orientation-called: did the agent run scripts/_orientation.py before anything else?
+"""orientation-called: did the agent run scripts/orientation.py before anything else?
 
 reads the run transcript and checks for orientation's own output lines
 (ORIENTATION_MARKERS in _lib), the same way scorer_chisel-cut.py does. four

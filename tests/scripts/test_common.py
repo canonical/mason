@@ -1,17 +1,16 @@
-"""The output contract every helper shares, as implemented by _shared/common.py."""
+"""The output contract every helper shares, as implemented by shared/common.py."""
 
 from __future__ import annotations
 
 import importlib.util
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-SHARED = Path(__file__).resolve().parents[2] / "_shared"
+SHARED = Path(__file__).resolve().parents[2] / "shared"
 CODES = {"removed": "gone from a published slice", "moved": "still installed"}
 
 
@@ -165,21 +164,6 @@ def test_usage_goes_to_stderr(common, capsys) -> None:
     assert common.usage("usage: foo.py <bar>") == 2
     captured = capsys.readouterr()
     assert captured.out == "" and "usage: foo.py" in captured.err
-
-
-def test_imports_as_either_name(tmp_path) -> None:
-    # a skill ships the copy as _common.py, the _shared source is common.py
-    (tmp_path / "_common.py").write_text((SHARED / "common.py").read_text())
-    (tmp_path / "tool.py").write_text(
-        "import sys\nsys.path.insert(0, sys.argv[1])\nimport _common\nprint(_common.EXIT)\n"
-    )
-    r = subprocess.run(
-        [sys.executable, str(tmp_path / "tool.py"), str(tmp_path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert r.returncode == 0, r.stderr
 
 
 def test_lists_indent_under_their_key(common, capsys) -> None:

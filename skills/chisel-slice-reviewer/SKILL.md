@@ -15,7 +15,7 @@ State the scope and any assumption needed to interpret the request.
 
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; keep the checkout as working directory.
-- Run `uv run "<skill-root>/scripts/_orientation.py"` first. The working
+- Run `uv run "<skill-root>/scripts/orientation.py"` first. The working
   directory is the checkout; without one, stop and report that. Do not clone
   or guess one.
 - Confirm that the files and manifest being checked match the review's revision
@@ -24,7 +24,7 @@ State the scope and any assumption needed to interpret the request.
   report that check as unavailable rather than checking different files.
 - The review inspects; it does not cut slices or run spread. Runtime evidence
   is what already exists for the reviewed revision, its CI results; without
-  it the review is incomplete, never passed. Read `kb/_verification.md` for
+  it the review is incomplete, never passed. Read `kb/verification.md` for
   check status and completion.
 
 ## 1. run static checks
@@ -33,39 +33,39 @@ For a branch or PR represented by the working tree, find what changed against
 the target base and check it for append-only regressions:
 
 ```bash
-uv run "<skill-root>/scripts/_check-diff.py"
+uv run "<skill-root>/scripts/check-diff.py"
 ```
 
 The target base is the release branch named by `chisel.yaml`; orientation
 reports it as `target base` and whether it is fetched. Pass `--base=<ref>` only
 to review against something else.
 
-Then run the single-file checkers on each slices file `_check-diff.py` lists, or on the
+Then run the single-file checkers on each slices file `check-diff.py` lists, or on the
 one slices file under review:
 
 ```bash
-uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
-uv run "<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/check-slice.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/check-test.py" slices/<pkg>.yaml
 ```
 
-Fold findings into the review under `kb/_verification.md`, then assess design
+Fold findings into the review under `kb/verification.md`, then assess design
 and runtime evidence before choosing the overall verdict.
 
 ## 2. assess correctness and design
 
 Read the references relevant to the changed slices:
 
-- `kb/_slices-file-format.md` and `kb/_chisel-formats.md`: field semantics,
+- `kb/slices-file-format.md` and `kb/chisel-formats.md`: field semantics,
   manifest format and tool-version compatibility.
-- `kb/_slice-conventions.md`: grouping, naming, legal files, path style and
+- `kb/slice-conventions.md`: grouping, naming, legal files, path style and
   preservation of published slice contents.
-- `kb/_dependency-policy.md`: target package inspection, runtime dependency
+- `kb/dependency-policy.md`: target package inspection, runtime dependency
   selection, provider resolution and generated files.
 
 Inspect actual target package contents where needed:
 
 ```bash
-uv run "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
+uv run "<skill-root>/scripts/deb-list.py" <pkg> <arch>
 ```
 
 Trace the retained dependencies and compare against the files actually supplied
@@ -73,23 +73,23 @@ by their slices. Review broad globs, shared paths and mutation effects. For
 removed declarations, establish whether effective contents are preserved through
 dependencies; static path comparison cannot decide this.
 
-Validate disputed rules against the live sources in `kb/_upstream-sources.md`.
+Validate disputed rules against the live sources in `kb/upstream-sources.md`.
 Distinguish parser errors, demonstrated runtime defects and repository
 conventions. Do not turn an unsupported stylistic preference into a hard gate.
 
 ## 3. assess tests and upstream checks
 
-Use `kb/_spread-tests.md` for coverage, assertions and rootfs isolation. Review
+Use `kb/spread-tests.md` for coverage, assertions and rootfs isolation. Review
 each affected package, including libraries, data and dependency packages.
 Explicit binary references alone do not prove execution or meaningful tests.
 
 Read the lint, cut and spread results CI holds for the reviewed revision, for
-example with `gh pr checks` and the run logs; `kb/_upstream-sources.md` names
+example with `gh pr checks` and the run logs; `kb/upstream-sources.md` names
 the workflows. A result for another revision or architecture is unavailable
 evidence, not a pass.
 
-Read `kb/_chisel-branches.md` and live contribution guidance linked from
-`kb/_contributing.md` to establish forward-port obligations and PR requirements.
+Read `kb/chisel-branches.md` and live contribution guidance linked from
+`kb/contributing.md` to establish forward-port obligations and PR requirements.
 Check discovery completeness before claiming that all maintained releases are
 covered. Package disappearance requires archive evidence, not a denied lookup.
 
@@ -102,6 +102,6 @@ Return findings with file, slice/path, evidence and proposed correction:
 - **Nits:** optional improvements.
 
 List passed, failed and unavailable checks separately, then give the overall
-verdict under `kb/_verification.md`: approve, request-changes or incomplete.
+verdict under `kb/verification.md`: approve, request-changes or incomplete.
 Include remaining forward ports and verification gaps. The final message is
 the review.

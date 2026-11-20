@@ -13,7 +13,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SHARED = ROOT / "_shared"
+SHARED = ROOT / "shared"
 SLICES_FILE = """\
 package: foo
 essential:

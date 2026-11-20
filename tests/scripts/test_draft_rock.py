@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills" / "rock-crafter" / "scripts" / "draft-rock.py"
+SCRIPT = ROOT / "skills" / "rockcrafter" / "scripts" / "draft-rock.py"
 
 
 def module(path):
@@ -25,7 +25,7 @@ def module(path):
 
 
 dr = module(SCRIPT)
-cr = module(ROOT / "_shared" / "check-rock.py")
+cr = module(ROOT / "skills" / "rockcrafter" / "scripts" / "check-rock.py")
 
 NOBLE = dr.rl.Release("24.04", "noble", True, True)
 

@@ -31,9 +31,13 @@ suites:
   items:
     slicer: {tasks: knockout}
     ci-chisel-slicer: {tasks: knockout}
-    ci-rock-crafter: {tasks: rock-create}
+    ci-rockcrafter-create: {tasks: rock-create}
+    ci-rockcrafter-debug: {tasks: rock-debug}
     ci-Bad_Name: {tasks: knockout}
 """
+
+ROCK = ["ci-rockcrafter-create", "ci-rockcrafter-debug"]
+EVERY = ["ci-chisel-slicer", *ROCK]
 
 
 @pytest.fixture
@@ -64,22 +68,19 @@ def suites(config: Path, *args: str, changed: list[str] | None = None) -> list[s
     [
         # a skill picks its own suite, and only one that is declared
         (["skills/chisel-slicer/SKILL.md"], ["ci-chisel-slicer"]),
-        (
-            ["skills/rock-crafter/kb/x.md", "skills/rock-crafter/SKILL.md"],
-            ["ci-rock-crafter"],
-        ),
-        (
-            ["skills/chisel-slicer/a", "skills/rock-crafter/b"],
-            ["ci-chisel-slicer", "ci-rock-crafter"],
-        ),
+        # ... or every variant of it, ci-<skill>-<variant>
+        (["skills/rockcrafter/kb/x.md", "skills/rockcrafter/SKILL.md"], ROCK),
+        (["skills/chisel-slicer/a", "skills/rockcrafter/b"], EVERY),
         (["skills/mason/SKILL.md"], []),
+        # a suite that only starts like the skill's name is not its variant
+        (["skills/rock/SKILL.md"], []),
         # the eval and the pats ci move every score
-        (["tests/skills/pats.yaml"], ["ci-chisel-slicer", "ci-rock-crafter"]),
-        ([".github/workflows/pats.yml"], ["ci-chisel-slicer", "ci-rock-crafter"]),
-        ([".github/scripts/pats-suites.sh"], ["ci-chisel-slicer", "ci-rock-crafter"]),
+        (["tests/skills/pats.yaml"], EVERY),
+        ([".github/workflows/pats.yml"], EVERY),
+        ([".github/scripts/pats-suites.sh"], EVERY),
         # nothing else does
         (["tests/skills/README.md"], []),
-        (["README.md", "_shared/common.py", "skills/README.md"], []),
+        (["README.md", "shared/common.py", "skills/README.md"], []),
         ([], []),
     ],
 )
@@ -90,18 +91,18 @@ def test_changed_files_pick_suites(
 
 
 def test_all_is_every_declared_ci_suite(config: Path) -> None:
-    assert suites(config, "--all") == ["ci-chisel-slicer", "ci-rock-crafter"]
+    assert suites(config, "--all") == EVERY
 
 
 def test_a_suite_declared_twice_is_one_job(config: Path) -> None:
     more = "nightly:\n  kind: suite\n  items:\n    ci-chisel-slicer: {tasks: denovo}\n"
     config.write_text(CONFIG + more, encoding="utf-8")
-    assert suites(config, "--all") == ["ci-chisel-slicer", "ci-rock-crafter"]
+    assert suites(config, "--all") == EVERY
 
 
 def test_output_is_one_line_for_github_output(config: Path) -> None:
     proc = run(config, "--all")
-    assert proc.stdout == '["ci-chisel-slicer","ci-rock-crafter"]\n'
+    assert proc.stdout == json.dumps(EVERY, separators=(",", ":")) + "\n"
     assert run(config, changed=["README.md"]).stdout == "[]\n"
 
 

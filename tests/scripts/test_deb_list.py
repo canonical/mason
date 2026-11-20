@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-SCRIPT = Path(__file__).resolve().parents[2] / "_shared/deb-list.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "shared/deb-list.py"
 OTHER_INDEX = gzip.compress(b"Package: other\nFilename: pool/other.deb\n\n")
 FOUND_INDEX = gzip.compress(b"Package: foo\nFilename: pool/foo.deb\n\n")
 

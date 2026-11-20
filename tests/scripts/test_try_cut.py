@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-SCRIPT = Path(__file__).resolve().parents[2] / "_shared" / "try-cut.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "shared" / "try-cut.py"
 
 # a stand-in for chisel cut: installs each requested slice's explicit content
 # paths, following same-package essentials, and fails the way it is told to.

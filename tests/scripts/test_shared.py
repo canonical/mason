@@ -1,6 +1,6 @@
 """pytest regression net for scripts/shared.py.
 
-Builds a throwaway repo (a _shared/ dir, a skills/ dir, a root .shared.yaml, the
+Builds a throwaway repo (a shared/ dir, a skills/ dir, a root .shared.yaml, the
 real script) in a tmpdir and drives the script's CLI against it, so this tests
 the real thing rather than imported internals. Like test_checks.py, the
 subprocessed script needs pyyaml under the runner's interpreter. Run:
@@ -19,16 +19,16 @@ from pathlib import Path
 REAL = Path(__file__).resolve().parents[2] / "scripts/shared.py"
 
 # the smallest well-formed manifest: one skill, one source, one destination.
-ONE_A = "shared:\n  one:\n    a.md:\n      path: shared/_a.md\n"
+ONE_A = "shared:\n  one:\n    a.md:\n      path: shared/a.md\n"
 
 
 def make_repo(d: Path, shared: dict[str, str], manifest: str, skills=("one",)) -> Path:
-    """A minimal repo: _shared/ files, skills/<name>/SKILL.md, root .shared.yaml."""
+    """A minimal repo: shared/ files, skills/<name>/SKILL.md, root .shared.yaml."""
     (d / "scripts").mkdir(parents=True)
     shutil.copy(REAL, d / "scripts/shared.py")
-    (d / "_shared").mkdir()
+    (d / "shared").mkdir()
     for name, text in shared.items():
-        (d / "_shared" / name).write_text(text, encoding="utf-8")
+        (d / "shared" / name).write_text(text, encoding="utf-8")
     for skill in skills:
         sd = d / "skills" / skill
         sd.mkdir(parents=True)
@@ -55,17 +55,17 @@ def test_destination_is_a_path_not_a_convention() -> None:
             {"a.md": "alpha\n", "b.md": "bravo\n", "c.md": "charlie\n"},
             "shared:\n"
             "  one:\n"
-            "    a.md:\n      path: shared/_a.md\n"  # under shared/
-            "    b.md:\n      path: reference/deep/_renamed.md\n"  # nested + renamed
-            "    c.md:\n      path: _c.md\n",  # at the skill root
+            "    a.md:\n      path: shared/a.md\n"  # under shared/
+            "    b.md:\n      path: reference/deep/renamed.md\n"  # nested + renamed
+            "    c.md:\n      path: c.md\n",  # at the skill root
         )
         rc, out = sync(d)
         assert rc == 0, out
         skill = d / "skills/one"
         # a copy is byte-for-byte its source -- nothing added, since it ships
-        assert (skill / "shared/_a.md").read_text() == "alpha\n"
-        assert (skill / "reference/deep/_renamed.md").read_text() == "bravo\n"
-        assert (skill / "_c.md").read_text() == "charlie\n"
+        assert (skill / "shared/a.md").read_text() == "alpha\n"
+        assert (skill / "reference/deep/renamed.md").read_text() == "bravo\n"
+        assert (skill / "c.md").read_text() == "charlie\n"
         assert sync(d, "--check")[0] == 0
 
 
@@ -76,8 +76,8 @@ def test_nothing_of_the_tool_lands_in_the_skill() -> None:
         d = make_repo(Path(td), {"a.md": "alpha\n"}, ONE_A)
         assert sync(d)[0] == 0
         names = {p.name for p in (d / "skills/one").rglob("*")}
-        assert names == {"SKILL.md", "shared", "_a.md"}
-        assert (d / "skills/one/shared/_a.md").read_bytes() == b"alpha\n"
+        assert names == {"SKILL.md", "shared", "a.md"}
+        assert (d / "skills/one/shared/a.md").read_bytes() == b"alpha\n"
 
 
 def test_retarget_moves_the_copy_and_prunes_the_dir() -> None:
@@ -86,16 +86,16 @@ def test_retarget_moves_the_copy_and_prunes_the_dir() -> None:
     with tempfile.TemporaryDirectory() as td:
         d = make_repo(Path(td), {"a.md": "alpha\n"}, ONE_A)
         assert sync(d)[0] == 0
-        assert (d / "skills/one/shared/_a.md").exists()
+        assert (d / "skills/one/shared/a.md").exists()
 
         (d / ".shared.yaml").write_text(
-            "shared:\n  one:\n    a.md:\n      path: docs/_a.md\n", encoding="utf-8"
+            "shared:\n  one:\n    a.md:\n      path: docs/a.md\n", encoding="utf-8"
         )
         rc, out = sync(d)
         assert rc == 0, out
         assert "removed" in out and "wrote" in out
-        assert (d / "skills/one/docs/_a.md").exists()
-        assert not (d / "skills/one/shared/_a.md").exists()
+        assert (d / "skills/one/docs/a.md").exists()
+        assert not (d / "skills/one/shared/a.md").exists()
         assert not (d / "skills/one/shared").exists()  # emptied dir pruned
 
 
@@ -104,34 +104,34 @@ def test_dropping_an_entry_removes_the_copy() -> None:
         d = make_repo(
             Path(td),
             {"a.md": "alpha\n", "b.md": "bravo\n"},
-            ONE_A + "    b.md:\n      path: shared/_b.md\n",
+            ONE_A + "    b.md:\n      path: shared/b.md\n",
         )
         assert sync(d)[0] == 0
         (d / ".shared.yaml").write_text(ONE_A, encoding="utf-8")
         assert sync(d)[0] == 0
-        assert (d / "skills/one/shared/_a.md").exists()
-        assert not (d / "skills/one/shared/_b.md").exists()
+        assert (d / "skills/one/shared/a.md").exists()
+        assert not (d / "skills/one/shared/b.md").exists()
 
 
 def test_a_leftover_whose_source_changed_too_is_not_seen() -> None:
-    """The known blind spot: a copy is recognised by matching a _shared/ source
+    """The known blind spot: a copy is recognised by matching a shared/ source
     byte for byte, so one that moved in the same change that rewrote its source
     matches nothing and survives. Syncing after a plain retarget catches it."""
     with tempfile.TemporaryDirectory() as td:
         d = make_repo(Path(td), {"a.md": "alpha\n"}, ONE_A)
         assert sync(d)[0] == 0
-        (d / "_shared/a.md").write_text("alpha rewritten\n", encoding="utf-8")
+        (d / "shared/a.md").write_text("alpha rewritten\n", encoding="utf-8")
         (d / ".shared.yaml").write_text(
-            "shared:\n  one:\n    a.md:\n      path: docs/_a.md\n", encoding="utf-8"
+            "shared:\n  one:\n    a.md:\n      path: docs/a.md\n", encoding="utf-8"
         )
         assert sync(d)[0] == 0
-        assert (d / "skills/one/docs/_a.md").read_text() == "alpha rewritten\n"
-        assert (d / "skills/one/shared/_a.md").exists()  # the blind spot
+        assert (d / "skills/one/docs/a.md").read_text() == "alpha rewritten\n"
+        assert (d / "skills/one/shared/a.md").exists()  # the blind spot
 
 
 def test_a_hand_written_skill_file_is_left_alone() -> None:
     """COVER: the sweep keys on content, so it must not touch a skill's own
-    files -- only ones that duplicate a _shared/ source."""
+    files -- only ones that duplicate a shared/ source."""
     with tempfile.TemporaryDirectory() as td:
         d = make_repo(Path(td), {"a.md": "alpha\n"}, ONE_A)
         own = d / "skills/one/notes.md"
@@ -146,10 +146,10 @@ def test_check_reports_drift_without_writing() -> None:
         d = make_repo(Path(td), {"a.md": "alpha\n"}, ONE_A)
         rc, out = sync(d, "--check")
         assert rc == 1 and "missing" in out
-        assert not (d / "skills/one/shared/_a.md").exists()  # --check writes nothing
+        assert not (d / "skills/one/shared/a.md").exists()  # --check writes nothing
 
         assert sync(d)[0] == 0
-        (d / "_shared/a.md").write_text("alpha changed\n", encoding="utf-8")
+        (d / "shared/a.md").write_text("alpha changed\n", encoding="utf-8")
         rc, out = sync(d, "--check")
         assert rc == 1 and "differs" in out
 
@@ -169,30 +169,25 @@ def test_the_manifest_is_never_written_to() -> None:
 def test_bad_manifests_are_rejected() -> None:
     cases = [
         (
-            "shared:\n  one:\n    a.md:\n      path: ../../_escape.md\n",
+            "shared:\n  one:\n    a.md:\n      path: ../../escape.md\n",
             "must stay inside",
         ),
-        ("shared:\n  one:\n    a.md:\n      path: /_abs.md\n", "must stay inside"),
+        ("shared:\n  one:\n    a.md:\n      path: /abs.md\n", "must stay inside"),
         (
             (
-                "shared:\n  one:\n    a.md:\n      path: shared/_x.md\n"
-                "    b.md:\n      path: shared/_x.md\n"
+                "shared:\n  one:\n    a.md:\n      path: shared/x.md\n"
+                "    b.md:\n      path: shared/x.md\n"
             ),
             "both target",
         ),
         (
-            "shared:\n  one:\n    missing.md:\n      path: shared/_m.md\n",
+            "shared:\n  one:\n    missing.md:\n      path: shared/m.md\n",
             "does not exist",
         ),
         ("shared:\n  nope:\n    a.md:\n", "is not a skill"),
-        ("one:\n  a.md:\n    path: shared/_a.md\n", "unknown top-level key"),
-        ("shared:\n  one:\n    a.md: shared/_a.md\n", "must be a map"),
-        ("shared:\n  one:\n    a.md:\n      dest: shared/_a.md\n", "unknown key"),
-        # every copy is marked, and the mark is not optional
-        (
-            "shared:\n  one:\n    a.md:\n      path: kb/a.md\n",
-            "must start its filename with",
-        ),
+        ("one:\n  a.md:\n    path: shared/a.md\n", "unknown top-level key"),
+        ("shared:\n  one:\n    a.md: shared/a.md\n", "must be a map"),
+        ("shared:\n  one:\n    a.md:\n      dest: shared/a.md\n", "unknown key"),
         ("shared:\n  one:\n    a.md:\n", "must be a map"),
         ("shared:\n  one:\n    a.md: {}\n", "needs an explicit 'path:'"),
     ]

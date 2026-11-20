@@ -25,21 +25,26 @@ def manifest() -> dict:
 def shipped() -> list[Path]:
     """Every helper a skill ships: synced copies' sources and skill-owned scripts."""
     sources = {
-        ROOT / "_shared" / src
+        ROOT / "shared" / src
         for entries in manifest()["shared"].values()
         for src, entry in entries.items()
         if entry["path"].startswith("scripts/")
     }
+    synced = {
+        ROOT / "skills" / skill / entry["path"]
+        for skill, entries in manifest()["shared"].items()
+        for entry in entries.values()
+    }
     owned = {
         p
         for p in ROOT.glob("skills/*/scripts/*")
-        if p.is_file() and not p.name.startswith("_")
+        if p.is_file() and p not in synced
     }
     return sorted(sources | owned)
 
 
 def docs() -> list[Path]:
-    return sorted([*ROOT.glob("skills/*/SKILL.md"), *ROOT.glob("_shared/*.md")])
+    return sorted([*ROOT.glob("skills/*/SKILL.md"), *ROOT.glob("shared/*.md")])
 
 
 def test_helpers_are_python() -> None:

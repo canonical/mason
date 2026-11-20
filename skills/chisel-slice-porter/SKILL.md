@@ -14,19 +14,19 @@ Adapt the source slices and tests to the user's target release checkout.
 
 - `<skill-root>` is the absolute directory containing this `SKILL.md`. Resolve
   `kb/` and `scripts/` there; run helpers with the checkout as working directory.
-- Run `uv run "<skill-root>/scripts/_orientation.py"` first. If no checkout is
+- Run `uv run "<skill-root>/scripts/orientation.py"` first. If no checkout is
   present, ask where it is; do not clone or guess one.
 - Confirm the checkout's release is the requested target. Work on its current
   branch and preserve unrelated changes. Read source branches with `git show`
   or upstream URLs; do not switch branches as part of the port.
-- Read `kb/_verification.md` for blockers, unavailable checks and completion.
-  Leave PR creation to the user. If asked to commit, follow `kb/_contributing.md`.
+- Read `kb/verification.md` for blockers, unavailable checks and completion.
+  Leave PR creation to the user. If asked to commit, follow `kb/contributing.md`.
 
 ## 1. establish source and target
 
 Identify the source revision, target release and requested packages. Read both
-manifests and source slices files/tests. Use `kb/_chisel-branches.md` for the branch model
-and `kb/_chisel-formats.md` for format compatibility.
+manifests and source slices files/tests. Use `kb/chisel-branches.md` for the branch model
+and `kb/chisel-formats.md` for format compatibility.
 
 Establish target maintenance from its manifest; stop on an EOL or unknown target.
 Check orientation's release-discovery status before drawing conclusions about
@@ -46,36 +46,36 @@ Distinguish an absent source test from a failed source lookup.
 
 ## 2. inspect target packages
 
-Read `kb/_cross-release-porting.md` for packaging differences and
-`kb/_dependency-policy.md` for inspection and dependency evidence. For each
+Read `kb/cross-release-porting.md` for packaging differences and
+`kb/dependency-policy.md` for inspection and dependency evidence. For each
 affected target package and architecture:
 
 ```bash
-uv run "<skill-root>/scripts/_deb-list.py" <pkg> <arch>
+uv run "<skill-root>/scripts/deb-list.py" <pkg> <arch>
 ```
 
 Compare target contents, dependencies and maintainer scripts with the source
 design. Record changed paths, package identities, features and dependency edges.
 Inspect required unsliced dependencies before authoring their consumers. A failed
-lookup does not establish that a package disappeared; apply `kb/_verification.md`
+lookup does not establish that a package disappeared; apply `kb/verification.md`
 when inspection cannot complete.
 
 ## 3. adapt package slices files and tests
 
-Read `kb/_slice-conventions.md` and the relevant sections of
-`kb/_slices-file-format.md`. Preserve the source's grouping unless target
+Read `kb/slice-conventions.md` and the relevant sections of
+`kb/slices-file-format.md`. Preserve the source's grouping unless target
 packaging or verified functionality requires a change. Adapt paths, dependencies,
 legal files and format-sensitive fields using the inspected target evidence.
 Preserve effective contents of any published target slices being reconciled.
 
-Read `kb/_spread-tests.md`. Port the source task and its shell helpers, adapting
+Read `kb/spread-tests.md`. Port the source task and its shell helpers, adapting
 binary paths, installed slices and assertions. If no source test exists, create
-one; use `_scaffold-test.py` only for a new task, then replace its placeholders.
+one; use `scaffold-test.py` only for a new task, then replace its placeholders.
 Apply the same policy to any dependency package authored during the port.
 
 ```bash
 mkdir -p tests/spread/integration/<pkg>
-uv run "<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
+uv run "<skill-root>/scripts/scaffold-test.py" slices/<pkg>.yaml > tests/spread/integration/<pkg>/task.yaml
 ```
 
 ## 4. verify the target
@@ -83,37 +83,37 @@ uv run "<skill-root>/scripts/_scaffold-test.py" slices/<pkg>.yaml > tests/spread
 For every new or modified slices file:
 
 ```bash
-uv run "<skill-root>/scripts/_check-slice.py" slices/<pkg>.yaml
-uv run "<skill-root>/scripts/_check-test.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/check-slice.py" slices/<pkg>.yaml
+uv run "<skill-root>/scripts/check-test.py" slices/<pkg>.yaml
 ```
 
 Run the target repository's applicable lint checks. Cut each independently usable
 new or changed slice and run the affected spread tasks when tools/backends permit:
 
 ```bash
-uv run "<skill-root>/scripts/_try-cut.py" --arch <arch> <pkg>_<slice>
+uv run "<skill-root>/scripts/try-cut.py" --arch <arch> <pkg>_<slice>
 spread lxd:tests/spread/integration/<pkg>
 ```
 
 For changes to published target slices files, compare against the target base revision:
 
 ```bash
-uv run "<skill-root>/scripts/_check-diff.py"
-uv run "<skill-root>/scripts/_try-cut.py" --base --arch <arch>
+uv run "<skill-root>/scripts/check-diff.py"
+uv run "<skill-root>/scripts/try-cut.py" --base --arch <arch>
 ```
 
 The second runs the before/after cuts that investigate removed declarations.
 A successful source
 cut is not target verification. For retained rootfs inspection, use
-`kb/_chisel-cli.md`.
+`kb/chisel-cli.md`.
 
-Consult the live sources in `kb/_upstream-sources.md` for the affected fields,
-design and contribution requirements. Apply `kb/_verification.md` to every
+Consult the live sources in `kb/upstream-sources.md` for the affected fields,
+design and contribution requirements. Apply `kb/verification.md` to every
 result, including unavailable upstream access and unjustified warnings.
 
 ## final report
 
-Return the completion status from `kb/_verification.md`, with:
+Return the completion status from `kb/verification.md`, with:
 
 - Source revision, target release, formats and architectures inspected.
 - Packaging differences, adaptations, retained dependency graph and justified
