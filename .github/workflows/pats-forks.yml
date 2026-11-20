@@ -34,7 +34,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      suite-args: ${{ steps.plan.outputs.suite-args }}
+      suites: ${{ steps.plan.outputs.suites }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,15 +49,20 @@ jobs:
         run: |
           gh api -H "Accept: application/vnd.github.raw" \
             "repos/$GITHUB_REPOSITORY/contents/tests/skills/pats.yaml?ref=$REF" > "$RUNNER_TEMP/pats.yaml"
-          args="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' |
+          suites="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' |
             bash .github/scripts/pats-suites.sh "$RUNNER_TEMP/pats.yaml")"
-          echo "suites: ${args:-none}"
-          printf 'suite-args=%s\n' "$args" >> "$GITHUB_OUTPUT"
+          echo "suites: $suites"
+          printf 'suites=%s\n' "$suites" >> "$GITHUB_OUTPUT"
 
+  # a call per suite, as in pats.yml.
   pats:
     needs: plan
-    if: needs.plan.outputs.suite-args != ''
-    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@db3ef09cdd071eff2aea79d68a0d0c2c6eb9b342 # main
+    if: needs.plan.outputs.suites != '' && needs.plan.outputs.suites != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.plan.outputs.suites) }}
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@e8004bcaf2c035047e3c69ba47f0aeb9e5375d05 # feat/call-name
     permissions:
       contents: read
       pull-requests: write
@@ -67,8 +72,10 @@ jobs:
       environment: pats-forks
       working-directory: tests/skills
       pats-channel: latest/candidate
-      run-args: ${{ needs.plan.outputs.suite-args }} -j -1
-      score-args: ${{ needs.plan.outputs.suite-args }}
+      name: ${{ matrix.suite }}
+      init-args: -S ${{ matrix.suite }}
+      run-args: -S ${{ matrix.suite }} -j -1
+      score-args: -S ${{ matrix.suite }}
       max-regression: "0.1" # 10%
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
