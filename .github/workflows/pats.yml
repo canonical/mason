@@ -1,8 +1,8 @@
 name: pats
 
-# skill evals (tests/skills/pats.yaml) via alesancor1/pats-action. on prs this
-# runs the ci suites the change needs on the pr head and on the base branch,
-# comments the score delta, and fails on a regression larger than
+# skill evals (tests/skills/pats.yaml) via pats-action, one call per ci suite
+# the change needs. on prs each suite runs on the pr head and on the base
+# branch, comments its own score delta, and fails on a regression larger than
 # max-regression. pinned to a pats-action commit; bump it to pick up changes.
 
 on:
@@ -32,7 +32,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      suite-args: ${{ steps.plan.outputs.suite-args }}
+      suites: ${{ steps.plan.outputs.suites }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,18 +48,24 @@ jobs:
           gh api -H "Accept: application/vnd.github.raw" \
             "repos/$GITHUB_REPOSITORY/contents/tests/skills/pats.yaml?ref=$REF" > "$RUNNER_TEMP/pats.yaml"
           if [ -n "$PR" ]; then
-            args="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' |
+            suites="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' |
               bash .github/scripts/pats-suites.sh "$RUNNER_TEMP/pats.yaml")"
           else
-            args="$(bash .github/scripts/pats-suites.sh "$RUNNER_TEMP/pats.yaml" --all)"
+            suites="$(bash .github/scripts/pats-suites.sh "$RUNNER_TEMP/pats.yaml" --all)"
           fi
-          echo "suites: ${args:-none}"
-          printf 'suite-args=%s\n' "$args" >> "$GITHUB_OUTPUT"
+          echo "suites: $suites"
+          printf 'suites=%s\n' "$suites" >> "$GITHUB_OUTPUT"
 
+  # a call per suite: a suite the base branch lacks fails only its own base
+  # run, and each is held to max-regression against its own base score.
   pats:
     needs: plan
-    if: needs.plan.outputs.suite-args != ''
-    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@db3ef09cdd071eff2aea79d68a0d0c2c6eb9b342 # main
+    if: needs.plan.outputs.suites != '' && needs.plan.outputs.suites != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.plan.outputs.suites) }}
+    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@46fd80c3f26c21268164005ada2c51dca3b38202 # v0.1.0
     permissions:
       contents: read
       pull-requests: write
@@ -69,8 +75,10 @@ jobs:
       environment: ${{ github.event_name == 'pull_request' && 'pats-in-repo' || '' }}
       working-directory: tests/skills
       pats-channel: latest/candidate
-      run-args: ${{ needs.plan.outputs.suite-args }} -j -1
-      score-args: ${{ needs.plan.outputs.suite-args }}
+      name: ${{ matrix.suite }}
+      init-args: -S ${{ matrix.suite }}
+      run-args: -S ${{ matrix.suite }} -j -1
+      score-args: -S ${{ matrix.suite }}
       max-regression: "0.1" # 10%
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

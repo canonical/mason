@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # picks the ci suites a pull request needs: pats-suites.sh <pats.yaml> [--all]
 # reads the changed files on stdin, one per line, unless --all. prints the
-# pats args (`-S ci-a -S ci-b`), or nothing when no suite applies.
+# suites as a json array (`["ci-a","ci-b"]`), for a job matrix: `[]` when no
+# suite applies.
 #
 # a ci suite is a suite named ci-<skill> in <pats.yaml>. a change under
 # skills/<skill>/ picks ci-<skill>, a change to the eval or to the pats ci
@@ -16,17 +17,17 @@ function _fail() {
     exit 2
 }
 
-# _ci_suites: the ci-* suites <pats.yaml> declares, one per line.
+# _ci_suites: the ci-* suites <pats.yaml> declares, one per line, each once.
 function _ci_suites() {
     yq -r '.[] | select(.kind == "suite") | .items | keys | .[]' "$1" |
-        grep -E "$SUITE_RE" || true
+        grep -E "$SUITE_RE" | sort -u || true
 }
 
 function main() {
     case "${1:-}" in
         ("" | -h | --help) _fail "usage: pats-suites.sh <pats.yaml> [--all] < changed-files" ;;
     esac
-    local config="$1" all=0 wanted=" " file skill suite args=""
+    local config="$1" all=0 wanted=" " file skill suite names=""
     [ -f "$config" ] || _fail "no such file: $config"
     case "${2:-}" in
         ("") ;;
@@ -49,10 +50,10 @@ function main() {
 
     while IFS= read -r suite; do
         if [ "$all" = 1 ] || [[ "$wanted" == *" $suite "* ]]; then
-            args+="${args:+ }-S $suite"
+            names+="${names:+,}\"$suite\""
         fi
     done < <(_ci_suites "$config")
-    printf '%s\n' "$args"
+    printf '[%s]\n' "$names"
 }
 
 main "$@"
