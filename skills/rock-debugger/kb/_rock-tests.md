@@ -31,25 +31,25 @@ not a test.
   representative input, and assert on its output:
 
   ```yaml
-  summary: jq filters JSON
+  summary: xxd dumps its input as hex
   execute: |
-    echo '{"a": 1}' | docker run --rm -i <name>:latest exec /usr/bin/jq .a | MATCH "^1$"
+    printf 'A' | docker run --rm -i <name>:latest exec /usr/bin/xxd -p | MATCH "^41$"
   ```
 
 - **Service rock**: start it detached, wait with a bound, then talk to it from
   the VM; stop it in `restore`:
 
   ```yaml
-  summary: nginx serves its default page
+  summary: redis answers a ping
   execute: |
-    docker run -d --name web -p 8080:8080 <name>:latest
-    retry --times 30 --delay 1 -- curl -sf http://localhost:8080/ | MATCH "nginx"
+    docker run -d --name kv -p 6379:6379 <name>:latest
+    retry --times 30 --delay 1 -- redis-cli -p 6379 ping | MATCH "^PONG$"
   restore: |
-    docker rm -f web || true
+    docker rm -f kv || true
   ```
 
-  Install tools the task needs in the VM (`apt install --yes retry curl`) in
-  `prepare`, never into the rock.
+  Install tools the task needs in the VM (`apt install --yes retry redis-tools`)
+  in `prepare`, never into the rock.
 - **The rock as a whole**: the service runs as `run-user` (not root), and the
   paths it writes are writable -- these are what break when `permissions:` or a
   slice is missing.

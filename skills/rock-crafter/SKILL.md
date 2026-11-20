@@ -49,14 +49,14 @@ archive packages, packages from a PPA, or a project to build: git URL or local
 dir, and a tag if not the latest release); the **release** (default: the
 newest supported LTS, which the draft reports); **service or CLI** -- for a
 service, its foreground command line, absolute binary first (e.g.
-`/usr/sbin/nginx -g 'daemon off;'`).
+`/usr/bin/redis-server --protected-mode no`).
 
 ## 2. draft
 
 ```bash
-uv run "<skill-root>/scripts/draft-rock.py" hello --release 24.04                                       # archive
-uv run "<skill-root>/scripts/draft-rock.py" git --ppa git-core/ppa --release 24.04                      # PPA
-uv run "<skill-root>/scripts/draft-rock.py" https://github.com/jqlang/jq --tag jq-1.7.1 --release 24.04 # source
+uv run "<skill-root>/scripts/draft-rock.py" xxd --release 24.04                                                 # archive
+uv run "<skill-root>/scripts/draft-rock.py" python3.13 --ppa deadsnakes/ppa --release 24.04                      # PPA
+uv run "<skill-root>/scripts/draft-rock.py" https://github.com/BurntSushi/ripgrep --tag 14.1.1 --release 24.04 # source
 ```
 
 Swap in the real names; add `--service "<cmd>"` for a service. The draft is
