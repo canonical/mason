@@ -38,7 +38,7 @@ usage:
   /chisel-slicer jq
   /chisel-slice-reviewer slices/jq.yaml
   /chisel-slice-porter jq ubuntu-24.04 ubuntu-26.04
-  /rockcrafter "build a rock for nginx on ubuntu 24.04"
+  /rockcrafter "build a rock for redis on ubuntu 24.04"
   or plain language: "write a slice for jq", "review slices/jq.yaml"
 
 docs: https://github.com/canonical/mason
