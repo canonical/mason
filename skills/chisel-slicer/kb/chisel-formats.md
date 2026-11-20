@@ -4,7 +4,7 @@ Which package slices file features a branch's `format:` decides, and which it do
 
 ## Versions
 
-A branch's format is a property of *that branch* -- read it from its own `chisel.yaml` `format:` (`orientation` prints it per live branch). The example column is illustrative, not an exhaustive branch list.
+A branch's format is a property of *that branch* -- read it from its own `chisel.yaml` `format:` (`orientation` prints it per branch). The example column is illustrative, not an exhaustive branch list.
 
 | Version | Branch (e.g.) | What the format itself decides |
 |---------|---------------|--------------------------------|

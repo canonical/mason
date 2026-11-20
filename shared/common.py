@@ -96,17 +96,6 @@ class Report:
     def mark_unavailable(self, check: str, reason: str) -> None:
         self.unavailable.append(Flow(check=check, reason=reason))
 
-    def merge(self, doc: dict[str, Any]) -> None:
-        """Fold in another helper's parsed document."""
-        codes = doc.get("codes") or {}
-        for file, items in (doc.get("findings") or {}).items():
-            for item in items:
-                self.codes.setdefault(item["code"], codes.get(item["code"], ""))
-                fields = {k: v for k, v in item.items() if k not in ("sev", "code")}
-                self.add(item["sev"], item["code"], file, **fields)
-        for entry in doc.get("unavailable") or []:
-            self.mark_unavailable(entry["check"], entry["reason"])
-
     def count(self, sev: str) -> int:
         return sum(f["sev"] == sev for items in self.findings.values() for f in items)
 
@@ -179,35 +168,52 @@ def tools(names: tuple[str, ...]) -> dict[str, Flow]:
     return out
 
 
-def git(args: list[str]) -> str | None:
-    """stdout of a git command, or None when git is missing or the command fails."""
+def git(args: list[str], timeout: float | None = None) -> str | None:
+    """stdout of a git command, or None when git is missing or the command fails.
+    With a timeout, running out of it raises subprocess.TimeoutExpired: a query
+    that did not end is not a query that answered no."""
     try:
-        r = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+        r = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
     except OSError:
         return None
     return r.stdout if r.returncode == 0 else None
 
 
-_UBUNTU_VERSION = re.compile(
-    r"^[ \t]+version:[ \t]*['\"]?([0-9]+\.[0-9]+)", re.MULTILINE
-)
+_MANIFEST = {
+    "format": r"^format:[ \t]*(.*)$",
+    "version": r"^[ \t]+version:[ \t]*['\"]?([0-9]+\.[0-9]+)",
+    "suites": r"suites:[ \t]*(.*)$",
+    "components": r"components:[ \t]*(.*)$",
+    "end-of-life": r"^[ \t]*end-of-life:[ \t]*(.*)$",
+}
 
 
-def ubuntu_version(manifest_text: str) -> str | None:
-    """The archive version a chisel.yaml names, e.g. 24.04."""
-    m = _UBUNTU_VERSION.search(manifest_text)
-    return m.group(1) if m else None
+def manifest(text: str) -> dict[str, str | None]:
+    """What a chisel.yaml says, field by field: its format, the archive
+    version, the suites and components as written on the key's own line, and
+    the end-of-life date. None for a field it does not find."""
+    out = {}
+    for key, pattern in _MANIFEST.items():
+        m = re.search(pattern, text, re.MULTILINE)
+        out[key] = (m.group(1).strip().strip("\"'") or None) if m else None
+    return out
 
 
-def target_base(manifest: str | Path = "chisel.yaml") -> str | None:
+def target_base(path: str | Path = "chisel.yaml") -> str | None:
     """The branch this checkout's work targets: ubuntu-<version>, the archive
     version read off the manifest. None without a readable manifest, which in
     chisel-releases means a branch with no slices on it."""
     try:
-        text = Path(manifest).read_text(encoding="utf-8", errors="replace")
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    version = ubuntu_version(text)
+    version = manifest(text)["version"]
     return f"ubuntu-{version}" if version else None
 
 
@@ -226,17 +232,21 @@ def derived_base(report: Report) -> str | None:
     return ref
 
 
-def base_ref(base: str) -> str | None:
+def base_ref(base: str, timeout: float | None = None) -> str | None:
     """The spelling of `base` this checkout resolves: its remote-tracking ref
     on any remote (origin first), else the local branch. None when nothing
     here can be diffed against."""
     tracking = (
-        git(["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{base}"])
+        git(
+            ["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{base}"],
+            timeout,
+        )
         or ""
     ).split()
     tracking.sort(key=lambda ref: (not ref.startswith("origin/"), ref))
     for ref in [*tracking, base]:
-        if git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]) is not None:
+        query = ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]
+        if git(query, timeout) is not None:
             return ref
     return None
 

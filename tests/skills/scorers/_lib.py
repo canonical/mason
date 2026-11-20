@@ -76,12 +76,12 @@ __all__ = [
 
 # lines orientation prints, spread through its output: harnesses truncate long
 # tool output (codex keeps the tail), so any one of these hitting means it ran.
-# "live releases:" is printed whether or not the cwd is a checkout.
+# "default rock base:" is printed whether or not the cwd is a checkout.
 ORIENTATION_MARKERS = (
     "working dir: ",
     "manifest format:",
     "existing slices:",
-    "live releases:",
+    "default rock base:",
 )
 
 OUT = Path(os.environ["PATS_SCORED_DIR"])

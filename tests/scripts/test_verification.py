@@ -6,7 +6,6 @@ import importlib.util
 import os
 import subprocess
 import sys
-import urllib.error
 from pathlib import Path
 
 import pytest
@@ -184,98 +183,6 @@ def test_cut_usage_error(tmp_path):
     assert code == 2 and doc is None and "usage" in err
 
 
-def discover(monkeypatch, branches, today="2040-01-01"):
-    """orientation's release discovery over fake branches: name -> chisel.yaml,
-    or an exception to raise when that branch's manifest is read."""
-    orientation = module(SHARED / "orientation.py")
-    refs = "".join(
-        f"{n}{i}\trefs/heads/{b}\n"
-        for i, (b, n) in enumerate(zip(branches, "abcdefgh"))
-    )
-    monkeypatch.setattr(
-        orientation.subprocess,
-        "run",
-        lambda *a, **kw: subprocess.CompletedProcess(a, 0, refs, ""),
-    )
-    by_rev = {
-        f"{n}{i}": v for i, (n, v) in enumerate(zip("abcdefgh", branches.values()))
-    }
-
-    def manifest(url, revision):
-        value = by_rev[revision]
-        if isinstance(value, Exception):
-            raise value
-        return value
-
-    monkeypatch.setattr(orientation, "branch_manifest", manifest)
-    report = module(SHARED / "common.py").Report({})
-    orientation.live_releases(today, report)
-    return report.document()
-
-
-LIVE = "format: v3\nmaintenance:\n  end-of-life: 2999-01-01\n"
-
-
-def test_partial_release_discovery_reports_access_refusal(monkeypatch):
-    doc = discover(
-        monkeypatch,
-        {
-            "ubuntu-40.04": LIVE,
-            "ubuntu-40.10": urllib.error.HTTPError("u", 403, "Forbidden", {}, None),
-        },
-    )
-    assert "ubuntu-40.04" in doc["live releases"]
-    assert doc["status"] == "unavailable"
-    [problem] = doc["unavailable"]
-    assert problem["check"] == "release discovery" and "403" in problem["reason"]
-
-
-def test_successful_empty_discovery_is_distinct(monkeypatch):
-    doc = discover(monkeypatch, {})
-    assert doc["status"] == "passed"
-    assert doc["live releases"] == {}
-
-
-def test_expired_interim_without_end_of_life_is_not_live(monkeypatch):
-    # interims get 9 months of support, so an old one with no maintenance
-    # section is past it -- nothing about the live list is left unknown
-    doc = discover(monkeypatch, {"ubuntu-40.04": LIVE, "ubuntu-22.10": "format: v1\n"})
-    assert doc["status"] == "passed", doc
-    assert list(doc["live releases"]) == ["ubuntu-40.04"]
-
-
-@pytest.mark.parametrize("branch", ["ubuntu-38.04", "ubuntu-39.10"])
-def test_unknown_end_of_life_is_unavailable(monkeypatch, branch):
-    # an LTS, or an interim still inside its support window, could be live
-    doc = discover(monkeypatch, {"ubuntu-40.04": LIVE, branch: "format: v3\n"})
-    assert doc["status"] == "unavailable", doc
-    assert branch in doc["unavailable"][0]["reason"]
-
-
-def test_missing_maintenance_is_unknown(tmp_path, monkeypatch):
-    orientation = module(SHARED / "orientation.py")
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "chisel.yaml").write_text("format: v3\n")
-    report = module(SHARED / "common.py").Report({})
-    orientation.checkout("2040-01-01", report)
-    assert report.data["maintained"] is None
-
-
-def test_checkout_access_refusal_is_not_missing_checkout(tmp_path, monkeypatch):
-    orientation = module(SHARED / "orientation.py")
-    monkeypatch.chdir(tmp_path)
-
-    def denied(*args, **kwargs):
-        raise PermissionError("access denied")
-
-    monkeypatch.setattr(Path, "read_text", denied)
-    report = module(SHARED / "common.py").Report({})
-    orientation.checkout("2040-01-01", report)
-    [problem] = report.unavailable
-    assert problem["check"] == "checkout" and "access denied" in problem["reason"]
-    assert "branch" not in report.data
-
-
 def test_inaccessible_task_is_not_a_test_defect(tmp_path, monkeypatch):
     checker = module(SHARED / "check-test.py")
     slices_file = tmp_path / "foo.yaml"
@@ -437,24 +344,3 @@ def test_diff_explicit_base_wins(tmp_path):
     run("branch", "other", "ubuntu-26.04")
     _, doc = check_diff(tmp_path, "--base=other")
     assert doc["base"] == "other"
-
-
-def test_orientation_reports_the_target_base(tmp_path, monkeypatch):
-    orientation = module(SHARED / "orientation.py")
-    run = release_checkout(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    report = module(SHARED / "common.py").Report({})
-    orientation.checkout("2040-01-01", report)
-    assert (report.data["target base"], report.data["base ref"]) == (
-        "ubuntu-26.04",
-        "ubuntu-26.04",
-    )
-    assert report.data["branch"] is None
-    assert not report.unavailable
-
-    run("branch", "-D", "ubuntu-26.04")
-    report = module(SHARED / "common.py").Report({})
-    orientation.checkout("2040-01-01", report)
-    # a fact to act on, not a failure of orientation: check-diff says what to fetch
-    assert report.data["base ref"] is None
-    assert not report.unavailable

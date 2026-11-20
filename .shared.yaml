@@ -115,5 +115,7 @@ shared:
   rockcrafter:
     chisel-cli.md:
       path: kb/chisel-cli.md
+    orientation.py:
+      path: scripts/orientation.py
     common.py:
       path: scripts/common.py
