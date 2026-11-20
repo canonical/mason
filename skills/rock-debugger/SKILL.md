@@ -20,7 +20,7 @@ not hand the task to a subagent. Work autonomously: no mid-task questions.
   directory and run helpers by absolute path, e.g.:
 
   ```bash
-  uv run "/absolute/path/to/rock-debugger/scripts/_check-rock.py"
+  uv run "/absolute/path/to/rock-debugger/scripts/check-rock.py"
   ```
 
   In the remaining commands, replace `<skill-root>` with that path.
@@ -31,11 +31,11 @@ not hand the task to a subagent. Work autonomously: no mid-task questions.
   touched. Without git, copy `rockcraft.yaml` to `rockcraft.yaml.bak` before
   the first edit.
 - `kb/rock-debugging.md` covers logs, the build instance and failing tests;
-  `kb/_rock-tests.md` how the tests are laid out and run. For the fix
-  itself: `kb/_rockcraft-yaml.md` (keys, parts, lifecycle),
-  `kb/_pebble-services.md` (services, permissions), `kb/_rock-slices.md`
+  `kb/rock-tests.md` how the tests are laid out and run. For the fix
+  itself: `kb/rockcraft-yaml.md` (keys, parts, lifecycle),
+  `kb/pebble-services.md` (services, permissions), `kb/rock-slices.md`
   (slices, including ones not upstream yet). Upstream wins over this
-  knowledge base: `kb/_rock-upstream-sources.md`.
+  knowledge base: `kb/rock-upstream-sources.md`.
 
 Every helper reports `passed`, `failed` or `unavailable`. **Failed** is a
 defect to fix; **unavailable** means a tool or a network source could not be
@@ -50,7 +50,7 @@ only that would work, stop and recommend it.
 ## 1. lint
 
 ```bash
-uv run "<skill-root>/scripts/_check-rock.py"
+uv run "<skill-root>/scripts/check-rock.py"
 ```
 
 Fix every `block` and re-run until it passes; these are cheaper than a pack.
@@ -58,7 +58,7 @@ Fix every `block` and re-run until it passes; these are cheaper than a pack.
 ## 2. pack
 
 ```bash
-uv run "<skill-root>/scripts/_pack-rock.py"
+uv run "<skill-root>/scripts/pack-rock.py"
 ```
 
 A failure names the category, step, part and the fix; apply it and go back to
@@ -70,7 +70,7 @@ When the rock has a test suite (`rockcraft-test.yaml`, or a deprecated
 `spread.yaml`):
 
 ```bash
-uv run "<skill-root>/scripts/_test-rock.py"
+uv run "<skill-root>/scripts/test-rock.py"
 ```
 
 Each failed task, and each failed prepare or restore script, comes with the

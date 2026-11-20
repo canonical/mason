@@ -79,7 +79,7 @@ def suites(config: Path, *args: str, changed: list[str] | None = None) -> list[s
         ([".github/scripts/pats-suites.sh"], ["ci-chisel-slicer", "ci-rock-crafter"]),
         # nothing else does
         (["tests/skills/README.md"], []),
-        (["README.md", "_shared/common.py", "skills/README.md"], []),
+        (["README.md", "shared/common.py", "skills/README.md"], []),
         ([], []),
     ],
 )

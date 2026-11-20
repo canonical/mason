@@ -1,6 +1,6 @@
 """pytest regression net for the skill's deterministic checkers.
 
-Exercises the scripts under _shared/ -- the sources the skills ship copies of -- on inline
+Exercises the scripts under shared/ -- the sources the skills ship copies of -- on inline
 fixtures via subprocess, so this tests the real CLI, not imported internals. The
 subprocessed scripts need pyyaml, which must be present under the runner's
 interpreter. Run:
@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-SCRIPTS = Path(__file__).resolve().parents[2] / "_shared"
+SCRIPTS = Path(__file__).resolve().parents[2] / "shared"
 EXIT = {"passed": 0, "failed": 1, "unavailable": 3}
 
 
@@ -34,7 +34,7 @@ def run(script: str, *args: str) -> str:
 
 def report(script: str, *args: str, **kwargs) -> tuple[int, dict]:
     """Run a helper and return its exit code and its document, checked against
-    the output contract in _shared/common.py."""
+    the output contract in shared/common.py."""
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / script), *args],
         capture_output=True,

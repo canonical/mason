@@ -14,20 +14,20 @@ test:  ## Test the scripts and repo metadata (uvx pytest, the helpers' dependenc
 
 .PHONY: lint
 lint:  ## Lint python (ruff, version pinned by RUFF)
-	uvx $(RUFF) check scripts/ _shared/ skills/ tests/scripts/ tests/meta/ tests/skills/
+	uvx $(RUFF) check scripts/ shared/ skills/ tests/scripts/ tests/meta/ tests/skills/
 
 .PHONY: format
 format:  ## Format python in place (ruff, version pinned by RUFF)
-	uvx $(RUFF) format scripts/ _shared/ skills/ tests/scripts/ tests/meta/
+	uvx $(RUFF) format scripts/ shared/ skills/ tests/scripts/ tests/meta/
 
 .PHONY: sync-shared
-sync-shared:  ## Copy _shared/ files into the skills that ask for them in .shared.yaml
+sync-shared:  ## Copy shared/ files into the skills that ask for them in .shared.yaml
 	uv run --script scripts/shared.py sync
 
 .PHONY: check-shared
-check-shared:  ## Fail if any skill's generated copy is out of sync with _shared/
+check-shared:  ## Fail if any skill's generated copy is out of sync with shared/
 	uv run --script scripts/shared.py sync --check
 
 .PHONY: list-shared
-list-shared:  ## Print a skill-by-file matrix of what _shared/ goes where
+list-shared:  ## Print a skill-by-file matrix of what shared/ goes where
 	@uv run --script scripts/shared.py list

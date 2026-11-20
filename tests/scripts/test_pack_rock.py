@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "_shared" / "pack-rock.py"
+SCRIPT = ROOT / "shared" / "pack-rock.py"
 
 
 def module(path):

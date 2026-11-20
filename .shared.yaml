@@ -1,160 +1,160 @@
-# what each skill takes from _shared/, and where the copy lands inside it.
+# what each skill takes from shared/, and where the copy lands inside it.
 # `make sync-shared` writes the copies; `make check-shared` (ci) catches drift.
 shared:
   chisel-slicer:
     verification.md:
-      path: kb/_verification.md
+      path: kb/verification.md
     dependency-policy.md:
-      path: kb/_dependency-policy.md
+      path: kb/dependency-policy.md
     slices-file-format.md:
-      path: kb/_slices-file-format.md
+      path: kb/slices-file-format.md
     slice-conventions.md:
-      path: kb/_slice-conventions.md
+      path: kb/slice-conventions.md
     chisel-formats.md:
-      path: kb/_chisel-formats.md
+      path: kb/chisel-formats.md
     spread-tests.md:
-      path: kb/_spread-tests.md
+      path: kb/spread-tests.md
     chisel-cli.md:
-      path: kb/_chisel-cli.md
+      path: kb/chisel-cli.md
     upstream-sources.md:
-      path: kb/_upstream-sources.md
+      path: kb/upstream-sources.md
     contributing.md:
-      path: kb/_contributing.md
+      path: kb/contributing.md
     orientation.py:
-      path: scripts/_orientation.py
+      path: scripts/orientation.py
     deb-list.py:
-      path: scripts/_deb-list.py
+      path: scripts/deb-list.py
     file.py:
-      path: scripts/_file.py
+      path: scripts/file.py
     try-cut.py:
-      path: scripts/_try-cut.py
+      path: scripts/try-cut.py
     scaffold-test.py:
-      path: scripts/_scaffold-test.py
+      path: scripts/scaffold-test.py
     check-slice.py:
-      path: scripts/_check-slice.py
+      path: scripts/check-slice.py
     check-test.py:
-      path: scripts/_check-test.py
+      path: scripts/check-test.py
     check-diff.py:
-      path: scripts/_check-diff.py
+      path: scripts/check-diff.py
     common.py:
-      path: scripts/_common.py
+      path: scripts/common.py
   chisel-slice-reviewer:
     verification.md:
-      path: kb/_verification.md
+      path: kb/verification.md
     dependency-policy.md:
-      path: kb/_dependency-policy.md
+      path: kb/dependency-policy.md
     upstream-sources.md:
-      path: kb/_upstream-sources.md
+      path: kb/upstream-sources.md
     deb-list.py:
-      path: scripts/_deb-list.py
+      path: scripts/deb-list.py
     file.py:
-      path: scripts/_file.py
+      path: scripts/file.py
     slices-file-format.md:
-      path: kb/_slices-file-format.md
+      path: kb/slices-file-format.md
     slice-conventions.md:
-      path: kb/_slice-conventions.md
+      path: kb/slice-conventions.md
     chisel-formats.md:
-      path: kb/_chisel-formats.md
+      path: kb/chisel-formats.md
     chisel-branches.md:
-      path: kb/_chisel-branches.md
+      path: kb/chisel-branches.md
     spread-tests.md:
-      path: kb/_spread-tests.md
+      path: kb/spread-tests.md
     contributing.md:
-      path: kb/_contributing.md
+      path: kb/contributing.md
     orientation.py:
-      path: scripts/_orientation.py
+      path: scripts/orientation.py
     check-slice.py:
-      path: scripts/_check-slice.py
+      path: scripts/check-slice.py
     check-test.py:
-      path: scripts/_check-test.py
+      path: scripts/check-test.py
     check-diff.py:
-      path: scripts/_check-diff.py
+      path: scripts/check-diff.py
     common.py:
-      path: scripts/_common.py
+      path: scripts/common.py
   chisel-slice-porter:
     verification.md:
-      path: kb/_verification.md
+      path: kb/verification.md
     dependency-policy.md:
-      path: kb/_dependency-policy.md
+      path: kb/dependency-policy.md
     upstream-sources.md:
-      path: kb/_upstream-sources.md
+      path: kb/upstream-sources.md
     slices-file-format.md:
-      path: kb/_slices-file-format.md
+      path: kb/slices-file-format.md
     slice-conventions.md:
-      path: kb/_slice-conventions.md
+      path: kb/slice-conventions.md
     chisel-formats.md:
-      path: kb/_chisel-formats.md
+      path: kb/chisel-formats.md
     chisel-branches.md:
-      path: kb/_chisel-branches.md
+      path: kb/chisel-branches.md
     cross-release-porting.md:
-      path: kb/_cross-release-porting.md
+      path: kb/cross-release-porting.md
     spread-tests.md:
-      path: kb/_spread-tests.md
+      path: kb/spread-tests.md
     chisel-cli.md:
-      path: kb/_chisel-cli.md
+      path: kb/chisel-cli.md
     contributing.md:
-      path: kb/_contributing.md
+      path: kb/contributing.md
     orientation.py:
-      path: scripts/_orientation.py
+      path: scripts/orientation.py
     deb-list.py:
-      path: scripts/_deb-list.py
+      path: scripts/deb-list.py
     file.py:
-      path: scripts/_file.py
+      path: scripts/file.py
     try-cut.py:
-      path: scripts/_try-cut.py
+      path: scripts/try-cut.py
     scaffold-test.py:
-      path: scripts/_scaffold-test.py
+      path: scripts/scaffold-test.py
     check-slice.py:
-      path: scripts/_check-slice.py
+      path: scripts/check-slice.py
     check-test.py:
-      path: scripts/_check-test.py
+      path: scripts/check-test.py
     check-diff.py:
-      path: scripts/_check-diff.py
+      path: scripts/check-diff.py
     common.py:
-      path: scripts/_common.py
+      path: scripts/common.py
   rock-crafter:
     rockcraft-yaml.md:
-      path: kb/_rockcraft-yaml.md
+      path: kb/rockcraft-yaml.md
     pebble-services.md:
-      path: kb/_pebble-services.md
+      path: kb/pebble-services.md
     rock-slices.md:
-      path: kb/_rock-slices.md
+      path: kb/rock-slices.md
     rock-upstream-sources.md:
-      path: kb/_rock-upstream-sources.md
+      path: kb/rock-upstream-sources.md
     rock-tests.md:
-      path: kb/_rock-tests.md
+      path: kb/rock-tests.md
     chisel-cli.md:
-      path: kb/_chisel-cli.md
+      path: kb/chisel-cli.md
     check-rock.py:
-      path: scripts/_check-rock.py
+      path: scripts/check-rock.py
     pack-rock.py:
-      path: scripts/_pack-rock.py
+      path: scripts/pack-rock.py
     test-rock.py:
-      path: scripts/_test-rock.py
+      path: scripts/test-rock.py
     rocklib.py:
-      path: scripts/_rocklib.py
+      path: scripts/rocklib.py
     common.py:
-      path: scripts/_common.py
+      path: scripts/common.py
   rock-debugger:
     rockcraft-yaml.md:
-      path: kb/_rockcraft-yaml.md
+      path: kb/rockcraft-yaml.md
     pebble-services.md:
-      path: kb/_pebble-services.md
+      path: kb/pebble-services.md
     rock-slices.md:
-      path: kb/_rock-slices.md
+      path: kb/rock-slices.md
     rock-upstream-sources.md:
-      path: kb/_rock-upstream-sources.md
+      path: kb/rock-upstream-sources.md
     rock-tests.md:
-      path: kb/_rock-tests.md
+      path: kb/rock-tests.md
     chisel-cli.md:
-      path: kb/_chisel-cli.md
+      path: kb/chisel-cli.md
     check-rock.py:
-      path: scripts/_check-rock.py
+      path: scripts/check-rock.py
     pack-rock.py:
-      path: scripts/_pack-rock.py
+      path: scripts/pack-rock.py
     test-rock.py:
-      path: scripts/_test-rock.py
+      path: scripts/test-rock.py
     rocklib.py:
-      path: scripts/_rocklib.py
+      path: scripts/rocklib.py
     common.py:
-      path: scripts/_common.py
+      path: scripts/common.py

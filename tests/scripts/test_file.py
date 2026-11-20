@@ -9,7 +9,7 @@ import struct
 import tempfile
 from pathlib import Path
 
-MODULE = Path(__file__).resolve().parents[2] / "_shared" / "file.py"
+MODULE = Path(__file__).resolve().parents[2] / "shared" / "file.py"
 
 
 def describe(*paths: Path) -> list[str]:

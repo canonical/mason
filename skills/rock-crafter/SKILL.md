@@ -22,7 +22,7 @@ slice hand-over in step 3 is the one exception).
   directory and run helpers by absolute path, e.g.:
 
   ```bash
-  uv run "/absolute/path/to/rock-crafter/scripts/_check-rock.py"
+  uv run "/absolute/path/to/rock-crafter/scripts/check-rock.py"
   ```
 
   In the remaining commands, replace `<skill-root>` with that path.
@@ -30,7 +30,7 @@ slice hand-over in step 3 is the one exception).
   it references are written there. Preserve unrelated changes; when you make
   commits, use Conventional Commits.
 - Where this knowledge base and upstream disagree, upstream wins:
-  `kb/_rock-upstream-sources.md`.
+  `kb/rock-upstream-sources.md`.
 
 Every helper reports `passed`, `failed` or `unavailable`. **Failed** is a
 defect to fix; **unavailable** means a tool or a network source could not be
@@ -75,23 +75,23 @@ Ask the user **once**: author the slices, or build unchiselled?
   release. In it, follow chisel-slicer's `SKILL.md` for each missing package
   (a subagent is fine here). Then re-draft with
   `--chisel-release <checkout> --force`. After a successful pack, push the
-  branch and point the part at the fork (`kb/_rock-slices.md`; chisel itself in
-  `kb/_chisel-cli.md`); if you cannot push, keep the local source and
+  branch and point the part at the fork (`kb/rock-slices.md`; chisel itself in
+  `kb/chisel-cli.md`); if you cannot push, keep the local source and
   report the push as remaining. If authoring fails, go unchiselled and say why.
 
 ## 4. adjust
 
 Edit only what the draft cannot know: what its `review` lists, config files,
 writable dirs for a service, a non-privileged port. Keep every existing key.
-Read `kb/_rockcraft-yaml.md` for keys and parts, `kb/_pebble-services.md` for
-services and the non-root user, and `kb/_rock-slices.md` before adding runtime
+Read `kb/rockcraft-yaml.md` for keys and parts, `kb/pebble-services.md` for
+services and the non-root user, and `kb/rock-slices.md` before adding runtime
 slices.
 
 ## 5. check and pack
 
 ```bash
-uv run "<skill-root>/scripts/_check-rock.py"
-uv run "<skill-root>/scripts/_pack-rock.py"
+uv run "<skill-root>/scripts/check-rock.py"
+uv run "<skill-root>/scripts/pack-rock.py"
 ```
 
 Fix every `block` from check-rock and re-run it until it passes, then pack:
@@ -102,7 +102,7 @@ pack-rock names.
 
 ## 6. test
 
-Read `kb/_rock-tests.md` before writing tests: it owns layout, depth and what
+Read `kb/rock-tests.md` before writing tests: it owns layout, depth and what
 each kind of rock must prove. Scaffold the suite once, beside
 `rockcraft.yaml`; preserve existing tests:
 
@@ -115,7 +115,7 @@ its `project:` key. Replace the scaffolded placeholder task with tasks that prov
 works, then run them:
 
 ```bash
-uv run "<skill-root>/scripts/_test-rock.py"
+uv run "<skill-root>/scripts/test-rock.py"
 ```
 
 A failed task or prepare script is a defect: fix the rock (check, pack, test

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SHARED = ROOT / "_shared"
+SHARED = ROOT / "shared"
 
 
 def module(path):

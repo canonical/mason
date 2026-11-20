@@ -141,7 +141,7 @@ def fmt() -> int | None:
     return int(m.group()) if m else None
 
 
-# slice names the conventions reject (kb/_slice-conventions.md). packages coin
+# slice names the conventions reject (kb/slice-conventions.md). packages coin
 # their own names freely (python's `utils`, binutils' `linker`), so the check
 # flags known-wrong names instead of demanding a fixed vocabulary.
 REJECTED_SLICE_NAMES = {"bin", "lib", "configs", "dev", "all", "license", "notice", "rules"}

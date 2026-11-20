@@ -25,7 +25,7 @@ def module(path):
 
 
 dr = module(SCRIPT)
-cr = module(ROOT / "_shared" / "check-rock.py")
+cr = module(ROOT / "shared" / "check-rock.py")
 
 NOBLE = dr.rl.Release("24.04", "noble", True, True)
 
