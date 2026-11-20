@@ -47,7 +47,9 @@ KEYS = (
     "package-repositories", "extensions", "adopt-info", "contact", "issues",
     "source-code",
 )  # fmt: skip
-BASES = ["ubuntu@22.04", "ubuntu@24.04"]
+# rockcraft takes 26.10 here, and chisel-releases has no branch for it yet
+BASES = ["ubuntu@22.04", "ubuntu@24.04", "ubuntu@26.10"]
+BRANCHES = {"ubuntu-22.04", "ubuntu-24.04"}
 
 
 def schema(extra_keys=(), required=("name", "summary", "description", "base", "platforms", "parts")):
@@ -72,6 +74,7 @@ def offline(monkeypatch):
         return [f"{pkg}_{n}" for n in SLICES.get(pkg, [])] or None
 
     monkeypatch.setattr(cr.rl, "slices_of", slices_of)
+    monkeypatch.setattr(cr.rl, "has_branch", lambda branch: branch in BRANCHES)
     monkeypatch.setattr(cr.orientation, "rockcraft_version", lambda: "1.0.0")
     monkeypatch.setattr(cr.orientation, "rockcraft_schema", lambda version: schema())
 
@@ -339,8 +342,10 @@ def test_without_a_rockcraft_version_the_schema_checks_do_not_run(monkeypatch, v
     monkeypatch.setattr(cr.orientation, "rockcraft_version", installed)
     report = run(changed(color="red", summary=None, base="noble"))
     assert report.findings == {} and report.status == "unavailable"
-    [problem] = report.unavailable
+    # with nothing to refuse `noble`, the slices staged on it go unchecked too
+    problem, unchecked = report.unavailable
     assert problem["check"] == "rockcraft schema" and reason in problem["reason"]
+    assert unchecked["check"] == "slices" and "noble" in unchecked["reason"]
 
 
 def test_a_schema_that_cannot_be_read_is_unavailable_and_the_rest_still_runs(monkeypatch):
@@ -379,7 +384,7 @@ def test_a_schema_of_another_shape_is_not_an_empty_allow_list(monkeypatch, broke
     monkeypatch.setattr(cr.orientation, "rockcraft_schema", lambda v: broken)
     report = run(changed(color="red", base="noble"))
     assert report.findings == {} and report.status == "unavailable"
-    assert [u["check"] for u in report.unavailable] == ["rockcraft schema"]
+    assert [u["check"] for u in report.unavailable] == ["rockcraft schema", "slices"]
 
 
 def test_the_real_reader_at_the_installed_version(tmp_path, monkeypatch):
@@ -416,6 +421,54 @@ def test_the_real_reader_at_the_installed_version(tmp_path, monkeypatch):
     assert proc.returncode == 3 and "findings" not in out, proc.stdout
     assert [u["check"] for u in out["unavailable"]] == ["rockcraft schema"]
     assert "7.9.0.post1" in out["unavailable"][0]["reason"]
+
+
+# --- where the slices are looked up ---------------------------------------------
+
+
+def test_a_base_without_a_branch_is_one_finding_not_one_per_slice():
+    doc = changed(**{"build-base": "ubuntu@26.10"})
+    assert run(doc).findings == {
+        "rockcraft.yaml": [{"sev": "block", "code": "unknown-release", "release": "ubuntu-26.10"}]
+    }
+    # an unchiselled rock asks chisel-releases for nothing
+    assert run(changed(base="ubuntu@26.10", parts={"p": {"stage-packages": ["hello"]}})).findings == {}
+
+
+def test_a_branch_that_cannot_be_asked_about_is_unavailable(monkeypatch):
+    def down(branch):
+        raise cr.rl.Unavailable("chisel-releases unreachable")
+
+    monkeypatch.setattr(cr.rl, "has_branch", down)
+    report = run(GOOD)
+    assert report.findings == {} and report.status == "unavailable"
+    assert [u["check"] for u in report.unavailable] == ["slices"]
+
+
+def test_devel_names_no_release_and_says_its_slices_went_unchecked():
+    report = run(changed(**{"build-base": "devel"}))
+    assert report.findings == {} and report.status == "unavailable"
+    [problem] = report.unavailable
+    assert problem["check"] == "slices" and "devel" in problem["reason"]
+
+
+def test_devel_with_no_slices_to_look_up_passes():
+    report = run(changed(**{"build-base": "devel"}, parts={"p": {"plugin": "nil"}}))
+    assert report.findings == {} and report.status == "passed"
+
+
+def test_a_cut_that_names_its_release_is_checked_whatever_the_base():
+    script = "chisel cut --release ubuntu-24.04 --root x hello_binz"
+    report = run(changed(**{"build-base": "devel"}, parts={"p": {"override-build": script}}))
+    assert [f["code"] for f in report.findings["rockcraft.yaml"]] == ["unknown-slice"]
+    # nothing was left unchecked: the cut said where to look
+    assert report.unavailable == []
+
+
+def test_a_refused_base_is_not_also_an_unchecked_one():
+    report = run(changed(**{"build-base": "ubuntu@25.04"}))
+    assert codes(changed(**{"build-base": "ubuntu@25.04"})) == ["bad-base"]
+    assert report.unavailable == []
 
 
 def test_slices_unavailable(monkeypatch):

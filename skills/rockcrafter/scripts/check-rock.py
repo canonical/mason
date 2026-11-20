@@ -17,8 +17,9 @@ replace a pack.
 Usage: check-rock.py [<rockcraft.yaml>]   (default: ./rockcraft.yaml)
 
 Unavailable when rockcraft is not installed or its schema cannot be read (the
-key and base checks then do not run), or when chisel-releases cannot be
-reached for the slice check; every other finding is still reported.
+key and base checks then do not run), when chisel-releases cannot be reached
+for the slice check, or when slices depend on a base that names no release
+(`build-base: devel`); every other finding is still reported.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ SLICE = re.compile(r"^[a-z0-9][a-z0-9.+-]*_[a-z0-9][a-z0-9-]*$")
 
 # ubuntu@XX.YY -- read off an accepted base to find its chisel-releases branch.
 BASE = re.compile(r"^ubuntu@(\d\d\.\d\d)$")
+BRANCH = re.compile(r"ubuntu-\d\d\.\d\d")
 
 CODES = {
     "not-a-mapping": "rockcraft.yaml is not a YAML mapping",
@@ -52,7 +54,7 @@ CODES = {
     "unknown-key": "a top-level key rockcraft rejects",
     "bad-type": "a key whose value is not the YAML type rockcraft expects",
     "bad-base": "a base or build-base the installed rockcraft does not accept",
-    "unknown-release": "the base, or a `chisel cut --release`, names no known Ubuntu release",
+    "unknown-release": "chisel-releases has no branch for the release slices are read from (the base, or a `chisel cut --release`): use one it has, or build unchiselled",
     "bare-needs-build-base": "base: bare without build-base",
     "version-type": "version is not a string (quote it)",
     "version-granularity": "archive-based rocks version XX.YY; a patch level needs a pinned source-tag",
@@ -91,7 +93,7 @@ def cut_from(rel: str | None, part: dict, release: str) -> str | None:
     is inside the part's source."""
     if rel is None:
         return release
-    if re.fullmatch(r"ubuntu-\d\d\.\d\d", rel):
+    if BRANCH.fullmatch(rel):
         return rel
     src = part.get("source")
     inside = re.sub(r"^\$\{?\w+\}?/?", "", rel) or "."
@@ -219,6 +221,7 @@ def check(doc: object, f: str, report: common.Report) -> None:
     # release, a `chisel cut` off whatever its --release names.
     used: dict[str, set[str]] = {}
     debs = []
+    unchecked = False
     for pname, p in parts.items():
         sp = p.get("stage-packages")
         sp = [] if sp is None else sp
@@ -230,28 +233,46 @@ def check(doc: object, f: str, report: common.Report) -> None:
         if sl and len(sl) != len(sp):
             add("block", "mixed-stage", f, part=pname)
         debs += [x for x in sp if not SLICE.match(x)]
-        if release:
-            used.setdefault(release, set()).update(sl)
-            for k, val in p.items():
-                if str(k).startswith("override-") and isinstance(val, str):
-                    for rel, slices in cuts(val):
-                        tree = cut_from(rel, p, release)
-                        if tree:
-                            used.setdefault(tree, set()).update(slices)
+        # "" stands for "the rock's release, and there is none": told apart
+        # from None, a tree that is deliberately not read
+        wanted = [(release or "", sl)]
+        for k, val in p.items():
+            if str(k).startswith("override-") and isinstance(val, str):
+                wanted += [(cut_from(rel, p, release or ""), s) for rel, s in cuts(val)]
+        for tree, slices in wanted:
+            if tree:
+                used.setdefault(tree, set()).update(slices)
+            elif tree == "" and slices:
+                unchecked = True
+    if unchecked and key not in refused:
+        report.mark_unavailable(
+            "slices", f"{key}: {value} names no release, so slices that depend on it were not checked"
+        )
     if doc.get("package-repositories") and base == "bare":
         add("warn", "ppa-on-bare", f)
     if base == "bare" and debs:
         add("warn", "debs-on-bare", f, value=" ".join(debs))
 
     for rel, slices in used.items():
+        if not slices:
+            continue
+        try:
+            # asked first: on a branch that is not there every slice would
+            # look missing, one finding each, for a single cause
+            if BRANCH.fullmatch(rel) and not rl.has_branch(rel):
+                add("block", "unknown-release", f, release=rel)
+                continue
+        except rl.Unavailable as e:
+            report.mark_unavailable("slices", str(e))
+            return
         for pkg in sorted({s.split("_", 1)[0] for s in slices}):
             try:
                 have = set(rl.slices_of(rel, pkg) or [])
             except rl.Unavailable as e:
                 report.mark_unavailable("slices", str(e))
                 return
-            except ValueError:  # a `chisel cut --release` naming no Ubuntu release
-                add("block", "unknown-release", f, value=rel)
+            except ValueError:  # a release Ubuntu's own list does not know
+                add("block", "unknown-release", f, release=rel)
                 break
             for s in sorted({u for u in slices if u.startswith(pkg + "_")} - have):
                 add("block", "unknown-slice", f, slice=s, release=rel,
