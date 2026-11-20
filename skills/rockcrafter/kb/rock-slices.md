@@ -8,7 +8,7 @@
 | `stage-packages` | slice names only: `<pkg>_<slice>` | whole debs: `<pkg>` |
 | size / surface | minimal -- no shell, no apt unless sliced in | full Ubuntu base + debs |
 
-Prefer chiselled. A part's `stage-packages` must not mix slices and whole debs. Rockcraft resolves slice names from the upstream chisel-releases branch matching `build-base` -- you list the top-level slices you need; `essential:` deps resolve automatically.
+Prefer chiselled. Chisel only reads the Ubuntu archive, so packages from a PPA are always staged whole, on an `ubuntu@` base. A part's `stage-packages` must not mix slices and whole debs. Rockcraft resolves slice names from the upstream chisel-releases branch matching `build-base` -- you list the top-level slices you need; `essential:` deps resolve automatically.
 
 ## Foundation slices
 
@@ -19,6 +19,20 @@ For a `bare` rock:
 - `ca-certificates_data` -- when the workload makes TLS connections.
 - `tzdata_*` -- when the workload needs zone data.
 - `<pkg>_bins` / `<pkg>_libs` / `<pkg>_config` / `<pkg>_data` -- the workload itself.
+
+## Runtime of a source build
+
+What a built workload needs at run time, on top of `base-files_base` and
+`ca-certificates_data`:
+
+| Built with | Stage | Build side |
+|---|---|---|
+| go | nothing more | `build-environment: [CGO_ENABLED: "0"]` for a static binary |
+| rust | `libc6_libs`, `libgcc-s1_libs` | |
+| python, uv | `python3.X_standard`, `python3.X-venv_ensurepip` | `python3.X` is what `python3` depends on in the release |
+| npm | `nodejs_bins` | the archive's node: `npm-include-node: false`, `build-packages: [nodejs, npm]` |
+| maven, gradle | `openjdk-N-jre-headless_standard` | `build-packages` with the matching `openjdk-N-jdk-headless`; `N` is what `default-jre-headless` depends on unless the project pins one |
+| cmake, meson, autotools, make | `libc6_libs` and a `<lib>_libs` slice per shared library (`ldd` on the built binary) | the matching `-dev` packages in `build-packages` |
 
 ## Shell and CLI gotchas
 

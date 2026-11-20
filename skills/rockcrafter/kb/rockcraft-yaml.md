@@ -37,9 +37,26 @@ build-base: ubuntu@XX.YY   # required with base: bare
 run-user: _daemon_         # non-root, see kb/pebble-services.md
 platforms:
   amd64:                   # Debian arch names only
+package-repositories: ...  # only for a PPA, see Parts
 services: ...              # kb/pebble-services.md
 parts: ...
 ```
+
+## Parts
+
+- **Ubuntu packages**: one `plugin: nil` part with the packages in
+  `stage-packages`. Packages from a PPA also need the repository declared:
+
+  ```yaml
+  package-repositories:
+    - {type: apt, ppa: <owner>/<name>, priority: always}
+  ```
+- **Source build**: one part with the build plugin and a pinned source
+  (`source-type: git`, `source-tag: <tag>`), and a second `plugin: nil` part
+  whose `stage-packages` is the runtime (`kb/rock-slices.md`).
+- **Framework extension** (`extensions: [<name>-framework]`): the extension
+  generates the parts and the service, and the project must follow the layout
+  it expects.
 
 ## Version
 
