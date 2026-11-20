@@ -10,7 +10,7 @@ verify: lint check-shared test  ## Run every check ci runs
 
 .PHONY: test
 test:  ## Test the scripts and repo metadata (uvx pytest, the helpers' dependencies pulled in on the fly)
-	uvx --with pyyaml --with spdx --with pytest pytest tests/scripts/ tests/meta/
+	uvx --with pyyaml --with pytest pytest tests/scripts/ tests/meta/
 
 .PHONY: lint
 lint:  ## Lint python (ruff, version pinned by RUFF)

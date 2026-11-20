@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["pyyaml", "spdx"]
+# dependencies = ["pyyaml"]
 # ///
 """check-rock: deterministic static linter for a rockcraft.yaml.
 
@@ -27,7 +27,6 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import spdx
 import yaml
 
 try:
@@ -68,9 +67,6 @@ ARCHES = {"amd64", "arm64", "armhf", "i386", "ppc64el", "riscv64", "s390x"}
 # (Debian package names can't contain one).
 SLICE = re.compile(r"^[a-z0-9][a-z0-9.+-]*_[a-z0-9][a-z0-9-]*$")
 
-# the licence ids rockcraft knows: it looks a licence up in this same list.
-LICENSES = {rec["id"].strip().lower() for rec in spdx.licenses()}
-
 # ubuntu@XX.YY -- the version itself is validated live against the release list.
 BASE = re.compile(r"^ubuntu@(\d\d\.\d\d)$")
 
@@ -84,8 +80,6 @@ CODES = {
     "bare-needs-build-base": "base: bare without build-base",
     "version-type": "version is not a string (quote it)",
     "version-granularity": "archive-based rocks version XX.YY; a patch level needs a pinned source-tag",
-    "license-form": "rockcraft knows only the plain SPDX id (GPL-3.0, not GPL-3.0-or-later)",
-    "license-unknown": "license is neither `proprietary` nor an SPDX id rockcraft knows",
     "root-user": "no `run-user: _daemon_`: the rock runs as root -- set it or justify it",
     "bad-platform": "a platform without `build-for` whose name is not a Debian architecture",
     "service-command": "a Pebble service command must start with an absolute path",
@@ -182,12 +176,6 @@ def check(doc: object, f: str, report: common.Report) -> None:
     if isinstance(v, str) and not pinned and not re.fullmatch(r"\d+\.\d+", v):
         add("warn", "version-granularity", f, value=v)
 
-    lic = doc.get("license")
-    if isinstance(lic, str) and lic and lic != "proprietary":
-        if re.search(r"-(or-later|only)$|\+$", lic):
-            add("block", "license-form", f, value=lic)
-        elif lic.strip().lower() not in LICENSES:
-            add("block", "license-unknown", f, value=lic)
     if doc.get("run-user") != "_daemon_":
         add("warn", "root-user", f)
 

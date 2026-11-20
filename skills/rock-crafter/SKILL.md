@@ -142,7 +142,7 @@ Summarise for the user (or the parent agent when delegated):
   slices, or unchiselled and why -- and the service command or CLI
 - the tests: what each task proves, and their result
 - checks passed, failed or unavailable, and what remains (push, upstreaming
-  slices, an unrun test suite, an unset `license:`)
+  slices, an unrun test suite)
 - what you changed from the draft, and why
 
 Keep it concise; do not dump file contents or raw logs.

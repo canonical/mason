@@ -8,8 +8,7 @@
 Does the discovery -- versions, build system, runtime slices -- so the agent
 only makes the judgement calls. A fresh draft passes check-rock.py. It builds
 nothing, and cannot know a C project's library dependencies or a service's
-configuration: what to review is listed under `review`. It never sets
-`license:` -- that is the user's to state.
+configuration: what to review is listed under `review`.
 
 What it decides:
   archive  version XX.YY and description from the archive;
@@ -667,7 +666,6 @@ def write(doc: dict, out: Path, report: common.Report) -> int:
             lines.append("")
         lines += emit({k: v})
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    note("license: left out -- optional, add it only when the user states one")
     report.data["wrote"] = str(out)
     report.data["review"] = REVIEW or None
     return report.emit()

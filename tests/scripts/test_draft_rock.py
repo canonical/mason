@@ -198,7 +198,6 @@ def test_archive_draft_passes_check(offline, monkeypatch, capsys):
 def test_draft_leaves_the_licence_to_the_user(offline, monkeypatch, capsys):
     code, doc = draft(monkeypatch, capsys, "hello", "--release", "24.04")
     assert (code, "license" in doc) == (0, False)
-    assert any(note.startswith("license: left out") for note in doc["review"])
     assert "license" not in yaml.safe_load((offline / "rockcraft.yaml").read_text())
     assert check_codes(offline / "rockcraft.yaml") == []
 
