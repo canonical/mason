@@ -1,5 +1,5 @@
 prompt: |
-  Use the rock-debugger skill: `rockcraft pack` fails for the rock in the current directory. Find out why and fix it.
+  Use the rockcrafter skill: `rockcraft pack` fails for the rock in the current directory. Find out why and fix it.
 
   This is an automated eval: work autonomously and do not ask questions. Stop with the final report.
 stage: stage --rock

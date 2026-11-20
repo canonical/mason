@@ -112,49 +112,8 @@ shared:
       path: scripts/check-diff.py
     common.py:
       path: scripts/common.py
-  rock-crafter:
-    rockcraft-yaml.md:
-      path: kb/rockcraft-yaml.md
-    pebble-services.md:
-      path: kb/pebble-services.md
-    rock-slices.md:
-      path: kb/rock-slices.md
-    rock-upstream-sources.md:
-      path: kb/rock-upstream-sources.md
-    rock-tests.md:
-      path: kb/rock-tests.md
+  rockcrafter:
     chisel-cli.md:
       path: kb/chisel-cli.md
-    check-rock.py:
-      path: scripts/check-rock.py
-    pack-rock.py:
-      path: scripts/pack-rock.py
-    test-rock.py:
-      path: scripts/test-rock.py
-    rocklib.py:
-      path: scripts/rocklib.py
-    common.py:
-      path: scripts/common.py
-  rock-debugger:
-    rockcraft-yaml.md:
-      path: kb/rockcraft-yaml.md
-    pebble-services.md:
-      path: kb/pebble-services.md
-    rock-slices.md:
-      path: kb/rock-slices.md
-    rock-upstream-sources.md:
-      path: kb/rock-upstream-sources.md
-    rock-tests.md:
-      path: kb/rock-tests.md
-    chisel-cli.md:
-      path: kb/chisel-cli.md
-    check-rock.py:
-      path: scripts/check-rock.py
-    pack-rock.py:
-      path: scripts/pack-rock.py
-    test-rock.py:
-      path: scripts/test-rock.py
-    rocklib.py:
-      path: scripts/rocklib.py
     common.py:
       path: scripts/common.py

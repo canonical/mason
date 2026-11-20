@@ -21,8 +21,8 @@ _MARKERS = (
     "/chisel-slicer <pkg>",
     "/chisel-slice-reviewer <slices-file>",
     "/chisel-slice-porter <pkg>",
-    "/rock-crafter <app>",
-    "/rock-debugger",
+    "/rockcrafter <app>",
+    "or fix one whose pack or tests fail",
     "slices/curl.yaml",
     "github.com/canonical/mason",
 )

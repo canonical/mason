@@ -4,10 +4,11 @@
 # suites as a json array (`["ci-a","ci-b"]`), for a job matrix: `[]` when no
 # suite applies.
 #
-# a ci suite is a suite named ci-<skill> in <pats.yaml>. a change under
-# skills/<skill>/ picks ci-<skill>, a change to the eval or to the pats ci
-# picks them all, anything else none. only declared ci-* names are printed,
-# since <pats.yaml> and the file names may come from a fork.
+# a ci suite is a suite named ci-<skill> or ci-<skill>-<variant> in
+# <pats.yaml>. a change under skills/<skill>/ picks the skill's ci suites, a
+# change to the eval or to the pats ci picks them all, anything else none.
+# only declared ci-* names are printed, since <pats.yaml> and the file names
+# may come from a fork.
 set -eu
 
 SUITE_RE='^ci-[a-z0-9][a-z0-9-]*$'
@@ -27,7 +28,8 @@ function main() {
     case "${1:-}" in
         ("" | -h | --help) _fail "usage: pats-suites.sh <pats.yaml> [--all] < changed-files" ;;
     esac
-    local config="$1" all=0 wanted=" " file skill suite names=""
+    local config="$1" all=0 file skill suite want pick names=""
+    local -a wanted=()
     [ -f "$config" ] || _fail "no such file: $config"
     case "${2:-}" in
         ("") ;;
@@ -43,13 +45,19 @@ function main() {
                     all=1 ;;
                 (skills/*/*)
                     skill="${file#skills/}"
-                    wanted+="ci-${skill%%/*} " ;;
+                    wanted+=("ci-${skill%%/*}") ;;
             esac
         done
     fi
 
     while IFS= read -r suite; do
-        if [ "$all" = 1 ] || [[ "$wanted" == *" $suite "* ]]; then
+        pick="$all"
+        for want in ${wanted[@]+"${wanted[@]}"}; do
+            if [[ "$suite" == "$want" || "$suite" == "$want-"* ]]; then
+                pick=1
+            fi
+        done
+        if [ "$pick" = 1 ]; then
             names+="${names:+,}\"$suite\""
         fi
     done < <(_ci_suites "$config")

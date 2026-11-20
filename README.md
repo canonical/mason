@@ -38,5 +38,4 @@ and then, for example, write a new slice file:
 - `chisel-slicer` - authors and tests chisel slices files
 - `chisel-slice-reviewer` - read-only review of a slices file or PR
 - `chisel-slice-porter` - moves a slice between Ubuntu release branches
-- `rock-crafter` - drafts, checks, packs and tests rocks (Ubuntu archive / PPA packages or source builds)
-- `rock-debugger` - fixes a rock whose `rockcraft pack` or `rockcraft test` fails
+- `rockcrafter` - drafts, checks, packs and tests rocks (Ubuntu archive / PPA packages or source builds), and fixes a rock whose `rockcraft pack` or `rockcraft test` fails

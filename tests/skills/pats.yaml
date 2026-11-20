@@ -210,8 +210,8 @@ suites:
         - knockout
         - denovo
       scorers: slice-checks
-    # ci-<skill> is what ci runs when skills/<skill>/ changes
-    # (.github/scripts/pats-suites.sh). manual, on the openrouter agents.
+    # ci-<skill> and ci-<skill>-<variant> are what ci runs when skills/<skill>/
+    # changes (.github/scripts/pats-suites.sh). manual, on the openrouter agents.
     ci-chisel-slicer: {<<: *slicer, agents: openrouter, manual: true}
     # slice-checks need ground truth, which refusal has none of.
     slicer-refusal:
@@ -220,23 +220,23 @@ suites:
         - refusal-checks
         - orientation-called
     # rock tasks run in the rock-lxd sandbox: real rockcraft packs and tests.
-    rock-crafter: &rock-crafter
+    rockcrafter-create: &rockcrafter-create
       agents: rock-models
       tasks: rock-create
       scorers: [rock-checks, rock-create-checks]
-    rock-debugger: &rock-debugger
+    rockcrafter-debug: &rockcrafter-debug
       agents: rock-models
       tasks: rock-debug
       scorers: [rock-checks, rock-debug-checks]
     # in ci a pack and a test run take minutes per pair, so a subset: one rock
     # each from the archive and from source; one failing pack, one failing test.
-    ci-rock-crafter:
-      <<: *rock-crafter
+    ci-rockcrafter-create:
+      <<: *rockcrafter-create
       agents: rock-openrouter
       tasks: [hello, yq]
       manual: true
-    ci-rock-debugger:
-      <<: *rock-debugger
+    ci-rockcrafter-debug:
+      <<: *rockcrafter-debug
       agents: rock-openrouter
       tasks: [slice-typo, missing-workload-slice]
       manual: true

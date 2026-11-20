@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SHARED = ROOT / "shared"
+SCRIPTS = ROOT / "skills" / "rockcrafter" / "scripts"
 
 
 def module(path):
@@ -22,7 +22,7 @@ def module(path):
     return result
 
 
-rl = module(SHARED / "rocklib.py")
+rl = module(SCRIPTS / "rocklib.py")
 
 RELEASES = [
     rl.Release("22.04", "jammy", True, True),
