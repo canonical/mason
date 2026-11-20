@@ -15,7 +15,7 @@ description: >-
 
 Build [rocks](https://ubuntu.com/containers/rockcraft/docs) in the user's
 project, and fix the ones that fail to pack or fail their tests. **Do the work
-yourself** -- do not hand the task to a subagent (the slice hand-over in step 3
+yourself** -- do not hand the task to a subagent (the slice hand-over in step 4
 is the one exception).
 
 ## roots and boundaries
@@ -43,20 +43,30 @@ reached -- report it, do not work around it, and never read it as evidence
 **Slicing never blocks delivery**: when slices can't be authored, ship an
 unchiselled rock and say so.
 
-A new rock starts at step 1. A rock that already exists and fails to pack or
-fails its tests starts at step 5, under "fixing a failure".
+Every rock starts at step 1. After it, a rock that already exists and fails to
+pack or fails its tests goes to step 6, under "fixing a failure".
 
-## 1. gather
+## 1. orient
 
-If a `rockcraft.yaml` already exists, ask: overwrite it, or fix it (step 5)?
-Settle -- asking once, grouped, only for what is missing: **what goes in**
+```bash
+uv run "<skill-root>/scripts/orient-rock.py"
+```
+
+Run it first, every time: it reports the tools on this machine, the rock
+already in the project and the release to default to. Without rockcraft a new
+rock is blocked -- say so and stop; an existing rock can still be linted.
+
+## 2. gather
+
+If orientation found a `rockcraft.yaml`, ask: overwrite it, or fix it (step
+6)? Settle -- asking once, grouped, only for what is missing: **what goes in**
 (Ubuntu archive packages, packages from a PPA, or a project to build: git URL
 or local dir, and a tag if not the latest release); the **release** (default:
-the newest supported LTS, which the draft reports); **service or CLI** -- for a
-service, its foreground command line, absolute binary first (e.g.
+the one orientation reports); **service or CLI** -- for a service, its
+foreground command line, absolute binary first (e.g.
 `/usr/sbin/nginx -g 'daemon off;'`).
 
-## 2. draft
+## 3. draft
 
 ```bash
 uv run "<skill-root>/scripts/draft-rock.py" hello --release 24.04                                       # archive
@@ -66,9 +76,9 @@ uv run "<skill-root>/scripts/draft-rock.py" https://github.com/jqlang/jq --tag j
 
 Swap in the real names; add `--service "<cmd>"` for a service. The draft is
 complete -- do not retype or restructure it. A `missing-slices` failure goes
-to step 3; other failures name what to correct.
+to step 4; other failures name what to correct.
 
-## 3. missing slices
+## 4. missing slices
 
 Ask the user **once**: author the slices, or build unchiselled?
 
@@ -84,7 +94,7 @@ Ask the user **once**: author the slices, or build unchiselled?
   `kb/chisel-cli.md`); if you cannot push, keep the local source and
   report the push as remaining. If authoring fails, go unchiselled and say why.
 
-## 4. adjust
+## 5. adjust
 
 Edit only what the draft cannot know: what its `review` lists, config files,
 writable dirs for a service, a non-privileged port. Keep every existing key.
@@ -92,7 +102,7 @@ Read `kb/rockcraft-yaml.md` for keys and parts, `kb/pebble-services.md` for
 services and the non-root user, and `kb/rock-slices.md` before adding runtime
 slices.
 
-## 5. check and pack
+## 6. check and pack
 
 ```bash
 uv run "<skill-root>/scripts/check-rock.py"
@@ -103,7 +113,7 @@ Fix every `block` from check-rock and re-run it until it passes -- these are
 cheaper than a pack -- then pack: packing needs rockcraft, not docker. A
 failed pack goes to "fixing a failure".
 
-## 6. test
+## 7. test
 
 Read `kb/rock-tests.md` before writing tests: it owns layout, depth and what
 each kind of rock must prove. Scaffold the suite once, beside
@@ -159,8 +169,9 @@ untested.
   written, or the fixes are in, and check-rock passed, but the pack or the
   test run is unavailable (no rockcraft, no test VM, unreachable network).
   Name what remains.
-- **Blocked**: a failure you cannot fix in scope, or one only a forbidden
-  change would fix. State it and the change you recommend.
+- **Blocked**: a new rock without rockcraft installed, a failure you cannot
+  fix in scope, or one only a forbidden change would fix. State it and the
+  change you recommend.
 
 A packed rock is not proof the workload runs; only passing tests are.
 
