@@ -284,25 +284,38 @@ def rockcraft_version() -> str | None:
     """The installed rockcraft's own version string, or None without one."""
     if not shutil.which("rockcraft"):
         return None
-    words = run(["rockcraft", "--version"], timeout=10).stdout.split()
+    asked = run(["rockcraft", "--version"], timeout=10)
+    words = asked.stdout.split()
+    if asked.returncode:
+        raise Failed(f"rockcraft --version failed (exit {asked.returncode})")
     if not words:
         raise Failed("rockcraft --version printed no version")
     return words[-1]
 
 
-def rockcraft_bases(version: str) -> dict[str, common.Flow]:
-    """release -> how the given rockcraft version accepts it."""
-    # the schema is read at the tag of the installed version, never at main:
-    # another version's bases would be a guess about this one.
+def rockcraft_schema(version: str) -> dict:
+    """The schema of rockcraft.yaml that the given rockcraft version publishes."""
+    # read at the tag of the installed version, never at main: another
+    # version's schema would be a guess about this one.
     url = os.environ.get("ROCKCRAFT_SCHEMA_URL", ROCKCRAFT_SCHEMA)
     try:
-        props = json.loads(fetch(url.format(version=version)))["properties"]
+        schema = json.loads(fetch(url.format(version=version)))
+        schema["properties"]["base"]["enum"]  # the part every reader relies on
+    except (ValueError, KeyError, TypeError) as e:
+        raise Failed(f"rockcraft {version}: its schema does not read: {e!r}") from e
+    return schema
+
+
+def rockcraft_bases(version: str) -> dict[str, common.Flow]:
+    """release -> how the given rockcraft version accepts it."""
+    try:
+        props = rockcraft_schema(version)["properties"]
         build = props["build-base"]["anyOf"]
         accepted = {
             "base": props["base"]["enum"],
             "build-base": [e for alt in build for e in alt.get("enum", [])],
         }
-    except (ValueError, KeyError, TypeError) as e:
+    except (KeyError, TypeError) as e:
         raise Failed(f"rockcraft {version}: its schema does not read: {e!r}") from e
     out: dict[str, common.Flow] = {}
     for key, names in accepted.items():

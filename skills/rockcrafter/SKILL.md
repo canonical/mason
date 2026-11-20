@@ -131,9 +131,9 @@ uv run "<skill-root>/scripts/check-rock.py"
 uv run "<skill-root>/scripts/pack-rock.py"
 ```
 
-Fix every `block` from check-rock and re-run it until it passes -- these are
-cheaper than a pack -- then pack: packing needs rockcraft, not docker. A
-failed pack goes to "fixing a failure".
+Fix every `block` from check-rock and re-run it until it reports none --
+these are cheaper than a pack -- then pack: packing needs rockcraft, not
+docker. A failed pack goes to "fixing a failure".
 
 ## 7. test
 
@@ -188,9 +188,9 @@ untested.
 - **Complete**: check-rock passed, pack-rock packed the rock and test-rock
   passed (or an existing rock has no tests -- say so).
 - **Ready for remaining verification**: `rockcraft.yaml` and the tests are
-  written, or the fixes are in, and check-rock passed, but the pack or the
-  test run is unavailable (no rockcraft, no test VM, unreachable network).
-  Name what remains.
+  written, or the fixes are in, and check-rock reports no block, but one of
+  its checks, the pack or the test run is unavailable (no rockcraft, no test
+  VM, unreachable network). Name what remains.
 - **Blocked**: a new rock without rockcraft installed, a failure you cannot
   fix in scope, or one only a forbidden change would fix. State it and the
   change you recommend.

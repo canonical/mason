@@ -7,15 +7,18 @@
 
 Checks what rockcraft itself would reject, plus the rock conventions -- the
 rules that do NOT need judgement or a build -- so a pack is never spent on a
-typo. Slices are checked to exist on the release (or on a local
+typo. Which top-level keys, required keys and bases rockcraft accepts is read
+from the schema the installed rockcraft publishes for its version; no list of
+them is kept here. Slices are checked to exist on the release (or on a local
 chisel-releases checkout a part cuts them from), not that they carry what the
 workload needs; slices cut from a remote source are not checked. It does not
 replace a pack.
 
 Usage: check-rock.py [<rockcraft.yaml>]   (default: ./rockcraft.yaml)
 
-Unavailable when the release list or chisel-releases cannot be reached for
-the slice check; every other finding is still reported.
+Unavailable when rockcraft is not installed or its schema cannot be read (the
+key and base checks then do not run), or when chisel-releases cannot be
+reached for the slice check; every other finding is still reported.
 """
 
 from __future__ import annotations
@@ -28,31 +31,9 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import common
+import orientation
 import rocklib as rl
 import yaml
-
-# top-level keys rockcraft accepts (rockcraft.yaml reference); anything else is
-# rejected with "extra inputs are not permitted". changes with rockcraft
-# releases, not Ubuntu releases.
-KNOWN = {
-    "name", "title", "version", "summary", "description", "license", "base",
-    "build-base", "run-user", "platforms", "services", "checks",
-    "entrypoint-service", "entrypoint-command", "environment", "parts",
-    "package-repositories", "extensions", "adopt-info", "contact", "issues",
-    "source-code", "build-slices",
-}  # fmt: skip
-
-# keys rockcraft requires (`parts` is generated when an extension is used,
-# `version` may be set by the part `adopt-info` names).
-REQUIRED = (
-    "name",
-    "version",
-    "summary",
-    "description",
-    "base",
-    "platforms",
-    "parts",
-)
 
 # Debian arch names -- what a platform is named after unless it sets
 # `build-for`; never x86_64 / aarch64.
@@ -62,7 +43,7 @@ ARCHES = {"amd64", "arm64", "armhf", "i386", "ppc64el", "riscv64", "s390x"}
 # (Debian package names can't contain one).
 SLICE = re.compile(r"^[a-z0-9][a-z0-9.+-]*_[a-z0-9][a-z0-9-]*$")
 
-# ubuntu@XX.YY -- the version itself is validated live against the release list.
+# ubuntu@XX.YY -- read off an accepted base to find its chisel-releases branch.
 BASE = re.compile(r"^ubuntu@(\d\d\.\d\d)$")
 
 CODES = {
@@ -70,7 +51,7 @@ CODES = {
     "missing-key": "a key rockcraft requires is absent",
     "unknown-key": "a top-level key rockcraft rejects",
     "bad-type": "a key whose value is not the YAML type rockcraft expects",
-    "bad-base": "base is not `bare` or `ubuntu@XX.YY`, or build-base not `ubuntu@XX.YY` or `devel`",
+    "bad-base": "a base or build-base the installed rockcraft does not accept",
     "unknown-release": "the base, or a `chisel cut --release`, names no known Ubuntu release",
     "bare-needs-build-base": "base: bare without build-base",
     "version-type": "version is not a string (quote it)",
@@ -132,36 +113,81 @@ def mappings(value: object, key: str, f: str, report: common.Report) -> dict:
     return {n: v for n, v in value.items() if isinstance(v, dict)}
 
 
+def accepted(report: common.Report) -> dict | None:
+    """What the installed rockcraft accepts at the top level of a
+    rockcraft.yaml: its keys, the required ones, and the values of base and
+    build-base, as the schema of that version states them. None, with the
+    reason recorded, when that cannot be read: there is no list to fall back on."""
+    try:
+        version = orientation.rockcraft_version()
+        if version is None:
+            raise orientation.Failed("rockcraft is not installed, so what it accepts is unknown")
+        schema = orientation.rockcraft_schema(version)
+        props = schema["properties"]
+        # build-base is "one of these, or null": an alternative that is neither
+        # would let values through that no list here names
+        build = [alt.get("enum") for alt in props["build-base"]["anyOf"] if alt != {"type": "null"}]
+        takes = {
+            "keys": props,
+            "required": schema["required"],
+            "base": props["base"]["enum"],
+            "build-base": [e for enum in build for e in enum],
+        }
+        names = (takes["required"], takes["base"], takes["build-base"])
+        shaped = (
+            isinstance(props, dict)
+            and all(isinstance(n, list) and all(isinstance(e, str) for e in n) for n in names)
+            and takes["base"]
+            and takes["build-base"]
+            # only a schema that forbids other keys makes an unlisted key a rejection
+            and schema.get("additionalProperties") is False
+        )
+        if not shaped:
+            raise orientation.Failed(f"rockcraft {version}: its schema is not in a shape this reads")
+    except (AttributeError, KeyError, TypeError) as e:
+        report.mark_unavailable("rockcraft schema", f"its schema does not read: {e!r}")
+    except orientation.Failed as e:
+        report.mark_unavailable("rockcraft schema", str(e))
+    else:
+        return takes
+    return None
+
+
 def check(doc: object, f: str, report: common.Report) -> None:
     add = report.add
     if not isinstance(doc, dict):
         add("block", "not-a-mapping", f)
         return
-    generated = {"parts": doc.get("extensions"), "version": doc.get("adopt-info")}
-    for k in REQUIRED:
+    takes = accepted(report)
+    # `parts` is generated when an extension is used
+    generated = {"parts": doc.get("extensions")}
+    for k in takes["required"] if takes else ():
         absent = doc.get(k) is None or (k == "name" and doc[k] == "")
-        if absent and not generated.get(k):
+        if absent and not generated.get(k) and k != "version":
             add("block", "missing-key", f, key=k)
-    for k in doc:
-        if k not in KNOWN:
+    # not in the schema: craft-application asks for a version after validating,
+    # unless a part is named to set it (craft_application/services/project.py,
+    # "'adopt-info' not set and required fields are missing").
+    if doc.get("version") is None and not doc.get("adopt-info"):
+        add("block", "missing-key", f, key="version")
+    for k in doc if takes else ():
+        if k not in takes["keys"]:
             add("block", "unknown-key", f, key=k)
 
     base, bb = doc.get("base"), doc.get("build-base")
-    if base is not None and base != "bare" and not BASE.match(str(base)):
-        add("block", "bad-base", f, key="base", value=str(base))
+    refused = set()
+    for key, value in (("base", base), ("build-base", bb)):
+        if takes and value is not None and value not in takes[key]:
+            refused.add(key)
+            add("block", "bad-base", f, key=key, value=str(value), accepted=" ".join(takes[key]))
     if base == "bare" and not bb:
         add("block", "bare-needs-build-base", f)
-    if bb is not None and bb != "devel" and not BASE.match(str(bb)):
-        add("block", "bad-base", f, key="build-base", value=str(bb))
-    m = BASE.match(str(bb if base == "bare" else base))
-    release = None
-    if m:
-        try:
-            release = rl.resolve_release(m.group(1)).branch
-        except ValueError:
-            add("block", "unknown-release", f, value=f"ubuntu@{m.group(1)}")
-        except rl.Unavailable as e:
-            report.mark_unavailable("release", str(e))
+    # slices are looked up on the chisel-releases branch of the release the
+    # rock is built from. none when that base was refused, or is `devel`,
+    # which names no release.
+    key, value = ("build-base", bb) if base == "bare" else ("base", base)
+    m = None if key in refused else BASE.match(str(value))
+    release = f"ubuntu-{m.group(1)}" if m else None
 
     v = doc.get("version")
     if v is not None and not isinstance(v, str):

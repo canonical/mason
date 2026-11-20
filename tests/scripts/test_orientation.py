@@ -473,6 +473,15 @@ def test_the_rockcraft_version_is_taken_whole(monkeypatch):
     assert orientation.rockcraft_version() == "1.12.0.post3+g1a2b3c"
 
 
+def test_a_rockcraft_that_fails_to_state_its_version_is_a_failed_read(monkeypatch):
+    done = subprocess.CompletedProcess([], 1, "Traceback in rockcraft 1.2.3\n", "")
+    monkeypatch.setattr(orientation.shutil, "which", lambda t: "/snap/bin/" + t)
+    monkeypatch.setattr(orientation, "run", lambda cmd, timeout=0: done)
+    # whatever it printed, a command that failed has not stated its version
+    with pytest.raises(Failed, match=r"failed \(exit 1\)"):
+        orientation.rockcraft_version()
+
+
 def test_the_ubuntu_list_marks_the_release_in_development(monkeypatch):
     stable = "Dist: new\nVersion: 38.04 LTS\nSupported: 1\n"
     devel = stable + "\nDist: next\nVersion: 38.10\nSupported: 0\n"

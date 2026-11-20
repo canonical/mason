@@ -40,19 +40,40 @@ GOOD = {
     "parts": {"hello": {"plugin": "nil", "stage-packages": ["base-files_base", "hello_bins"]}},
 }
 SLICES = {"base-files": ["base", "release-info"], "hello": ["bins", "copyright"]}
+KEYS = (
+    "name", "title", "version", "summary", "description", "license", "base",
+    "build-base", "run-user", "platforms", "services", "checks",
+    "entrypoint-service", "entrypoint-command", "environment", "parts",
+    "package-repositories", "extensions", "adopt-info", "contact", "issues",
+    "source-code",
+)  # fmt: skip
+BASES = ["ubuntu@22.04", "ubuntu@24.04"]
+
+
+def schema(extra_keys=(), required=("name", "summary", "description", "base", "platforms", "parts")):
+    """A rockcraft schema cut down to the parts the linter reads."""
+    props = {k: {} for k in (*KEYS, *extra_keys)}
+    props["base"] = {"enum": ["bare", *BASES]}
+    props["build-base"] = {"anyOf": [{"enum": [*BASES, "devel"]}, {"type": "null"}]}
+    return {"properties": props, "required": list(required), "additionalProperties": False}
+
+
+def with_build_base(spec):
+    result = schema()
+    result["properties"]["build-base"] = spec
+    return result
 
 
 @pytest.fixture(autouse=True)
 def offline(monkeypatch):
-    def resolve(text):
-        if text != "24.04":
-            raise ValueError("unknown")
-        return cr.rl.Release("24.04", "noble", True, True)
+    def slices_of(rel, pkg):
+        if rel == "ubuntu-99.04":
+            raise ValueError("unknown release")
+        return [f"{pkg}_{n}" for n in SLICES.get(pkg, [])] or None
 
-    monkeypatch.setattr(cr.rl, "resolve_release", resolve)
-    monkeypatch.setattr(
-        cr.rl, "slices_of", lambda rel, pkg: [f"{pkg}_{n}" for n in SLICES.get(pkg, [])] or None
-    )
+    monkeypatch.setattr(cr.rl, "slices_of", slices_of)
+    monkeypatch.setattr(cr.orientation, "rockcraft_version", lambda: "1.0.0")
+    monkeypatch.setattr(cr.orientation, "rockcraft_schema", lambda version: schema())
 
 
 def run(doc):
@@ -83,7 +104,7 @@ def test_good_rock_is_clean():
         (changed(summary=None), "missing-key"),
         (changed(color="red"), "unknown-key"),
         (changed(base="noble"), "bad-base"),
-        (changed(**{"build-base": "ubuntu@99.04"}), "unknown-release"),
+        (changed(parts={"p": {"override-build": "chisel cut --release ubuntu-99.04 hello_bins"}}), "unknown-release"),
         (changed(**{"build-base": None}), "bare-needs-build-base"),
         (changed(version=2.12), "version-type"),
         (changed(version="2.12.1"), "version-granularity"),
@@ -113,7 +134,6 @@ def test_codes_all_covered():
     [
         {"entrypoint-command": "/usr/bin/hello [ -g hi ]"},
         {"contact": "a@b.c", "issues": "https://x/issues", "source-code": "https://x"},
-        {"build-slices": ["base-files_base"]},
         {"license": None},
         {"summary": "", "description": ""},
         {"version": None, "adopt-info": "hello"},
@@ -229,16 +249,173 @@ def test_cut_naming_an_unknown_release(monkeypatch):
     assert codes(changed(parts={"p": {"plugin": "nil", "override-build": script}})) == ["unknown-release"]
 
 
-def test_release_unavailable_still_reports(monkeypatch):
-    def down(text):
-        raise cr.rl.Unavailable("meta-release unreachable")
+# --- what the installed rockcraft accepts ---------------------------------------
 
-    monkeypatch.setattr(cr.rl, "resolve_release", down)
+
+def test_keys_follow_the_installed_version(monkeypatch):
+    doc = changed(**{"build-slices": ["base-files_base"]})
+    assert codes(doc) == ["unknown-key"]
+    monkeypatch.setattr(
+        cr.orientation, "rockcraft_schema", lambda v: schema(extra_keys=["build-slices"])
+    )
+    assert codes(doc) == []
+
+
+def test_required_keys_follow_the_installed_version(monkeypatch):
+    doc = changed(title=None, summary=None)
+    assert [f["key"] for f in run(doc).findings["rockcraft.yaml"]] == ["summary"]
+    monkeypatch.setattr(
+        cr.orientation, "rockcraft_schema", lambda v: schema(required=["name", "title"])
+    )
+    assert [f["key"] for f in run(doc).findings["rockcraft.yaml"]] == ["title"]
+
+
+def test_version_is_required_whatever_the_schema_says():
+    # the schema does not list it: craft-application asks for it after validation
+    assert "version" not in schema()["required"]
+    findings = run(changed(version=None)).findings["rockcraft.yaml"]
+    assert [(f["code"], f["key"]) for f in findings] == [("missing-key", "version")]
+    assert run(changed(version=None, **{"adopt-info": "hello"})).findings == {}
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("base", "ubuntu@25.04"),  # a real release this rockcraft does not take
+        ("base", "noble"),
+        ("base", "devel"),  # a build-base only
+        ("build-base", "ubuntu@25.04"),
+        ("build-base", "bare"),
+        ("base", 24.04),
+    ],
+)
+def test_a_base_the_installed_rockcraft_does_not_take(key, value):
+    extra = {key: value} if key == "base" else {"base": "bare", key: value}
+    [finding] = [
+        f for f in run(changed(**extra)).findings["rockcraft.yaml"] if f["code"] == "bad-base"
+    ]
+    assert (finding["key"], finding["value"]) == (key, str(value))
+    assert "ubuntu@24.04" in finding["accepted"]
+
+
+def test_an_accepted_base_needs_no_ubuntu_release_list(monkeypatch):
+    def never(text):
+        raise AssertionError("the release list was asked")
+
+    monkeypatch.setattr(cr.rl, "resolve_release", never)
+    assert run(changed(base="ubuntu@22.04", parts={"p": {"stage-packages": ["hello"]}})).findings == {}
+    assert run(GOOD).status == "passed"
+
+
+def test_a_refused_build_base_does_not_hide_the_slices_of_a_good_base():
+    # an unchiselled rock is built from `base`: its slices are still checked
+    doc = changed(
+        base="ubuntu@24.04",
+        **{"build-base": "ubuntu@25.04"},
+        parts={"p": {"stage-packages": ["hello_binz"]}},
+    )
+    assert codes(doc) == ["bad-base", "unknown-slice"]
+    # a chiselled one is built from `build-base`: refused, there is no branch to ask
+    assert codes(changed(**{"build-base": "ubuntu@25.04"}, parts={"p": {"stage-packages": ["hello_binz"]}})) == ["bad-base"]
+
+
+def test_slices_are_looked_up_on_the_base_named(monkeypatch):
+    asked = []
+    monkeypatch.setattr(cr.rl, "slices_of", lambda rel, pkg: asked.append(rel) or [f"{pkg}_bins", f"{pkg}_base"])
+    run(changed(**{"build-base": "ubuntu@22.04"}))
+    assert set(asked) == {"ubuntu-22.04"}
+
+
+@pytest.mark.parametrize(
+    ("version", "reason"),
+    [(None, "not installed"), (cr.orientation.Failed("rockcraft --version: timed out"), "timed out")],
+)
+def test_without_a_rockcraft_version_the_schema_checks_do_not_run(monkeypatch, version, reason):
+    def installed():
+        if isinstance(version, Exception):
+            raise version
+        return version
+
+    monkeypatch.setattr(cr.orientation, "rockcraft_version", installed)
+    report = run(changed(color="red", summary=None, base="noble"))
+    assert report.findings == {} and report.status == "unavailable"
+    [problem] = report.unavailable
+    assert problem["check"] == "rockcraft schema" and reason in problem["reason"]
+
+
+def test_a_schema_that_cannot_be_read_is_unavailable_and_the_rest_still_runs(monkeypatch):
+    def down(version):
+        raise cr.orientation.Failed("rockcraft 1.0.0: HTTP Error 404: Not Found")
+
+    monkeypatch.setattr(cr.orientation, "rockcraft_schema", down)
     assert run(GOOD).status == "unavailable"
     # findings beat unavailable: a blocker still fails the check
-    report = run(changed(version=2.12))
-    assert report.status == "failed"
-    assert report.unavailable
+    report = run(changed(version=2.12, parts={"p": {"stage-packages": ["hello_binz"]}}))
+    assert report.status == "failed" and report.unavailable
+    assert codes(changed(version=2.12, parts={"p": {"stage-packages": ["hello_binz"]}})) == [
+        "unknown-slice",
+        "version-type",
+    ]
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"properties": [], "required": []},
+        {"properties": {"base": {"enum": ["bare"]}}, "required": []},  # no build-base
+        {**schema(), "required": None},
+        {**schema(), "required": "name"},  # not four keys named n, a, m, e
+        {**schema(), "required": [[]]},
+        {**schema(), "additionalProperties": True},  # an unlisted key is then no rejection
+        {k: v for k, v in schema().items() if k != "additionalProperties"},
+        with_build_base({"anyOf": [{"type": "string"}]}),  # no list at all
+        # a list beside an open alternative is only part of what is accepted
+        with_build_base({"anyOf": [{"enum": ["ubuntu@24.04"]}, {"type": "string"}]}),
+        with_build_base({"anyOf": [{"enum": []}, {"type": "null"}]}),
+        with_build_base({"enum": ["ubuntu@24.04"]}),
+    ],
+)
+def test_a_schema_of_another_shape_is_not_an_empty_allow_list(monkeypatch, broken):
+    monkeypatch.setattr(cr.orientation, "rockcraft_schema", lambda v: broken)
+    report = run(changed(color="red", base="noble"))
+    assert report.findings == {} and report.status == "unavailable"
+    assert [u["check"] for u in report.unavailable] == ["rockcraft schema"]
+
+
+def test_the_real_reader_at_the_installed_version(tmp_path, monkeypatch):
+    """The script end to end: a rockcraft on PATH that states its version, and
+    the schema published for exactly that version behind the redirect."""
+    import json
+    import os
+
+    fake = tmp_path / "bin" / "rockcraft"
+    fake.parent.mkdir()
+    fake.write_text("#!/bin/sh\necho 'rockcraft 7.8.9'\n")
+    fake.chmod(0o755)
+    (tmp_path / "7.8.9.json").write_text(json.dumps(schema(extra_keys=["only-in-7"])))
+    doc = changed(**{"only-in-7": True, "color": "red"}, parts={"p": {"plugin": "nil"}})
+    (tmp_path / "rockcraft.yaml").write_text(yaml.safe_dump(doc))
+    env = {
+        **os.environ,
+        "PATH": f"{fake.parent}{os.pathsep}{os.environ['PATH']}",
+        "ROCKCRAFT_SCHEMA_URL": (tmp_path / "{version}.json").as_uri().replace("%7B", "{").replace("%7D", "}"),
+    }
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT)], capture_output=True, text=True, cwd=tmp_path, env=env, check=False
+    )
+    out = yaml.safe_load(proc.stdout)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert out["findings"] == {"rockcraft.yaml": [{"sev": "block", "code": "unknown-key", "key": "color"}]}
+
+    # another version has no schema behind that url: nothing is assumed for it
+    fake.write_text("#!/bin/sh\necho 'rockcraft 7.9.0.post1'\n")
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT)], capture_output=True, text=True, cwd=tmp_path, env=env, check=False
+    )
+    out = yaml.safe_load(proc.stdout)
+    assert proc.returncode == 3 and "findings" not in out, proc.stdout
+    assert [u["check"] for u in out["unavailable"]] == ["rockcraft schema"]
+    assert "7.9.0.post1" in out["unavailable"][0]["reason"]
 
 
 def test_slices_unavailable(monkeypatch):
