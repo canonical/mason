@@ -1,14 +1,22 @@
 # Slices in a Rock
 
-## Chiselled vs unchiselled
+Which slices a rock stages, and how to choose between a chiseled and an
+unchiseled rock. How `bare` and Ubuntu bases differ is in
+[Bases](https://ubuntu.com/containers/rockcraft/docs/stable/explanation/bases/),
+and how rockcraft installs slices in
+[Chisel in Rockcraft](https://ubuntu.com/containers/rockcraft/docs/stable/explanation/chisel/)
+and [Chisel a rock](https://ubuntu.com/containers/rockcraft/docs/stable/how-to/chiseling/chisel-existing-rock/).
 
-| | Chiselled | Unchiselled |
-|---|---|---|
-| `base` | `bare` (+ `build-base: ubuntu@XX.04`) | `ubuntu@XX.04` |
-| `stage-packages` | slice names only: `<pkg>_<slice>` | whole debs: `<pkg>` |
-| size / surface | minimal -- no shell, no apt unless sliced in | full Ubuntu base + debs |
+## Chiseled or unchiseled
 
-Prefer chiselled. Chisel only reads the Ubuntu archive, so packages from a PPA are always staged whole, on an `ubuntu@` base. A part's `stage-packages` must not mix slices and whole debs. Rockcraft resolves slice names from the upstream chisel-releases branch matching `build-base` -- you list the top-level slices you need; `essential:` deps resolve automatically.
+- Prefer chiseled: `base: bare` with slices (`<pkg>_<slice>`) in
+  `stage-packages`. List only the top-level slices the workload needs; their
+  `essential:` slices come with them.
+- Unchiseled (an `ubuntu@` base with whole debs) only when the user chooses it,
+  or slices can't be authored -- and the report says so.
+- Packages from a PPA are always staged whole, on an `ubuntu@` base: chisel
+  only reads the Ubuntu archive.
+- Don't mix slices and whole debs in one part's `stage-packages`.
 
 ## Foundation slices
 
@@ -42,24 +50,16 @@ What a built workload needs at run time, on top of `base-files_base` and
 
 ## Slices that aren't upstream yet
 
-Slices that only exist in a chisel-releases checkout / fork **must not** be listed in `stage-packages` (rockcraft resolves those against upstream and fails with `slices of package "<pkg>" not found`). Cut them manually from a part whose source is the release:
+[Install a custom package slice](https://ubuntu.com/containers/rockcraft/docs/stable/how-to/chiseling/install-slice/)
+shows the part that cuts slices from a chisel-releases checkout. On top of it:
 
-```yaml
-parts:
-  <name>-slices:
-    plugin: nil
-    source: https://github.com/<user>/chisel-releases.git   # the fork
-    source-type: git
-    source-branch: <branch>                                 # ubuntu-XX.04-based branch with the new slices files
-    override-build: |
-      chisel cut --release ./ --root "${CRAFT_PART_INSTALL}" \
-        base-files_base \
-        base-passwd_data \
-        <pkg>_bins
-```
-
-- Chisel's `--release` and cutting from a checkout: `kb/chisel-cli.md`.
-- `--release ./` points chisel at the full checkout (every upstream slices file plus the new ones), so upstream deps resolve too.
-- List **every** slice the rock needs in that one `chisel cut` (including ones that are upstream) -- don't split slices between `stage-packages` and a manual cut of the same tree.
-- While iterating locally use `source: <path-to-checkout>` + `source-type: local`; switch to the git fork once pushed.
-- Chisel is available in the rockcraft build environment; no `build-snaps` needed for it.
+- Never list such slices in `stage-packages`: rockcraft resolves those against
+  upstream and fails with `slices of package "<pkg>" not found`.
+- List **every** slice the rock needs in that one `chisel cut`, upstream ones
+  too, starting with the foundation slices. Don't split them between
+  `stage-packages` and the cut.
+- Cut with `--release ./` from a checkout branched off the target release, so
+  the upstream slices resolve too (chisel itself: `kb/chisel-cli.md`).
+- While iterating, source the local checkout (`source-type: local`); once the
+  branch is pushed, point the part at the fork (`source-type: git`,
+  `source-branch: <branch>`).

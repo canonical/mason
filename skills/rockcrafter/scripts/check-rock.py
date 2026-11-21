@@ -6,7 +6,7 @@
 """check-rock: deterministic static linter for a rockcraft.yaml.
 
 Checks what rockcraft itself would reject, plus the rock conventions -- the
-rules that do NOT need judgement or a build -- so a pack is never spent on a
+rules that do NOT need judgment or a build -- so a pack is never spent on a
 typo. Which top-level keys, required keys and bases rockcraft accepts is read
 from the schema the installed rockcraft publishes for its version; no list of
 them is kept here. Slices are checked to exist on the release (or on a local
@@ -54,7 +54,7 @@ CODES = {
     "unknown-key": "a top-level key rockcraft rejects",
     "bad-type": "a key whose value is not the YAML type rockcraft expects",
     "bad-base": "a base or build-base the installed rockcraft does not accept",
-    "unknown-release": "chisel-releases has no branch for the release slices are read from (the base, or a `chisel cut --release`): use one it has, or build unchiselled",
+    "unknown-release": "chisel-releases has no branch for the release slices are read from (the base, or a `chisel cut --release`): use one it has, or build unchiseled",
     "bare-needs-build-base": "base: bare without build-base",
     "version-type": "version is not a string (quote it)",
     "version-granularity": "archive-based rocks version XX.YY; a patch level needs a pinned source-tag",
@@ -63,7 +63,7 @@ CODES = {
     "service-command": "a Pebble service command must start with an absolute path",
     "service-override": "a Pebble service without `override: replace`",
     "mixed-stage": "a part mixes slices and whole debs in stage-packages",
-    "debs-on-bare": "whole debs on base: bare -- use slices, or an ubuntu@ base for an unchiselled rock",
+    "debs-on-bare": "whole debs on base: bare -- use slices, or an ubuntu@ base for an unchiseled rock",
     "ppa-on-bare": "package-repositories feed whole debs, not slices -- use an ubuntu@ base",
     "unknown-slice": "a slice that does not exist on the release",
 }
