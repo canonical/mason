@@ -42,7 +42,7 @@ reached -- report it, do not work around it, and never read it as evidence
 (a denied fetch does not mean a package or slice is absent).
 
 **Slicing never blocks delivery**: when slices can't be authored, ship an
-unchiselled rock and say so.
+unchiseled rock and say so.
 
 Every rock starts at step 1. After it, a rock that already exists and fails to
 pack or fails its tests goes to step 6, under "fixing a failure".
@@ -96,13 +96,13 @@ Run it for every Ubuntu package the rock stages: the workload from the archive
 or a PPA, and the runtime a source build needs (`kb/rock-slices.md`). Take
 versions, executables and slice names from its report, never from memory. A
 `package-not-found` is a name to correct. For `missing-slices`, ask the user
-**once**: author the slices, or build unchiselled?
+**once**: author the slices, or build unchiseled?
 
-- **Unchiselled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
-  the report says unchiselled.
+- **Unchiseled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
+  the report says unchiseled.
 - **Author**: needs the chisel-slicer skill installed beside this one
   (`<skill-root>/../chisel-slicer/SKILL.md`); without it the user installs it,
-  or the rock goes unchiselled.
+  or the rock goes unchiseled.
   Use the user's chisel-releases checkout or a fork, branched off the target
   release. In it, follow chisel-slicer's `SKILL.md` for each missing package
   (a subagent is fine here). Then run rock-packages again with
@@ -110,7 +110,7 @@ versions, executables and slice names from its report, never from memory. A
   (`kb/rock-slices.md`; chisel itself in `kb/chisel-cli.md`). After a
   successful pack, push the branch and point the part at the fork; if you
   cannot push, keep the local source and report the push as remaining. If
-  authoring fails, go unchiselled and say why.
+  authoring fails, go unchiseled and say why.
 
 ## 5. fill in
 
@@ -201,8 +201,8 @@ A packed rock is not proof the workload runs; only passing tests are.
 
 Summarize for the user (or the parent agent when delegated):
 
-- the rock (file, or why not), its flavour -- chiselled, chiselled from local
-  slices, or unchiselled and why -- and the service command or CLI
+- the rock (file, or why not), its flavor -- chiseled, chiseled from local
+  slices, or unchiseled and why -- and the service command or CLI
 - the tests: what each task proves, and their result
 - each fix round: the failure (pack category and step / part, or the failed
   task), the cause, and the change made -- to the rock or to a wrong assertion

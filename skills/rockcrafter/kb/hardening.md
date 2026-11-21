@@ -18,7 +18,7 @@ an internal user other than `_daemon_` is in
 
 ## Ship only the workload
 
-- Prefer a chiselled rock (`kb/rock-slices.md`): no shell, package manager or
+- Prefer a chiseled rock (`kb/rock-slices.md`): no shell, package manager or
   tools unless the workload calls them.
 - Stage only what the workload needs at run time. Build tools go in
   `build-packages` / `build-snaps`, never into the rock.
