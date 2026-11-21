@@ -6,7 +6,7 @@
 """check-rock: deterministic static linter for a rockcraft.yaml.
 
 Checks what rockcraft itself would reject, plus the rock conventions -- the
-rules that do NOT need judgement or a build -- so a pack is never spent on a
+rules that do NOT need judgment or a build -- so a pack is never spent on a
 typo. Which top-level keys, required keys and bases rockcraft accepts is read
 from the schema the installed rockcraft publishes for its version; no list of
 them is kept here. Slices are checked to exist on the release (or on a local

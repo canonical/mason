@@ -54,7 +54,7 @@ not a test.
   paths it writes are writable -- these are what break when `permissions:` or a
   slice is missing.
 
-Keep each task to one behaviour so a failure names it. Bound every wait; spread
+Keep each task to one behavior so a failure names it. Bound every wait; spread
 kills a task only at `kill-timeout`. `MATCH` (spread's grep) fails the task when
 nothing matches.
 

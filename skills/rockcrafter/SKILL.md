@@ -116,9 +116,9 @@ versions, executables and slice names from its report, never from memory. A
 
 Edit the file init wrote: keep its structure, replace every placeholder (the
 summary, the description, the sample part) and add only what the rock needs.
-Read `kb/rockcraft-yaml.md` for keys, the version and parts,
-`kb/rock-slices.md` for the base and what to stage, and
-`kb/pebble-services.md` for services and the non-root user. A source build
+Read `kb/rockcraft-yaml.md` for keys, parts, the version and services,
+`kb/rock-slices.md` for the base and what to stage, and `kb/hardening.md` for
+the non-root user and what the rock ships. A source build
 takes its plugin and that plugin's keys from upstream's reference
 (`kb/rock-upstream-sources.md`), pinned to the tag the user named, else the
 newest release tag. A service also needs its config files, its writable dirs
@@ -170,7 +170,7 @@ reported as remaining, never a reason to leave them out.
 
 **Targeted fixes only**: change what the finding names. Never replace slices
 with whole debs, drop the workload, switch `base: bare` to an Ubuntu base,
-remove `run-user`, or drop or weaken a test's check of real behaviour -- if
+remove `run-user`, or drop or weaken a test's check of real behavior -- if
 only that would work, stop and recommend it.
 
 **A rock that already exists** is fixed, not redesigned. Work autonomously,
@@ -199,7 +199,7 @@ A packed rock is not proof the workload runs; only passing tests are.
 
 ## final report
 
-Summarise for the user (or the parent agent when delegated):
+Summarize for the user (or the parent agent when delegated):
 
 - the rock (file, or why not), its flavour -- chiselled, chiselled from local
   slices, or unchiselled and why -- and the service command or CLI

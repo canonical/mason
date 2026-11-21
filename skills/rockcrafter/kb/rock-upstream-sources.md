@@ -1,7 +1,7 @@
 # Sources of Truth for Rocks
 
 When this knowledge base and upstream disagree, upstream wins:
-**tool behaviour** (rockcraft / chisel / pebble) > **docs** > **conventions**
+**tool behavior** (rockcraft / chisel / pebble) > **docs** > **conventions**
 (rocks published by Canonical) > this knowledge base.
 
 - Rockcraft docs: <https://ubuntu.com/containers/rockcraft/docs/stable/>
@@ -12,6 +12,8 @@ When this knowledge base and upstream disagree, upstream wins:
     go, expressjs, spring-boot)
   - `how-to/chiseling/install-slice/` -- installing a custom slice
 - Rockcraft source: <https://github.com/canonical/rockcraft>
-- Pebble: <https://github.com/canonical/pebble> (layer and service format)
+- Pebble docs: <https://documentation.ubuntu.com/pebble/> -- the layer and
+  service format (`reference/layer-specification/`)
+- Pebble source: <https://github.com/canonical/pebble>
 - Published rocks for the same workload (e.g. `canonical/*-rock` repositories)
   show accepted conventions.
