@@ -2,8 +2,11 @@
 
 Rock tests are [spread](https://github.com/canonical/spread) tasks run by
 `rockcraft test` on its `craft` backend: rockcraft packs the rock, boots a test
-VM, and the suite's `prepare` loads the packed rock (`$CRAFT_ARTIFACT`) into
-docker there. Every task then exercises the rock through docker.
+VM, and the suite's `prepare` loads the packed rock into docker there. Every
+task then exercises the rock through docker. The command and its options are in
+the [commands reference](https://ubuntu.com/containers/rockcraft/docs/stable/reference/commands/#test),
+and the task format (`task.yaml` keys, `MATCH`, `kill-timeout`) in spread's
+README. This file holds what a rock's suite should contain.
 
 ## Layout
 
@@ -19,8 +22,6 @@ spread/general/<task>/task.yaml
 - `--name` must be the rock's `name`: the image is loaded as `<name>:latest`.
 - One directory per task under `spread/general/`; replace the scaffolded
   `test` task, never leave its placeholder.
-- `rockcraft test` runs every task; `rockcraft test craft:ubuntu-24.04:spread/general/<task>`
-  runs one.
 
 ## What to test
 
@@ -54,9 +55,8 @@ not a test.
   paths it writes are writable -- these are what break when `permissions:` or a
   slice is missing.
 
-Keep each task to one behaviour so a failure names it. Bound every wait; spread
-kills a task only at `kill-timeout`. `MATCH` (spread's grep) fails the task when
-nothing matches.
+Keep each task to one behavior so a failure names it, and bound every wait:
+spread only kills a hung task at `kill-timeout`.
 
 ## Results
 

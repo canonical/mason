@@ -148,7 +148,7 @@ def test_what_rockcraft_accepts_is_clean(extra):
     assert run(changed(**extra)).findings == {}
 
 
-def test_licence_is_left_to_rockcraft():
+def test_license_is_left_to_rockcraft():
     assert run(changed(license="not-an-spdx-id")).findings == {}
 
 
@@ -311,14 +311,14 @@ def test_an_accepted_base_needs_no_ubuntu_release_list(monkeypatch):
 
 
 def test_a_refused_build_base_does_not_hide_the_slices_of_a_good_base():
-    # an unchiselled rock is built from `base`: its slices are still checked
+    # an unchiseled rock is built from `base`: its slices are still checked
     doc = changed(
         base="ubuntu@24.04",
         **{"build-base": "ubuntu@25.04"},
         parts={"p": {"stage-packages": ["hello_binz"]}},
     )
     assert codes(doc) == ["bad-base", "unknown-slice"]
-    # a chiselled one is built from `build-base`: refused, there is no branch to ask
+    # a chiseled one is built from `build-base`: refused, there is no branch to ask
     assert codes(changed(**{"build-base": "ubuntu@25.04"}, parts={"p": {"stage-packages": ["hello_binz"]}})) == ["bad-base"]
 
 
@@ -431,7 +431,7 @@ def test_a_base_without_a_branch_is_one_finding_not_one_per_slice():
     assert run(doc).findings == {
         "rockcraft.yaml": [{"sev": "block", "code": "unknown-release", "release": "ubuntu-26.10"}]
     }
-    # an unchiselled rock asks chisel-releases for nothing
+    # an unchiseled rock asks chisel-releases for nothing
     assert run(changed(base="ubuntu@26.10", parts={"p": {"stage-packages": ["hello"]}})).findings == {}
 
 

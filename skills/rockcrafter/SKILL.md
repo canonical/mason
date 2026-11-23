@@ -42,7 +42,7 @@ reached -- report it, do not work around it, and never read it as evidence
 (a denied fetch does not mean a package or slice is absent).
 
 **Slicing never blocks delivery**: when slices can't be authored, ship an
-unchiselled rock and say so.
+unchiseled rock and say so.
 
 Every rock starts at step 1. After it, a rock that already exists and fails to
 pack or fails its tests goes to step 6, under "fixing a failure".
@@ -96,13 +96,13 @@ Run it for every Ubuntu package the rock stages: the workload from the archive
 or a PPA, and the runtime a source build needs (`kb/rock-slices.md`). Take
 versions, executables and slice names from its report, never from memory. A
 `package-not-found` is a name to correct. For `missing-slices`, ask the user
-**once**: author the slices, or build unchiselled?
+**once**: author the slices, or build unchiseled?
 
-- **Unchiselled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
-  the report says unchiselled.
+- **Unchiseled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
+  the report says unchiseled.
 - **Author**: needs the chisel-slicer skill installed beside this one
   (`<skill-root>/../chisel-slicer/SKILL.md`); without it the user installs it,
-  or the rock goes unchiselled.
+  or the rock goes unchiseled.
   Use the user's chisel-releases checkout or a fork, branched off the target
   release. In it, follow chisel-slicer's `SKILL.md` for each missing package
   (a subagent is fine here). Then run rock-packages again with
@@ -110,15 +110,15 @@ versions, executables and slice names from its report, never from memory. A
   (`kb/rock-slices.md`; chisel itself in `kb/chisel-cli.md`). After a
   successful pack, push the branch and point the part at the fork; if you
   cannot push, keep the local source and report the push as remaining. If
-  authoring fails, go unchiselled and say why.
+  authoring fails, go unchiseled and say why.
 
 ## 5. fill in
 
 Edit the file init wrote: keep its structure, replace every placeholder (the
 summary, the description, the sample part) and add only what the rock needs.
-Read `kb/rockcraft-yaml.md` for keys, the version and parts,
-`kb/rock-slices.md` for the base and what to stage, and
-`kb/pebble-services.md` for services and the non-root user. A source build
+Read `kb/rockcraft-yaml.md` for keys, parts, the version and services,
+`kb/rock-slices.md` for the base and what to stage, and `kb/hardening.md` for
+the non-root user and what the rock ships. A source build
 takes its plugin and that plugin's keys from upstream's reference
 (`kb/rock-upstream-sources.md`), pinned to the tag the user named, else the
 newest release tag. A service also needs its config files, its writable dirs
@@ -170,7 +170,7 @@ reported as remaining, never a reason to leave them out.
 
 **Targeted fixes only**: change what the finding names. Never replace slices
 with whole debs, drop the workload, switch `base: bare` to an Ubuntu base,
-remove `run-user`, or drop or weaken a test's check of real behaviour -- if
+remove `run-user`, or drop or weaken a test's check of real behavior -- if
 only that would work, stop and recommend it.
 
 **A rock that already exists** is fixed, not redesigned. Work autonomously,
@@ -199,10 +199,10 @@ A packed rock is not proof the workload runs; only passing tests are.
 
 ## final report
 
-Summarise for the user (or the parent agent when delegated):
+Summarize for the user (or the parent agent when delegated):
 
-- the rock (file, or why not), its flavour -- chiselled, chiselled from local
-  slices, or unchiselled and why -- and the service command or CLI
+- the rock (file, or why not), its flavor -- chiseled, chiseled from local
+  slices, or unchiseled and why -- and the service command or CLI
 - the tests: what each task proves, and their result
 - each fix round: the failure (pack category and step / part, or the failed
   task), the cause, and the change made -- to the rock or to a wrong assertion

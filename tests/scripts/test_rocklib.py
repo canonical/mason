@@ -145,7 +145,7 @@ slices:
       - libc6_libs
     contents:
       /usr/bin/hello:
-  copyright: # licence
+  copyright: # license
     contents:
       /usr/share/doc/hello/copyright:
 v3-essential:

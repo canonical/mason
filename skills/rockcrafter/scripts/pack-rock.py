@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common
 import rocklib as rl
 
-# rockcraft colours its console output; strip before matching.
+# rockcraft colors its console output; strip before matching.
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 # category -> console patterns, first match wins. patterns are taken from real

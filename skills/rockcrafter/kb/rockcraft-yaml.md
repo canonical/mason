@@ -1,46 +1,21 @@
 # `rockcraft.yaml`
 
-A rock is an OCI image built from a declarative `rockcraft.yaml`. Rockcraft runs
-the build in an LXD (or multipass) instance through the craft-parts lifecycle and
-packs the result into `<name>_<version>_<arch>.rock` (an OCI archive). Every rock
-ships [Pebble](https://github.com/canonical/pebble) as its entrypoint; its services
-are in `kb/pebble-services.md`.
-
-## Lifecycle
-
-Each part runs `PULL -> OVERLAY -> BUILD -> STAGE -> PRIME`, then the rock is
-packed from `prime/`.
-
-| Step | What happens | Key vars / dirs |
-|---|---|---|
-| PULL | fetch `source` | `$CRAFT_PART_SRC` (`parts/<part>/src/`) |
-| OVERLAY | edit the base layer (`overlay-*`; not on `bare`) | `$CRAFT_OVERLAY` |
-| BUILD | run the plugin / `override-build` | `$CRAFT_PART_BUILD`, output -> `$CRAFT_PART_INSTALL` |
-| STAGE | merge every part's install dir, apply `organize`/`stage` | `$CRAFT_STAGE` (`stage/`) |
-| PRIME | filter to the final payload, `override-prime` | `$CRAFT_PRIME` (`prime/`) |
-
-`override-<step>` scriptlets replace the default step; `craftctl default` runs the
-default inside one. `after: [<part>]` orders parts (no cycles).
+How to fill in the file `rockcraft init` wrote. Every key and its constraints
+are in the
+[`rockcraft.yaml` reference](https://ubuntu.com/containers/rockcraft/docs/stable/reference/rockcraft-yaml/),
+and the part lifecycle (`PULL -> OVERLAY -> BUILD -> STAGE -> PRIME`, which
+pack-rock names on a failure) is in the
+[craft-parts lifecycle](https://ubuntu.com/containers/rockcraft/docs/stable/common/craft-parts/explanation/lifecycle/).
+This file holds only the choices the reference leaves to the author.
 
 ## Top-level keys
 
-```yaml
-name: <name>               # lowercase, hyphenated
-title: <Title>
-version: "<XX.YY>"         # quoted -- see Version below
-summary: <one line, < 80 chars>
-description: |
-  <what the rock contains and how to use it>
-license: <SPDX id>         # optional -- only when the user states one
-base: bare                 # or ubuntu@XX.YY -- see kb/rock-slices.md
-build-base: ubuntu@XX.YY   # required with base: bare
-run-user: _daemon_         # non-root, see kb/pebble-services.md
-platforms:
-  amd64:                   # Debian arch names only
-package-repositories: ...  # only for a PPA, see Parts
-services: ...              # kb/pebble-services.md
-parts: ...
-```
+- `name`: the rock's name, as given to `rockcraft init`.
+- `summary` and `description`: what the rock contains and how to use it,
+  replacing init's placeholders.
+- `license`: optional. Set it only when the user states one.
+- `base` / `build-base`: `kb/rock-slices.md`.
+- `run-user`: `kb/hardening.md`.
 
 ## Parts
 
@@ -67,6 +42,21 @@ parts: ...
 | git `source-tag: vXX.YY` or `source-branch` | `XX.YY` |
 
 Always quote it (`"1.27"`) so YAML doesn't turn it into a float.
+
+## Services
+
+Pebble is the rock's entrypoint and runs its services
+([Pebble in rocks](https://ubuntu.com/containers/rockcraft/docs/stable/explanation/pebble/),
+[layer specification](https://documentation.ubuntu.com/pebble/reference/layer-specification/)).
+A CLI-only rock declares none.
+
+- One service per long-running process, started in the foreground: Pebble
+  supervises it, so it must not daemonize.
+- `command` starts with the binary's absolute path. Put the default arguments a
+  user may replace in `[ ]`.
+- `override: replace` and `startup: enabled`.
+- `entrypoint-service` only when the rock should behave like a single-binary
+  image, so that `docker run <img> <args>` passes the args to that service.
 
 ## Build snaps
 

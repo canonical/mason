@@ -37,4 +37,4 @@ How rock defects surface at run time:
 
 Decide whether the rock or the test is wrong from what the workload is
 documented to do, not from what makes the task pass. Fix a wrong assertion;
-never drop or weaken a check of real behaviour to get green.
+never drop or weaken a check of real behavior to get green.

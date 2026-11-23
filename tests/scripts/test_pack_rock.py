@@ -49,7 +49,7 @@ Full execution log: '/tmp/full.log'
 """
 YAML_LOG = """\
 Bad rockcraft.yaml content:
-- extra inputs are not permitted (in field 'colour')
+- extra inputs are not permitted (in field 'color')
 Full execution log: '/tmp/y.log'
 """
 
@@ -73,7 +73,7 @@ def test_diagnose_invalid_yaml_has_no_step():
     d = pr.diagnose(YAML_LOG)
     assert (d["category"], d["step"], d["part"]) == ("invalid-yaml", None, None)
     # nothing else names what rockcraft rejected
-    assert d["evidence"] == ["Bad rockcraft.yaml content:", "- extra inputs are not permitted (in field 'colour')"]
+    assert d["evidence"] == ["Bad rockcraft.yaml content:", "- extra inputs are not permitted (in field 'color')"]
 
 
 def test_diagnose_invalid_yaml_keeps_every_rejection():
