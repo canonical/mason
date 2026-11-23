@@ -1,0 +1,5 @@
+# override-build runs jq, which no part installs: only a real build shows it.
+# the rock ships a file and no binary, so it has no tests to run.
+name: app-config
+release: ubuntu-24.04
+fault: {kind: build-package, part: config, package: jq}

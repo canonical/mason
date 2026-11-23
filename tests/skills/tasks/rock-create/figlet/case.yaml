@@ -1,0 +1,9 @@
+# no slices on any branch and the user declines authoring them -> unchiselled.
+name: figlet
+release: ubuntu-24.04
+flavour: unchiselled
+fallback: true
+version: "2.2"
+service: false
+workload: [figlet]
+binary: figlet

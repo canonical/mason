@@ -1,0 +1,281 @@
+"""common: the output contract of mason's helper scripts.
+
+Every helper prints one YAML document on stdout; stderr carries only free-form
+diagnostics (a wrapped tool's own output, tracebacks, usage errors). The
+document opens with `status`:
+
+  passed        the check ran and found nothing that blocks
+  failed        something blocks
+  unavailable   a check could not establish a result; `unavailable` lists why
+
+and the exit code follows it: 0 passed, 1 failed, 3 unavailable, 2 for a usage
+error. A block outranks unavailable: a defect found stays found.
+
+Checkers report findings grouped by file, worst first, one line each:
+
+  findings:
+    slices/foo.yaml:
+      - {sev: warn, code: removed, slice: bins, path: /usr/bin/foo}
+
+`sev` is block, warn or info; `code` names the kind of finding and `codes`
+explains, once, each code that occurs. Reporters put their facts under keys of
+their own after the contract keys.
+
+The git-aware helpers also take from here the target base a checkout's
+manifest names and the revision a change is compared against.
+"""
+
+from __future__ import annotations
+
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+PASSED, FAILED, UNAVAILABLE = "passed", "failed", "unavailable"
+EXIT = {PASSED: 0, FAILED: 1, UNAVAILABLE: 3}
+USAGE = 2
+SEVERITIES = ("block", "warn", "info")
+
+
+class Flow(dict):
+    """A mapping dumped on a single line."""
+
+
+class _Dumper(yaml.SafeDumper):
+    def increase_indent(self, flow: bool = False, indentless: bool = False) -> None:
+        # indent a list under its key rather than level with it
+        return super().increase_indent(flow, False)
+
+
+def _str(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
+    style = "|" if "\n" in data else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+
+_Dumper.add_representer(str, _str)
+_Dumper.add_representer(
+    Flow,
+    lambda dumper, data: dumper.represent_mapping(
+        "tag:yaml.org,2002:map", data, flow_style=True
+    ),
+)
+
+
+def dump(doc: dict[str, Any]) -> str:
+    return yaml.dump(
+        doc,
+        Dumper=_Dumper,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+        width=1 << 30,
+    )
+
+
+class Report:
+    def __init__(self, codes: dict[str, str]) -> None:
+        self.codes = dict(codes)
+        self.findings: dict[str, list[Flow]] = {}
+        self.unavailable: list[Flow] = []
+        self.data: dict[str, Any] = {}
+
+    def add(self, sev: str, code: str, file: Any, **fields: Any) -> None:
+        if sev not in SEVERITIES:
+            raise ValueError(f"unknown severity {sev!r}")
+        if code not in self.codes:
+            raise KeyError(f"undeclared finding code {code!r}")
+        finding = Flow(sev=sev, code=code)
+        finding.update((k, v) for k, v in fields.items() if v is not None)
+        self.findings.setdefault(str(file), []).append(finding)
+
+    def mark_unavailable(self, check: str, reason: str) -> None:
+        self.unavailable.append(Flow(check=check, reason=reason))
+
+    def count(self, sev: str) -> int:
+        return sum(f["sev"] == sev for items in self.findings.values() for f in items)
+
+    @property
+    def status(self) -> str:
+        if self.count("block"):
+            return FAILED
+        return UNAVAILABLE if self.unavailable else PASSED
+
+    def document(self) -> dict[str, Any]:
+        doc: dict[str, Any] = {"status": self.status}
+        if self.unavailable:
+            doc["unavailable"] = list(self.unavailable)
+        if self.codes:
+            doc["counts"] = Flow(
+                (s, self.count(s)) for s in SEVERITIES if self.count(s)
+            )
+        rank = {s: i for i, s in enumerate(SEVERITIES)}
+        findings = {
+            file: sorted(self.findings[file], key=lambda f: rank[f["sev"]])
+            for file in sorted(self.findings)
+        }
+        if findings:
+            doc["findings"] = findings
+            used = dict.fromkeys(
+                f["code"] for items in findings.values() for f in items
+            )
+            doc["codes"] = {code: self.codes[code] for code in used}
+        doc.update(self.data)
+        return doc
+
+    def emit(self) -> int:
+        sys.stdout.write(dump(self.document()))
+        return EXIT[self.status]
+
+
+def usage(text: str) -> int:
+    print(text, file=sys.stderr)
+    return USAGE
+
+
+_TOOL_VERSION = re.compile(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?")
+
+
+def tools(names: tuple[str, ...]) -> dict[str, Flow]:
+    """Which of the named tools this machine has, and the version of each."""
+    # --version only. a bare "<tool> version" fallback would be a real
+    # invocation -- spread would read spread.yaml and treat it as a job filter --
+    # and a report of what is installed must stay read-only.
+    out = {}
+    for t in names:
+        if not shutil.which(t):
+            out[t] = Flow(present=False, version=None)
+            continue
+        try:
+            text = subprocess.run(
+                [t, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            text = ""
+        m = _TOOL_VERSION.search(text)
+        # present but unversioned is a fact of its own: chisel prints "unknown"
+        # on an unstamped build, spread has no version flag at all. null is
+        # reserved for a tool that is not here to have a version.
+        out[t] = Flow(present=True, version=m.group(0) if m else "unknown")
+    return out
+
+
+def git(args: list[str], timeout: float | None = None) -> str | None:
+    """stdout of a git command, or None when git is missing or the command fails.
+    With a timeout, running out of it raises subprocess.TimeoutExpired: a query
+    that did not end is not a query that answered no."""
+    try:
+        r = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except OSError:
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+_MANIFEST = {
+    "format": r"^format:[ \t]*(.*)$",
+    "version": r"^[ \t]+version:[ \t]*['\"]?([0-9]+\.[0-9]+)",
+    "suites": r"suites:[ \t]*(.*)$",
+    "components": r"components:[ \t]*(.*)$",
+    "end-of-life": r"^[ \t]*end-of-life:[ \t]*(.*)$",
+}
+
+
+def manifest(text: str) -> dict[str, str | None]:
+    """What a chisel.yaml says, field by field: its format, the archive
+    version, the suites and components as written on the key's own line, and
+    the end-of-life date. None for a field it does not find."""
+    out = {}
+    for key, pattern in _MANIFEST.items():
+        m = re.search(pattern, text, re.MULTILINE)
+        out[key] = (m.group(1).strip().strip("\"'") or None) if m else None
+    return out
+
+
+def target_base(path: str | Path = "chisel.yaml") -> str | None:
+    """The branch this checkout's work targets: ubuntu-<version>, the archive
+    version read off the manifest. None without a readable manifest, which in
+    chisel-releases means a branch with no slices on it."""
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    version = manifest(text)["version"]
+    return f"ubuntu-{version}" if version else None
+
+
+def derived_base(report: Report) -> str | None:
+    """The target base resolved for a git-mode helper, or None with the report
+    marked unavailable: no manifest names one, or it is not fetched."""
+    target = target_base()
+    if target is None:
+        report.mark_unavailable(
+            "base", "no ./chisel.yaml names the target base; pass --base=<ref>"
+        )
+        return None
+    ref = base_ref(target)
+    if ref is None:
+        report.mark_unavailable("base", fetch_hint(target))
+    return ref
+
+
+def base_ref(base: str, timeout: float | None = None) -> str | None:
+    """The spelling of `base` this checkout resolves: its remote-tracking ref
+    on any remote (origin first), else the local branch. None when nothing
+    here can be diffed against."""
+    tracking = (
+        git(
+            ["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{base}"],
+            timeout,
+        )
+        or ""
+    ).split()
+    tracking.sort(key=lambda ref: (not ref.startswith("origin/"), ref))
+    for ref in [*tracking, base]:
+        query = ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]
+        if git(query, timeout) is not None:
+            return ref
+    return None
+
+
+def comparison(base: str, report: Report) -> str:
+    """The revision the worktree is compared against, recorded in the report:
+    the merge base of `base` and HEAD, so that work landed on the base since
+    branching is not read as this change undoing it. Without one (a shallow
+    clone, unrelated histories) the tip of `base` stands in, with the caveat."""
+    report.data["base"] = base
+    merge_base = (git(["merge-base", base, "HEAD"]) or "").strip()
+    report.data["merge base"] = merge_base or None
+    if merge_base:
+        return merge_base
+    report.data["caveat"] = (
+        f"no merge base between {base} and HEAD in this history, so the "
+        f"comparison is against the tip of {base}: changes landed there since "
+        "branching show up reversed"
+    )
+    return base
+
+
+def fetch_hint(base: str) -> str:
+    """The fetch that makes base_ref resolve. The explicit refspec matters: a
+    checkout whose remote tracks one branch only, as CI checkouts do, would
+    otherwise fetch into FETCH_HEAD and leave no ref behind."""
+    remotes = (git(["remote"]) or "").split()
+    remote = "origin" if "origin" in remotes or not remotes else remotes[0]
+    return (
+        f"{base} is not fetched; "
+        f"git fetch {remote} {base}:refs/remotes/{remote}/{base} brings it"
+    )

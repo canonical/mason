@@ -1,0 +1,5 @@
+# a misnamed slice: check-rock flags it, the pack fails on it.
+name: hello
+release: ubuntu-24.04
+fault: {kind: slice, bad: hello_binz, good: hello_bins}
+tests: unchanged
