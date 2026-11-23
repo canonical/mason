@@ -12,7 +12,8 @@ _PLACEHOLDER = "Put your test code here"
 
 
 def score() -> float:
-    case()
+    if "fault" in case():
+        raise NA
     text = tests_text() or ""
     if not text and not (OUT / "rockcraft-test.yaml").exists():
         return 0.0  # no suite at all: nothing to credit

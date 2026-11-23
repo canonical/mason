@@ -57,6 +57,8 @@ def _calls(binary: str, script: str) -> list[list[str]]:
 
 def score() -> float:
     c = case()
+    if "fault" in c:
+        raise NA
     text = tests_text()
     if not text:
         return 0.0
