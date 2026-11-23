@@ -8,7 +8,8 @@ from _lib import *
 
 
 def score() -> float:
-    case()
+    if "fault" in case():
+        raise NA
     doc = rock()
     return 1.0 if doc is not None and doc.get("run-user") == "_daemon_" else 0.0
 
