@@ -220,25 +220,21 @@ suites:
         - refusal-checks
         - orientation-called
     # rock tasks run in the rock-lxd sandbox: real rockcraft packs and tests.
-    rockcrafter-create: &rockcrafter-create
+    rockcrafter-create:
       agents: rock-models
       tasks: rock-create
       scorers: [rock-checks, rock-create-checks]
-    rockcrafter-debug: &rockcrafter-debug
+    rockcrafter-debug:
       agents: rock-models
       tasks: rock-debug
       scorers: [rock-checks, rock-debug-checks]
     # in ci a pack and a test run take minutes per pair, so a subset: one rock
     # each from the archive and from source; one failing pack, one failing test.
-    ci-rockcrafter-create:
-      <<: *rockcrafter-create
+    # each scorer group is na on the other kind of task.
+    ci-rockcrafter:
       agents: rock-openrouter
-      tasks: [hello, yq]
-      manual: true
-    ci-rockcrafter-debug:
-      <<: *rockcrafter-debug
-      agents: rock-openrouter
-      tasks: [slice-typo, missing-workload-slice]
+      tasks: [hello, yq, slice-typo, missing-workload-slice]
+      scorers: [rock-checks, rock-create-checks, rock-debug-checks]
       manual: true
     mason:
       tasks: help

@@ -16,7 +16,7 @@ the rock suites (`rockcrafter-create`, `rockcrafter-debug`) run in the `rock-lxd
 sandbox: an lxd system container with nesting, provisioned with real rockcraft,
 since packing and `rockcraft test` both start lxd instances. locally they need
 an lxd server (`lxc` remote); in ci the pats action sets lxd up on the runner
-and the `ci-rockcrafter-*` suites run a subset of their tasks, as each pair takes
+and the `ci-rockcrafter` suite runs a subset of both, as each pair takes
 minutes. their steps run with `--rock` (`stage`, `collect`, `provision`); a
 debug task's project lives in its `project/`, with spread tasks stored as
 `task.spread.yaml` (pats reads any `task.yaml` as a task).
