@@ -54,12 +54,14 @@ DEFAULT_URL = "https://github.com/canonical/chisel-releases.git"  # CHISEL_RELEA
 RAW = "https://raw.githubusercontent.com/canonical/chisel-releases"
 # UBUNTU_META_RELEASE_URL. the release in development is in <url>-development.
 META_RELEASE = "https://changelogs.ubuntu.com/meta-release"
-# ROCKCRAFT_SCHEMA_URL. rockcraft publishes the schema of rockcraft.yaml in its
-# repository, generated from its own models, one per release tag. the enums of
-# `base` and `build-base` in it are the bases that version accepts.
+# ROCKCRAFT_SCHEMA_URL. rockcraft generates the schema of rockcraft.yaml from its
+# own models: the snap ships it (snap/snapcraft.yaml, the `schema` part) and the
+# repository publishes it per release tag. the enums of `base` and `build-base`
+# in it are the bases that version accepts.
 ROCKCRAFT_SCHEMA = (
     "https://raw.githubusercontent.com/canonical/rockcraft/{version}/schema/rockcraft.json"
 )
+SHIPPED_SCHEMA = Path("/snap/rockcraft/current/schema/rockcraft.json")
 TIMEOUT = 20  # seconds, per command
 FETCH_TIMEOUT = 8  # seconds, per fetch
 DEADLINE = 45  # seconds, for all release discovery together
@@ -294,12 +296,16 @@ def rockcraft_version() -> str | None:
 
 
 def rockcraft_schema(version: str) -> dict:
-    """The schema of rockcraft.yaml that the given rockcraft version publishes."""
-    # read at the tag of the installed version, never at main: another
-    # version's schema would be a guess about this one.
-    url = os.environ.get("ROCKCRAFT_SCHEMA_URL", ROCKCRAFT_SCHEMA)
+    """The schema of rockcraft.yaml of the given (installed) rockcraft version:
+    the copy its snap ships, else the one published at its tag."""
+    # never at main: another version's schema would be a guess about this one.
+    url = os.environ.get("ROCKCRAFT_SCHEMA_URL")
     try:
-        schema = json.loads(fetch(url.format(version=version)))
+        if url is None and SHIPPED_SCHEMA.is_file():
+            text = SHIPPED_SCHEMA.read_text(encoding="utf-8")
+        else:
+            text = fetch((url or ROCKCRAFT_SCHEMA).format(version=version))
+        schema = json.loads(text)
         schema["properties"]["base"]["enum"]  # the part every reader relies on
     except (ValueError, KeyError, TypeError) as e:
         raise Failed(f"rockcraft {version}: its schema does not read: {e!r}") from e

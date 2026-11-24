@@ -34,6 +34,12 @@ def module(path):
 
 
 orientation = module(SHARED / "orientation.py")
+
+
+@pytest.fixture(autouse=True)
+def no_shipped_schema(tmp_path, monkeypatch):
+    # the schema a rockcraft snap on this machine ships would win over every fetch
+    monkeypatch.setattr(orientation, "SHIPPED_SCHEMA", tmp_path / "no-rockcraft.json")
 Flow = orientation.common.Flow
 Failed = orientation.Failed
 
@@ -456,6 +462,15 @@ def test_rockcraft_bases_are_read_at_the_installed_version(monkeypatch):
     assert asked == [
         "https://raw.githubusercontent.com/canonical/rockcraft/1.2.3/schema/rockcraft.json"
     ]
+
+
+def test_the_shipped_schema_is_read_before_the_published_one(tmp_path, monkeypatch):
+    shipped = tmp_path / "rockcraft.json"
+    shipped.write_text(json.dumps({"properties": {"base": {"enum": ["bare", "ubuntu@36.04"]}}}))
+    monkeypatch.setattr(orientation, "SHIPPED_SCHEMA", shipped)
+    monkeypatch.delenv("ROCKCRAFT_SCHEMA_URL", raising=False)
+    monkeypatch.setattr(orientation, "fetch", lambda url: pytest.fail(f"fetched {url}"))
+    assert orientation.rockcraft_schema("1.2.3")["properties"]["base"]["enum"] == ["bare", "ubuntu@36.04"]
 
 
 def test_a_schema_of_another_shape_is_a_failed_read(monkeypatch):
