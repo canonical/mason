@@ -1,12 +1,12 @@
 ---
-name: chisel-slicer
+name: chisel-slice
 description: >-
   Authors and tests chisel package slices files against
   canonical/chisel-releases. Use when the user wants to slice an Ubuntu package
   or add a new slices file to their release branch. Does not open PRs.
 ---
 
-# chisel-slicer
+# chisel-slice
 
 Author slices against the user's `canonical/chisel-releases` checkout.
 
@@ -18,7 +18,7 @@ Author slices against the user's `canonical/chisel-releases` checkout.
   the working directory. For example:
 
   ```bash
-  uv run "/absolute/path/to/chisel-slicer/scripts/orientation.py"
+  uv run "/absolute/path/to/chisel-slice/scripts/orientation.py"
   ```
 
   In the remaining commands, replace `<skill-root>` with that absolute path.

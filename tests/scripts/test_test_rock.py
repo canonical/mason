@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills" / "rockcrafter" / "scripts" / "test-rock.py"
+SCRIPT = ROOT / "skills" / "rock-create" / "scripts" / "test-rock.py"
 
 
 def module(path):

@@ -1,5 +1,5 @@
 ---
-name: rockcrafter
+name: rock-create
 description: >-
   Builds and fixes rocks (OCI images) with rockcraft and chisel. Starts a
   rockcraft.yaml with `rockcraft init`, then fills in, checks, packs and tests
@@ -12,7 +12,7 @@ description: >-
   asks why.
 ---
 
-# rockcrafter
+# rock-create
 
 Build [rocks](https://ubuntu.com/containers/rockcraft/docs) in the user's
 project, and fix the ones that fail to pack or fail their tests. **Do the work
@@ -26,7 +26,7 @@ is the one exception).
   directory and run helpers by absolute path, e.g.:
 
   ```bash
-  uv run "/absolute/path/to/rockcrafter/scripts/check-rock.py"
+  uv run "/absolute/path/to/rock-create/scripts/check-rock.py"
   ```
 
   In the remaining commands, replace `<skill-root>` with that path.
@@ -100,11 +100,11 @@ versions, executables and slice names from its report, never from memory. A
 
 - **Unchiseled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
   the report says unchiseled.
-- **Author**: needs the chisel-slicer skill installed beside this one
-  (`<skill-root>/../chisel-slicer/SKILL.md`); without it the user installs it,
+- **Author**: needs the chisel-slice skill installed beside this one
+  (`<skill-root>/../chisel-slice/SKILL.md`); without it the user installs it,
   or the rock goes unchiseled.
   Use the user's chisel-releases checkout or a fork, branched off the target
-  release. In it, follow chisel-slicer's `SKILL.md` for each missing package
+  release. In it, follow chisel-slice's `SKILL.md` for each missing package
   (a subagent is fine here). Then run rock-packages again with
   `--chisel-release <checkout>` and cut the slices from the checkout
   (`kb/rock-slices.md`; chisel itself in `kb/chisel-cli.md`). After a

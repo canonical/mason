@@ -18,10 +18,10 @@ from _lib import *
 # skills/mason/SKILL.md; drift there should fail here.
 _MARKERS = (
     "agent kit for chisel / chisel-releases and rocks work",
-    "/chisel-slicer <pkg>",
-    "/chisel-slice-reviewer <slices-file>",
-    "/chisel-slice-porter <pkg>",
-    "/rockcrafter <app>",
+    "/chisel-slice <pkg>",
+    "/chisel-slice-review <slices-file>",
+    "/chisel-slice-port <pkg>",
+    "/rock-create <app>",
     "or fix one whose pack or tests fail",
     "slices/curl.yaml",
     "github.com/canonical/mason",

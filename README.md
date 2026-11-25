@@ -19,23 +19,23 @@ Agent kit for working with Canonical [`chisel`](https://github.com/canonical/chi
 Install with:
 
 ```shell
-npx skills add canonical/mason --skill chisel-slicer
+npx skills add canonical/mason --skill chisel-slice
 # or
-npx tessl i canonical/mason --skill chisel-slicer
+npx tessl i canonical/mason --skill chisel-slice
 # or
-gh skill install canonical/mason chisel-slicer
+gh skill install canonical/mason chisel-slice
 ```
 
 and then, for example, write a new slice file:
 
 ```shell
-/chisel-slicer "write slices file for foobar"
+/chisel-slice "write slices file for foobar"
 ```
 
 ## what's in here
 
 - `mason` - routes `/mason` requests to the right skill or prints usage
-- `chisel-slicer` - authors and tests chisel slices files
-- `chisel-slice-reviewer` - read-only review of a slices file or PR
-- `chisel-slice-porter` - moves a slice between Ubuntu release branches
-- `rockcrafter` - drafts, checks, packs and tests rocks (Ubuntu archive / PPA packages or source builds), and fixes a rock whose `rockcraft pack` or `rockcraft test` fails
+- `chisel-slice` - authors and tests chisel slices files
+- `chisel-slice-review` - read-only review of a slices file or PR
+- `chisel-slice-port` - moves a slice between Ubuntu release branches
+- `rock-create` - drafts, checks, packs and tests rocks (Ubuntu archive / PPA packages or source builds), and fixes a rock whose `rockcraft pack` or `rockcraft test` fails

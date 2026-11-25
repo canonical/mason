@@ -1,12 +1,12 @@
 ---
-name: chisel-slice-porter
+name: chisel-slice-port
 description: >-
   Ports chisel package slices files between Ubuntu release branches of
   canonical/chisel-releases, adapting package contents, dependencies and tests
   to the target release. Use for forward-ports or back-ports. Does not open PRs.
 ---
 
-# chisel-slice-porter
+# chisel-slice-port
 
 Adapt the source slices and tests to the user's target release checkout.
 

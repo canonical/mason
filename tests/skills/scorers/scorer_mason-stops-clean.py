@@ -7,7 +7,7 @@
 
 the skill is explicit: print the usage block verbatim, then stop -- no other
 skill, no scripts, no files. each violation class costs a third:
-  - ran the chisel-slicer orientation script (its output lines in the raw
+  - ran the chisel-slice orientation script (its output lines in the raw
     transcript, same detection as scorer_orientation-called)
   - ran chisel or rockcraft (a `chisel cut` / `try-cut` / `rockcraft` command,
     or one of the rock helpers)
