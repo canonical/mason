@@ -39,3 +39,5 @@ and then, for example, write a new slice file:
 - `chisel-slice-review` - read-only review of a slices file or PR
 - `chisel-slice-port` - moves a slice between Ubuntu release branches
 - `rock-create` - drafts, checks, packs and tests rocks (Ubuntu archive / PPA packages or source builds), and fixes a rock whose `rockcraft pack` or `rockcraft test` fails
+
+Skills are named `<domain>-<subject>-<action>`; see [docs/skill-naming.md](docs/skill-naming.md).
