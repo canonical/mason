@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT / "skills" / "rockcrafter" / "scripts"
+SCRIPTS = ROOT / "skills" / "rock-create" / "scripts"
 
 
 def module(path):

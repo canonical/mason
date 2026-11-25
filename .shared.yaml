@@ -1,7 +1,7 @@
 # what each skill takes from shared/, and where the copy lands inside it.
 # `make sync-shared` writes the copies; `make check-shared` (ci) catches drift.
 shared:
-  chisel-slicer:
+  chisel-slice:
     verification.md:
       path: kb/verification.md
     dependency-policy.md:
@@ -38,7 +38,7 @@ shared:
       path: scripts/check-diff.py
     common.py:
       path: scripts/common.py
-  chisel-slice-reviewer:
+  chisel-slice-review:
     verification.md:
       path: kb/verification.md
     dependency-policy.md:
@@ -71,7 +71,7 @@ shared:
       path: scripts/check-diff.py
     common.py:
       path: scripts/common.py
-  chisel-slice-porter:
+  chisel-slice-port:
     verification.md:
       path: kb/verification.md
     dependency-policy.md:
@@ -112,7 +112,7 @@ shared:
       path: scripts/check-diff.py
     common.py:
       path: scripts/common.py
-  rockcrafter:
+  rock-create:
     chisel-cli.md:
       path: kb/chisel-cli.md
     orientation.py:

@@ -18,9 +18,9 @@ scrub_agents() {
     local f="$1/AGENTS.md"
     [ -f "$f" ] || return 0
     awk '/^## /{skip = ($0 ~ /working on package slices/)} !skip' "$f" > "$f.tmp"
-    grep -viE 'mason|chisel-slicer' "$f.tmp" > "$f" || true
+    grep -viE 'mason|chisel-slice' "$f.tmp" > "$f" || true
     rm -f "$f.tmp"
-    if grep -qiE 'mason|chisel-slicer' "$f"; then
+    if grep -qiE 'mason|chisel-slice' "$f"; then
         echo "setup: AGENTS.md still mentions mason after scrub" >&2
         exit 1
     fi

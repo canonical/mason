@@ -1,5 +1,5 @@
 prompt: |
-  Use the rockcrafter skill to build a rock for GNU hello -- the `hello` package from the Ubuntu archive -- on ubuntu@24.04, amd64 only. It is a CLI tool, not a service.
+  Use the rock-create skill to build a rock for GNU hello -- the `hello` package from the Ubuntu archive -- on ubuntu@24.04, amd64 only. It is a CLI tool, not a service.
 
   This is an automated eval: work autonomously and do not ask questions -- defaults are fine for anything not stated above. Write `rockcraft.yaml` and its tests in the current directory, pack the rock, run its tests, and stop with the final report.
 stage: stage --rock

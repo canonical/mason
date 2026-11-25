@@ -30,14 +30,14 @@ suites:
   kind: suite
   items:
     slicer: {tasks: knockout}
-    ci-chisel-slicer: {tasks: knockout}
-    ci-rockcrafter-create: {tasks: rock-create}
-    ci-rockcrafter-debug: {tasks: rock-debug}
+    ci-chisel-slice: {tasks: knockout}
+    ci-rock-create: {tasks: rock-create}
+    ci-rock-create-debug: {tasks: rock-debug}
     ci-Bad_Name: {tasks: knockout}
 """
 
-ROCK = ["ci-rockcrafter-create", "ci-rockcrafter-debug"]
-EVERY = ["ci-chisel-slicer", *ROCK]
+ROCK = ["ci-rock-create", "ci-rock-create-debug"]
+EVERY = ["ci-chisel-slice", *ROCK]
 
 
 @pytest.fixture
@@ -67,13 +67,13 @@ def suites(config: Path, *args: str, changed: list[str] | None = None) -> list[s
     ("changed", "want"),
     [
         # a skill picks its own suite, and only one that is declared
-        (["skills/chisel-slicer/SKILL.md"], ["ci-chisel-slicer"]),
+        (["skills/chisel-slice/SKILL.md"], ["ci-chisel-slice"]),
         # ... or every variant of it, ci-<skill>-<variant>
-        (["skills/rockcrafter/kb/x.md", "skills/rockcrafter/SKILL.md"], ROCK),
-        (["skills/chisel-slicer/a", "skills/rockcrafter/b"], EVERY),
+        (["skills/rock-create/kb/x.md", "skills/rock-create/SKILL.md"], ROCK),
+        (["skills/chisel-slice/a", "skills/rock-create/b"], EVERY),
         (["skills/mason/SKILL.md"], []),
         # a suite that only starts like the skill's name is not its variant
-        (["skills/rock/SKILL.md"], []),
+        (["skills/rock-creat/SKILL.md"], []),
         # the eval and the pats ci move every score
         (["tests/skills/pats.yaml"], EVERY),
         ([".github/workflows/pats.yml"], EVERY),
@@ -95,7 +95,7 @@ def test_all_is_every_declared_ci_suite(config: Path) -> None:
 
 
 def test_a_suite_declared_twice_is_one_job(config: Path) -> None:
-    more = "nightly:\n  kind: suite\n  items:\n    ci-chisel-slicer: {tasks: denovo}\n"
+    more = "nightly:\n  kind: suite\n  items:\n    ci-chisel-slice: {tasks: denovo}\n"
     config.write_text(CONFIG + more, encoding="utf-8")
     assert suites(config, "--all") == EVERY
 

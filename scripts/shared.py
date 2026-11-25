@@ -16,7 +16,7 @@ goes. The destination is a path, not a directory convention -- a skill decides
 where its copies live and what they are called:
 
     shared:
-      chisel-slicer:
+      chisel-slice:
         chisel-cli.md:
           path: kb/chisel-cli.md
         check-slice.py:

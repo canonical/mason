@@ -1,12 +1,12 @@
 ---
-name: chisel-slice-reviewer
+name: chisel-slice-review
 description: >-
   Reviews chisel package slices files, branches or PRs in
   canonical/chisel-releases for correctness, dependencies, conventions, tests
   and forward-port requirements. Read-only; returns findings and a verdict.
 ---
 
-# chisel-slice-reviewer
+# chisel-slice-review
 
 Review the supplied slices file as it stands, or a branch/PR against its target base.
 State the scope and any assumption needed to interpret the request.
