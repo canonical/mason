@@ -65,7 +65,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: ${{ fromJSON(needs.plan.outputs.suites) }}
-    uses: alesancor1/pats-action/.github/workflows/Pats.yaml@0c64085fbf0e0fafb51a514fa5e6a97739a7dbaf # trial: main + the lockfile PR
+    uses: lczyk/pats-action/.github/workflows/Pats.yaml@696fad93fd947fdf5533e53ef2acf7fb9f3d2259 # trial: head of the lockfile PR
     permissions:
       contents: read
       pull-requests: write
