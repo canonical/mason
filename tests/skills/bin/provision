@@ -36,6 +36,29 @@ if [ "${1:-}" = --rock ]; then
     snap list lxd >/dev/null 2>&1 || snap install lxd
     lxd waitready --timeout=120
     lxd init --auto
+
+    # three settings without which no rock packs here: rockcraft's build
+    # instances are lxd containers inside this lxd container. each works around
+    # something upstream (tests/skills/README.md has the references).
+    #
+    # the agent has no supplementary groups, so the lxd socket goes to its own
+    # group. pats makes that user after this script, unless it is there.
+    id -u pats >/dev/null 2>&1 || useradd -m -s /bin/bash pats
+    snap set lxd daemon.group=pats
+    systemctl stop snap.lxd.daemon.service snap.lxd.daemon.unix.socket
+    systemctl start snap.lxd.daemon.unix.socket
+    lxd waitready --timeout=120
+    [ "$(stat -c %G /var/snap/lxd/common/lxd/unix.socket)" = pats ]
+    # a second-level container gets no apparmor namespace of its own, and snapd
+    # dies loading a profile it may not load. with no apparmor in sight (both
+    # paths: snap-confine asks the module) it runs without.
+    lxc profile set default raw.lxc 'lxc.mount.entry = tmpfs sys/kernel/security tmpfs rw,nosuid,nodev,noexec 0 0
+lxc.mount.entry = tmpfs sys/module/apparmor tmpfs ro,nosuid,nodev,noexec 0 0'
+    # rockcraft maps the project's owner to the instance's root and copies
+    # each build instance from a base one. nested, lxd shifts the copy's files
+    # a second time. a privileged instance has no id map to shift, and is
+    # still held by this container's own user namespace.
+    lxc profile set default security.privileged true
     snap install rockcraft --classic
     rockcraft --version
 fi
