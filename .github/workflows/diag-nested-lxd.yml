@@ -1,0 +1,101 @@
+name: diag nested lxd
+
+# trial, not for merging: rebuilds the layering of the rock-lxd sandbox on a
+# runner (runner -> lxd container with nesting -> rockcraft's build instance)
+# and prints, at each level, what apparmor lets it do and whether snapd starts.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diag-nested-lxd.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: runner
+        run: |
+          uname -r
+          cat /proc/self/attr/current
+          for f in .ns_level .ns_name .ns_stacked .stacked; do
+            printf '%s = %s\n' "$f" "$(sudo cat /sys/kernel/security/apparmor/$f 2>&1)"
+          done
+          snap list
+
+      # as pats-action's install.sh sets lxd up.
+      - name: lxd on the runner
+        run: |
+          if snap list lxd > /dev/null 2>&1; then sudo snap refresh lxd; else sudo snap install lxd; fi
+          sudo snap set lxd daemon.group=adm
+          sudo lxd waitready
+          sudo lxd init --auto
+          for br in lxdbr0 'patsbr+' patsup; do
+            sudo iptables -I DOCKER-USER -i "$br" -j ACCEPT
+            sudo iptables -I DOCKER-USER -o "$br" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+          done
+          snap list lxd
+          lxc info | grep -E 'kernel_version|server_version'
+
+      - name: sandbox
+        run: |
+          lxc launch ubuntu:24.04 l1 -c security.nesting=true -c limits.cpu=2 -c limits.memory=6GiB < /dev/null
+          sleep 20
+          lxc exec l1 -- cloud-init status --wait || true
+          cat > l1.sh <<'EOF'
+          facts() {
+            echo "label: $(cat /proc/self/attr/current)"
+            for f in .ns_level .ns_name .ns_stacked .stacked; do
+              printf '%s = %s\n' "$f" "$(cat /sys/kernel/security/apparmor/$f 2>&1)"
+            done
+            if head -c 1 /sys/kernel/security/apparmor/profiles > /dev/null 2>&1; then
+              echo "profiles: readable"
+            else
+              echo "profiles: not readable"
+            fi
+            printf 'profile diag-nested-test { }\n' > /root/t.aa
+            apparmor_parser -r /root/t.aa; echo "load a profile: exit $?"
+          }
+          echo "::group::level 1 facts"
+          facts
+          echo "::endgroup::"
+
+          echo "::group::provision, as tests/skills/bin/provision --rock"
+          apt-get update
+          apt-get install -y --no-install-recommends git snapd
+          snap wait system seed.loaded
+          snap list lxd > /dev/null 2>&1 || snap install lxd
+          lxd waitready --timeout=120
+          lxd init --auto
+          snap install rockcraft --classic
+          snap list
+          echo "::endgroup::"
+
+          mkdir -p /w
+          printf '%s\n' "name: hello" "base: bare" "build-base: ubuntu@24.04" 'version: "2.10"' \
+            "summary: hello" "description: hello" "run-user: _daemon_" "platforms:" "  amd64:" \
+            "parts:" "  hello:" "    plugin: nil" "    stage-packages: [base-files_base, hello_bins]" \
+            > /w/rockcraft.yaml
+          echo "::group::pack"
+          cd /w
+          timeout 1500 rockcraft pack -v; echo "pack: exit $?"
+          ls -la /w
+          echo "::endgroup::"
+
+          echo "::group::level 2 facts"
+          i="$(lxc list --project rockcraft --format csv -c n | head -n1)"
+          echo "instance: $i"
+          lxc start --project rockcraft "$i" 2> /dev/null
+          sleep 5
+          declare -f facts > /root/facts.sh
+          echo facts >> /root/facts.sh
+          lxc file push /root/facts.sh --project rockcraft "$i/root/facts.sh"
+          lxc exec --project rockcraft "$i" -- bash /root/facts.sh
+          lxc exec --project rockcraft "$i" -- sh -c 'cat /proc/self/uid_map; dpkg -l snapd | tail -n1; systemctl is-active snapd; journalctl -u snapd --no-pager -n 25'
+          echo "::endgroup::"
+          EOF
+          lxc file push l1.sh l1/root/l1.sh
+          lxc exec l1 -- bash /root/l1.sh
