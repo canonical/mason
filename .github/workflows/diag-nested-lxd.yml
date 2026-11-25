@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   diag:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04 # what the pats run job gets
     timeout-minutes: 45
     steps:
       - name: runner
@@ -42,7 +42,7 @@ jobs:
 
       - name: sandbox
         run: |
-          lxc launch ubuntu:24.04 l1 -c security.nesting=true -c limits.cpu=2 -c limits.memory=6GiB < /dev/null
+          lxc launch ubuntu:26.04 l1 -c security.nesting=true -c limits.cpu=2 -c limits.memory=6GiB < /dev/null
           sleep 20
           lxc exec l1 -- cloud-init status --wait || true
           cat > l1.sh <<'EOF'
