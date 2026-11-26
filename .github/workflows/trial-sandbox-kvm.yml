@@ -1,0 +1,144 @@
+name: trial sandbox kvm
+
+# throwaway trial, not for merging. `rockcraft test` boots an lxd virtual
+# machine, and the rock-lxd sandbox, an lxd container, has no /dev/kvm. this
+# rebuilds the sandbox on a runner with the runner's kvm devices passed in and
+# looks at how far a virtual machine and `rockcraft test` then get. no agent
+# runs and no secret is used.
+#
+# read the results with: grep RESULT in the job's log.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/trial-sandbox-kvm.yml
+
+permissions:
+  contents: read
+
+jobs:
+  trial:
+    runs-on: ubuntu-26.04 # what the pats run job gets
+    timeout-minutes: 90
+    steps:
+      - name: kvm on the runner
+        run: |
+          uname -r
+          nproc
+          free -g | sed -n 2p
+          for d in /dev/kvm /dev/vhost-net /dev/vhost-vsock /dev/vsock; do
+            if [ -e "$d" ]; then ls -l "$d"; else echo "RESULT step=runner-device dev=$d present=no"; fi
+          done
+          grep -c -E 'vmx|svm' /proc/cpuinfo || true
+
+      - name: lxd on the runner
+        run: |
+          if snap list lxd > /dev/null 2>&1; then sudo snap refresh lxd; else sudo snap install lxd; fi
+          sudo snap set lxd daemon.group=adm
+          sudo lxd waitready
+          sudo lxd init --auto --storage-backend=dir
+          for br in lxdbr0 'patsbr+' patsup; do
+            sudo iptables -I DOCKER-USER -i "$br" -j ACCEPT
+            sudo iptables -I DOCKER-USER -o "$br" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+          done
+          snap list lxd
+          # can the runner itself run a virtual machine?
+          lxc info | grep -A 3 -E '^  driver:|instance_types' || true
+
+      - name: sandbox with kvm
+        run: |
+          # more memory than the sandbox has today (6GiB): spread asks for a
+          # virtual machine of 8GiB.
+          lxc init ubuntu:26.04 l1 -c security.nesting=true -c limits.cpu=4 -c limits.memory=14GiB < /dev/null
+          for d in kvm vhost-net vhost-vsock vsock; do
+            if [ -e "/dev/$d" ]; then
+              lxc config device add l1 "$d" unix-char "path=/dev/$d" mode=0666
+            fi
+          done
+          lxc start l1
+          sleep 20
+          lxc exec l1 -- cloud-init status --wait || true
+          cat > l1.sh <<'EOF'
+          set -u
+          r() { echo "RESULT $*"; }
+          export DEBIAN_FRONTEND=noninteractive
+
+          echo "::group::provision, as tests/skills/bin/provision --rock"
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends git snapd sudo
+          snap wait system seed.loaded
+          snap list lxd > /dev/null 2>&1 || snap install lxd
+          lxd waitready --timeout=120
+          lxd init --auto
+          snap install rockcraft --classic
+          useradd -m -u 1001 pats 2> /dev/null || true
+          agent="$(id -nu 1001)"
+          snap set lxd daemon.group="$agent"
+          systemctl restart snap.lxd.daemon.unix.socket snap.lxd.daemon
+          lxd waitready --timeout=120
+          lxc profile set default raw.lxc 'lxc.mount.entry = tmpfs sys/kernel/security tmpfs rw,nosuid,nodev,noexec 0 0
+          lxc.mount.entry = tmpfs sys/module/apparmor tmpfs ro,nosuid,nodev,noexec 0 0'
+          lxc profile set default security.privileged true
+          echo "::endgroup::"
+
+          echo "::group::does the nested lxd see kvm"
+          ls -l /dev/kvm /dev/vhost-net /dev/vhost-vsock /dev/vsock 2>&1
+          lxc info | grep -B 2 -A 8 -E '^  driver' || true
+          grep -i -E 'kvm|qemu|virtual-machine' /var/snap/lxd/common/lxd/logs/lxd.log || true
+          r "step=nested-drivers value=$(lxc info | sed -n 's/^  driver: //p' | tr -d ' ')"
+          echo "::endgroup::"
+
+          echo "::group::a virtual machine by hand"
+          s=$(date +%s)
+          lxc launch ubuntu:24.04 v1 --vm -c limits.cpu=2 -c limits.memory=2GiB < /dev/null
+          r "step=vm-launch rc=$?"
+          up=no
+          deadline=$(($(date +%s) + 420))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            if lxc exec v1 -- true < /dev/null 2> /dev/null; then up=yes; break; fi
+            sleep 10
+          done
+          r "step=vm-agent up=$up secs=$(($(date +%s) - s))"
+          lxc list < /dev/null
+          lxc info v1 --show-log < /dev/null | tail -n 30
+          lxc delete -f v1 < /dev/null
+          echo "::endgroup::"
+
+          mkdir -p /wa
+          printf '%s\n' "name: hello" "base: bare" "build-base: ubuntu@24.04" 'version: "2.10"' \
+            "summary: hello" "description: hello" "run-user: _daemon_" "platforms:" "  amd64:" \
+            "parts:" "  hello:" "    plugin: nil" "    stage-packages: [base-files_base, hello_bins]" \
+            > /wa/rockcraft.yaml
+          chown -R 1001:1001 /wa
+          cat > /opt/agent.sh <<'AGENT'
+          cd /wa || exit 1
+          id
+          s=$(date +%s)
+          # through a pipe: straight into a file the output is lost here.
+          timeout 1500 rockcraft pack -v 2>&1 | cat > pack.out
+          echo "RESULT step=pack rc=${PIPESTATUS[0]} secs=$(($(date +%s) - s)) rocks=$(ls ./*.rock 2> /dev/null | wc -l)"
+          tail -n 8 pack.out
+
+          mkdir /wa/scaf && cd /wa/scaf && rockcraft init --profile=test --name hello 2>&1 | cat > /dev/null
+          cd /wa
+          sed '/^project:/,+1d' scaf/spread.yaml > rockcraft-test.yaml
+          cp -R scaf/spread spread
+          rm -rf scaf
+          cat rockcraft-test.yaml
+          find spread -type f
+          s=$(date +%s)
+          timeout 2400 rockcraft test 2>&1 | cat > test.out
+          echo "RESULT step=test rc=${PIPESTATUS[0]} secs=$(($(date +%s) - s))"
+          echo "::group::rockcraft test, full output"
+          cat test.out
+          echo "::endgroup::"
+          grep -E 'Successful tasks|Aborted tasks|Failed tasks|error:' test.out | sed 's/^/RESULT step=test-line /'
+          AGENT
+          setpriv --reuid 1001 --regid 1001 --init-groups \
+            /usr/bin/env "HOME=/home/$agent" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin" \
+            bash /opt/agent.sh
+          lxc list --all-projects < /dev/null
+          free -g | sed -n 2p
+          EOF
+          lxc file push l1.sh l1/root/l1.sh
+          lxc exec l1 -- bash /root/l1.sh
