@@ -94,11 +94,13 @@ jobs:
           case "$INNER" in
             dir) lxc storage create default dir ;;
             btrfs)
-              /snap/lxd/current/bin/btrfs subvolume create /var/lib/nested-pool \
-                && lxc storage create default btrfs source=/var/lib/nested-pool
+              # lxd makes the subvolume: one made beforehand it cannot inspect
+              # from in here (btrfs subvolume list: operation not permitted).
+              lxc storage create default btrfs source=/var/lib/nested-pool
               ;;
             zfs)
-              ds="$(findmnt -no SOURCE /)"
+              ds="$(findmnt -no SOURCE / | sed 's/\[.*//')"
+              ls -l /dev/zfs
               echo "dataset of this container: $ds"
               lxc storage create default zfs source="$ds/nested"
               ;;
@@ -169,8 +171,10 @@ jobs:
               bash /opt/pack.sh "$CASE" "$@"
           }
           wipe() {
-            lxc list --project rockcraft --format csv -c n < /dev/null \
-              | xargs -r -n1 lxc delete -f --project rockcraft < /dev/null
+            for n in $(lxc list --project rockcraft --format csv -c n < /dev/null); do
+              lxc delete -f --project rockcraft "$n" < /dev/null
+            done
+            lxc list --project rockcraft --format csv -c n < /dev/null | wc -l
           }
 
           # first with the id map rockcraft asks for, then privileged, which is
