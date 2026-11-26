@@ -20,6 +20,18 @@ jobs:
   trial:
     runs-on: ubuntu-26.04 # what the pats run job gets
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {cpu: 2, mem: 6GiB, devs: "kvm vhost-net vhost-vsock vsock"} # the sandbox's limits today
+          - {cpu: 2, mem: 10GiB, devs: "kvm vhost-net vhost-vsock vsock"}
+          - {cpu: 4, mem: 10GiB, devs: "kvm vhost-net vhost-vsock vsock"}
+          - {cpu: 4, mem: 14GiB, devs: "kvm"} # is /dev/kvm alone enough
+    env:
+      CPU: ${{ matrix.cpu }}
+      MEM: ${{ matrix.mem }}
+      DEVS: ${{ matrix.devs }}
     steps:
       - name: kvm on the runner
         run: |
@@ -47,10 +59,10 @@ jobs:
 
       - name: sandbox with kvm
         run: |
-          # more memory than the sandbox has today (6GiB): spread asks for a
-          # virtual machine of 8GiB.
-          lxc init ubuntu:26.04 l1 -c security.nesting=true -c limits.cpu=4 -c limits.memory=14GiB < /dev/null
-          for d in kvm vhost-net vhost-vsock vsock; do
+          # spread asks for a virtual machine of 4 cpus and 8GiB. the sandbox
+          # has 2 and 6GiB today.
+          lxc init ubuntu:26.04 l1 -c security.nesting=true -c "limits.cpu=$CPU" -c "limits.memory=$MEM" < /dev/null
+          for d in $DEVS; do
             if [ -e "/dev/$d" ]; then
               lxc config device add l1 "$d" unix-char "path=/dev/$d" mode=0666
             fi
@@ -60,7 +72,8 @@ jobs:
           lxc exec l1 -- cloud-init status --wait || true
           cat > l1.sh <<'EOF'
           set -u
-          r() { echo "RESULT $*"; }
+          CASE="$1"
+          r() { echo "RESULT case=$CASE $*"; }
           export DEBIAN_FRONTEND=noninteractive
 
           echo "::group::provision, as tests/skills/bin/provision --rock"
@@ -116,7 +129,7 @@ jobs:
           s=$(date +%s)
           # through a pipe: straight into a file the output is lost here.
           timeout 1500 rockcraft pack -v 2>&1 | cat > pack.out
-          echo "RESULT step=pack rc=${PIPESTATUS[0]} secs=$(($(date +%s) - s)) rocks=$(ls ./*.rock 2> /dev/null | wc -l)"
+          echo "RESULT case=$1 step=pack rc=${PIPESTATUS[0]} secs=$(($(date +%s) - s)) rocks=$(ls ./*.rock 2> /dev/null | wc -l)"
           tail -n 8 pack.out
 
           mkdir /wa/scaf && cd /wa/scaf && rockcraft init --profile=test --name hello 2>&1 | cat > /dev/null
@@ -128,17 +141,17 @@ jobs:
           find spread -type f
           s=$(date +%s)
           timeout 2400 rockcraft test 2>&1 | cat > test.out
-          echo "RESULT step=test rc=${PIPESTATUS[0]} secs=$(($(date +%s) - s))"
+          echo "RESULT case=$1 step=test rc=${PIPESTATUS[0]} secs=$(($(date +%s) - s))"
           echo "::group::rockcraft test, full output"
           cat test.out
           echo "::endgroup::"
-          grep -E 'Successful tasks|Aborted tasks|Failed tasks|error:' test.out | sed 's/^/RESULT step=test-line /'
+          grep -E 'Successful tasks|Aborted tasks|Failed tasks|error:' test.out | sed "s/^/RESULT case=$1 step=test-line /"
           AGENT
           setpriv --reuid 1001 --regid 1001 --init-groups \
             /usr/bin/env "HOME=/home/$agent" "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin" \
-            bash /opt/agent.sh
+            bash /opt/agent.sh "$CASE"
           lxc list --all-projects < /dev/null
           free -g | sed -n 2p
           EOF
           lxc file push l1.sh l1/root/l1.sh
-          lxc exec l1 -- bash /root/l1.sh
+          lxc exec l1 -- bash /root/l1.sh "$CPU-$MEM-$(echo "$DEVS" | wc -w)dev"
