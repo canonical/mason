@@ -43,8 +43,9 @@ fault is gone.
   profile). rockcraft maps the project dir's owner to the instance's root and
   makes each build instance by copying a base one. nested, lxd shifts the
   copy's files a second time, and rockcraft stops at `cannot create user data
-  directory: /root/snap/rockcraft/<rev>: Permission denied`. a privileged
-  instance has no id map. it is still held by the sandbox's own user namespace.
+  directory: /root/snap/rockcraft/<rev>: Permission denied`
+  ([canonical/lxd#19608](https://github.com/canonical/lxd/issues/19608)). a
+  privileged instance has no id map. it is still held by the sandbox's own user namespace.
 
 what to look for when one comes back: `rockcraft pack` fails with `LXD
 requires additional permissions` (the first), `Failed to enable snapd service`
