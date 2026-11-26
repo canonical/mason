@@ -185,6 +185,8 @@ jobs:
           fi
           wipe
           lxc profile set default security.privileged true
+          # rockcraft's project has a copy of the profile, made at its first pack.
+          lxc profile set default security.privileged true --project rockcraft
           as_agent privileged-cold /wa
           as_agent privileged-warm /wb
           lxc list --project rockcraft --format csv -c ns < /dev/null
