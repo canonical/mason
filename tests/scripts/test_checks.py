@@ -866,6 +866,26 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
         ("slices/foo.yaml", "bins", "removed")
     ], doc
 
+    # a new slices file not yet added to git is still a change in the worktree
+    (tmp_path / "slices" / "bar.yaml").write_text(SPLIT_BASE, encoding="utf-8")
+    doc = check_diff()
+    assert doc["changed"] == ["slices/foo.yaml", "slices/bar.yaml"], doc
+
+    # git refusing the worktree (dubious ownership) is unavailable, not a clean diff
+    shim = tmp_path.parent / f"{tmp_path.name}-bin"
+    shim.mkdir()
+    real = subprocess.run(
+        ["sh", "-c", "command -v git"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    (shim / "git").write_text(
+        f'#!/bin/sh\nfor a; do [ "$a" = ls-files ] && exit 128; done\nexec {real} "$@"\n',
+        encoding="utf-8",
+    )
+    (shim / "git").chmod(0o755)
+    env["PATH"] = f"{shim}:{env['PATH']}"
+    doc = check_diff()
+    assert doc["status"] == "unavailable", doc
+
 
 def test_scaffold_test() -> None:
     with tempfile.TemporaryDirectory() as td:
