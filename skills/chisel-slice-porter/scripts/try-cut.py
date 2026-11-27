@@ -141,7 +141,7 @@ def changed_slices(base: str) -> dict[str, list[str]] | None:
 
 
 def base_release(base: str, into: Path) -> bool:
-    """Materialise base's chisel.yaml and slices/ as a release dir."""
+    """Materialize base's chisel.yaml and slices/ as a release dir."""
     tar = subprocess.run(
         ["git", "archive", "--format=tar", base, "chisel.yaml", "slices"],
         capture_output=True,

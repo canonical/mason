@@ -33,7 +33,7 @@ Names are convention but reviewers enforce them. The counts below are how many s
 | `scripts` | 29 | Shell helpers / non-binary executables. Not in `bins` |
 | `data` | 21 | Static data (templates, tables, arch-independent payload). Not fonts -- those get `fonts` |
 | `headers` | 15 | `/usr/include/...`. This is the name `-dev` packages use, not `dev` |
-| `jars` | 5 | JVM artefacts |
+| `jars` | 5 | JVM artifacts |
 | `copyright` | 690 | The deb copyright file, plus any upstream `NOTICE` / `LICENSE` / `ThirdPartyNotices` the package ships. Every slices file has one |
 | `fonts` | 15 | Font files. Every font package uses this, not `data` |
 | `core` | 38 | Minimum-functional subset. **Not "everything"**. Avoid `all` -- exactly one slices file uses it (`fonts-ubuntu`, an umbrella aggregate) |
@@ -90,4 +90,4 @@ A `.deb` ships files a minimal rootfs never needs. Do **not** slice these unless
 | **doc-base / lintian** | `/usr/share/doc-base/`, `/usr/share/lintian/` | packaging metadata, not runtime |
 | **examples** | `/usr/share/doc/*/examples/`, `.../example*` | covered by the doc rule above |
 
-Under `/usr/share/doc/<pkg>/`, ship only legal files: `copyright` always, and the upstream legal notices (`NOTICE`, `LICENSE`, `ThirdPartyNotices`, with `.txt`/`.gz` variants) where the package carries them for licence compliance -- apache2, aspnetcore, and libaprutil1t64 ship `NOTICE`. Everything else there (README, changelog, NEWS, examples) is clutter. Shared-copyright packages instead ship `/usr/share/doc/<pkg>` itself as a symlink to another package's doc dir (gcc/cpp/binutils families); that bare entry is also fine.
+Under `/usr/share/doc/<pkg>/`, ship only legal files: `copyright` always, and the upstream legal notices (`NOTICE`, `LICENSE`, `ThirdPartyNotices`, with `.txt`/`.gz` variants) where the package carries them for license compliance -- apache2, aspnetcore, and libaprutil1t64 ship `NOTICE`. Everything else there (README, changelog, NEWS, examples) is clutter. Shared-copyright packages instead ship `/usr/share/doc/<pkg>` itself as a symlink to another package's doc dir (gcc/cpp/binutils families); that bare entry is also fine.

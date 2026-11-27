@@ -6,7 +6,7 @@
 """scaffold-test: emit a spread task.yaml skeleton for a slice's binaries.
 
 This reads a package slices file and prints a starting task.yaml with a fresh rootfs for each
-non-copyright slice. Explicit paths in recognised binary directories get a
+non-copyright slice. Explicit paths in recognized binary directories get a
 chroot placeholder; other slices and globbed binaries get author markers.
 Replace these with functional checks following kb/spread-tests.md. The
 scaffold does not establish coverage or prove that any command works.

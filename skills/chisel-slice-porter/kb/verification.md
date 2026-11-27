@@ -4,7 +4,7 @@ Include every dependency package added or changed in verification. Keep check
 status separate from finding severity.
 
 - **Passed:** the check ran and met its acceptance criteria. Static checks do
-  not prove installability or runtime behaviour.
+  not prove installability or runtime behavior.
 - **Failed:** evidence shows a defect: package slices file blocks, unjustified warnings, missing
   or malformed tests, unfinished scaffolds, inadequate assertions, unresolved
   source conflicts, or a cut/spread failure caused by the proposed change.
@@ -16,7 +16,7 @@ status separate from finding severity.
 
 Network access is required. Report network failures and access refusals as unavailable;
 do not work around them with offline fallbacks, cached upstream substitutes or
-test-specific behaviour. Do not turn an observed product failure into an
+test-specific behavior. Do not turn an observed product failure into an
 unavailable check. Inspect diagnostics when a cut or spread command fails:
 non-zero exit alone does not distinguish a defect from an inaccessible service.
 

@@ -148,7 +148,7 @@ finished. Report complete, ready for remaining verification or blocked.
 ## final report
 
 Respond to the user for direct invocation, or to the parent agent when delegated.
-Summarise:
+Summarize:
 
 - slices files created or changed and their slice breakdown.
 - Required dependency graph, reused slices, new dependencies and authoring order.

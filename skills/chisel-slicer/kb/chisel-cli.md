@@ -7,7 +7,7 @@ Docs: <https://ubuntu.com/chisel/docs/latest/>
 ## Commands
 
 ```bash
-chisel cut --release <ref> --root <dir> [--arch <a>] <pkg>_<slice> ...   # materialise rootfs
+chisel cut --release <ref> --root <dir> [--arch <a>] <pkg>_<slice> ...   # materialize rootfs
 chisel find <pattern>                                                     # search slices
 chisel info <pkg>_<slice>                                                 # inspect slice
 chisel debug check-release-archives --release <ref>                       # download all pkgs, report cross-package path conflicts

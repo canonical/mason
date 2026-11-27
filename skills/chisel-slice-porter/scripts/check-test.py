@@ -10,9 +10,9 @@ Reports references to explicit paths under /usr/bin, /usr/sbin, /bin, /sbin and
 
 It cannot judge whether a test is *meaningful* -- only that binaries are
 referenced. Shell comments and YAML metadata are excluded, but strings and
-uncalled helpers can still match. Globs and binaries outside the recognised
+uncalled helpers can still match. Globs and binaries outside the recognized
 directories need manual review. Test depth and rootfs isolation are defined in
-kb/spread-tests.md; only running spread proves runtime behaviour.
+kb/spread-tests.md; only running spread proves runtime behavior.
 
 Usage:
   check-test.py <slices/pkg.yaml> [<task.yaml>]

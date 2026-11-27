@@ -1,7 +1,7 @@
 name: app-config
 title: App config
 version: "1.0"
-summary: A chiselled rock shipping a generated JSON config.
+summary: A chiseled rock shipping a generated JSON config.
 description: |
   Ships /etc/app/config.json, minified at build time with jq.
 license: Apache-2.0

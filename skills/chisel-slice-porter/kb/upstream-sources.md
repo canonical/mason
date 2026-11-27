@@ -2,9 +2,9 @@
 
 The knowledge in these reference files is derived from three upstream projects. When in doubt, **always defer to these sources** over anything written here.
 
-## 1. `canonical/chisel` (tool behaviour)
+## 1. `canonical/chisel` (tool behavior)
 
-The Go source code defines what chisel actually does: how it parses package slices files, resolves dependencies, extracts files, runs mutate scripts, handles wildcards, and validates fields. The tool's behaviour is the ultimate arbiter of what is valid.
+The Go source code defines what chisel actually does: how it parses package slices files, resolves dependencies, extracts files, runs mutate scripts, handles wildcards, and validates fields. The tool's behavior is the ultimate arbiter of what is valid.
 
 - Repo: <https://github.com/canonical/chisel>
 - Key paths: `internal/setup/` (slices file parsing), `internal/slicer/` (slice cutting logic)
@@ -37,6 +37,6 @@ Also: chisel-releases navigator <https://canonical.github.io/chisel-releases-nav
 
 ## Precedence
 
-When sources conflict: **tool behaviour > chisel-docs > chisel-releases conventions > these reference files**.
+When sources conflict: **tool behavior > chisel-docs > chisel-releases conventions > these reference files**.
 
 When a reference file disagrees with the repo, trust the repo. When in doubt, read `slices/bash.yaml` or `slices/base-files.yaml` on the target release branch.

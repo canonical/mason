@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent forward-ports a library slice across a format boundary (ubuntu-24.04 v1 -> ubuntu-26.04 v3). Every check inspects the artefacts: chisel-releases/slices/libestr0.yaml, chisel-releases/tests/spread/integration/libestr0/task.yaml.",
+  "context": "Tests whether the agent forward-ports a library slice across a format boundary (ubuntu-24.04 v1 -> ubuntu-26.04 v3). Every check inspects the artifacts: chisel-releases/slices/libestr0.yaml, chisel-releases/tests/spread/integration/libestr0/task.yaml.",
   "type": "weighted_checklist",
   "checklist": [
     {

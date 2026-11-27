@@ -32,6 +32,6 @@ functional tests under `kb/spread-tests.md`; static references alone do not
 establish a working dependency closure.
 
 For package inspection, run `deb-list.py` from the target checkout for each
-required architecture. For Pro or custom archives, use an already authorised
+required architecture. For Pro or custom archives, use an already authorized
 archive setup. Do not infer absence from private archives using public archive
 evidence; apply `kb/verification.md` when inspection cannot complete.

@@ -4,7 +4,7 @@
 # dependencies = ["pyyaml"]
 # ///
 """rock-fallback-reported: when slices are missing and the rock goes
-unchiselled, the agent says so. na unless the case is such a fallback."""
+unchiseled, the agent says so. na unless the case is such a fallback."""
 from _lib import *
 
 _PHRASES = ("unchiselled", "unchiseled", "not chiselled", "not chiseled", "without chisel")

@@ -6,11 +6,11 @@
 """check-slice: deterministic static linter for chisel package slices files.
 
 Checks the mechanical conventions reviewers and CI enforce -- the rules that do
-NOT need judgement or a rootfs cut. Use it two ways:
+NOT need judgment or a rootfs cut. Use it two ways:
 
   - authoring: self-check a slices file while writing it (chisel-slicer).
   - review:    the deterministic first pass of a review (chisel-slice-reviewer),
-               so the agent only spends judgement on deps, tests, and design.
+               so the agent only spends judgment on deps, tests, and design.
 
 It does NOT replace `chisel cut` (installability) or spread tests
 (functionality). It only checks the slices file text. yamllint cosmetics (line
@@ -59,7 +59,7 @@ CODES = {
     "hint-unprintable": "hint: must be one line of printable characters (parse error)",
     "hint-style": "validate-hints ci: sentence case, no leading article, no trailing punctuation, single spaces, letters, digits and . , ; ( ) only",
     "clutter": "a minimal rootfs ships no man pages, shell completions or doc metadata",
-    "doc-clutter": "ship only copyright, notice and licence files from /usr/share/doc",
+    "doc-clutter": "ship only copyright, notice and license files from /usr/share/doc",
     "relative-path": "content paths must be absolute",
     "generate-value": "generate: takes only the value manifest (parse error)",
     "generate-path": "a generate: path ends in /** and holds no other wildcard (parse error)",
