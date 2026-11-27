@@ -54,7 +54,7 @@
     },
     {
       "name": "Report sections present",
-      "description": "`review-report.md` is organised into at least two severity-labelled sections (e.g. blocking, should-fix, or nits)",
+      "description": "`review-report.md` is organized into at least two severity-labeled sections (e.g. blocking, should-fix, or nits)",
       "max_score": 8
     },
     {

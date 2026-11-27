@@ -458,7 +458,7 @@ def test_orientation_release_discovery() -> None:
         assert doc["chisel-releases"]["manifest format"] == "v3", out
         assert doc["tools"]["git"]["present"] is True, out
         assert doc["status"] == "passed", out
-        # every branch is listed, formats normalised, and one whose end-of-life
+        # every branch is listed, formats normalized, and one whose end-of-life
         # has passed says so rather than going missing.
         assert doc["releases"]["40.04"]["chisel-releases"] == {
             "branch": "ubuntu-40.04",
@@ -770,7 +770,7 @@ def test_check_diff_arch_limited_path_moved(
         ),
         pytest.param("", " {until: mutate}", True, id="until-mutate-added"),
         pytest.param(" {arch: [amd64]}", "", False, id="arch-lifted"),
-        pytest.param(" {arch: amd64}", " {arch: [amd64]}", False, id="arch-respelt"),
+        pytest.param(" {arch: amd64}", " {arch: [amd64]}", False, id="arch-respelled"),
         pytest.param(" {until: mutate}", " {until: mutate}", False, id="until-kept"),
         pytest.param(" {until: mutate}", "", False, id="until-lifted"),
         pytest.param("", ' {until: ""}', False, id="until-empty"),

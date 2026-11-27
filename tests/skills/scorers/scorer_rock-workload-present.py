@@ -4,7 +4,7 @@
 # dependencies = ["pyyaml"]
 # ///
 """rock-workload-present: the rock carries the workload. each expected slice
-(chiselled) or deb (unchiselled) is staged; na when the case names none (a
+(chiseled) or deb (unchiseled) is staged; na when the case names none (a
 source build, whose workload is its part)."""
 from _lib import *
 
