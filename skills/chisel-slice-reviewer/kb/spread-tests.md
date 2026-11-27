@@ -34,9 +34,8 @@ Every authored package, including pure-library and data-only packages, gets a
 `tests/spread/integration/<pkg>/task.yaml`. Test depth depends on the contents:
 
 - **Libraries:** check that the selected shared objects exist and are valid ELF.
-- **Data:** cut with a consumer slice and assert that it uses the shipped data
-  (for example, a TLS client verifying against the CA bundle). File existence
-  alone does not establish that the data works.
+- **Data:** cut with a consumer slice and assert that the consumer uses the
+  shipped data. File existence alone does not establish that the data works.
 - **Simple utilities:** test a representative operation as well as a version or
   usage invocation.
 - **Applications and runtimes:** cover the selected functional areas. Use the
@@ -61,9 +60,9 @@ Sliced rootfs is minimal. Tests that need more than bare files must set up the c
 - **Isolate slice installation sets.** Start with a fresh rootfs for each independently tested slice or intentional consumer combination. Several assertions may share that rootfs if they do not rely on state from earlier assertions. Start afresh when adding slices or when mutated state could hide a missing dependency.
 - **Exercise binaries meaningfully.** Cover each binary where practical; representative tests are appropriate for alternatives, multi-call binaries and large suites when the report explains the coverage choice. A binary that cannot be driven fully can still get a linker-resolves skeleton -- run it and assert its own usage/error text, e.g. `chroot "$rootfs" /usr/lib/foo/helper 2>&1 | grep -Fiq "usage"`. A binary name appearing in a file is not an execution check.
 - **Untestable means unshippable.** Reviewers push to drop rather than ship untested slices. For data-only slices the consumer pattern is the test -- "no binaries" never means "no test".
-- **The slice brings its own dependencies.** A test may add only what the test itself needs: DNS, `/dev/null`, fixture inputs, a shell for its own command lines, or the consumer a data slice is tested through. Whatever the shipped files need when they run -- the interpreter in a script's shebang, the tools a script calls, libraries, `/bin`, files the package's maintainer scripts would generate -- must come from the slice's essentials or a mutate. An extra slice in `install-slices`, or a file copied, linked or written into the rootfs to make a shipped file work, is a missing dependency hidden by the test: fix the slices file, not the test. A fixture is input the test feeds to a shipped file (a log to rotate, data to hash), never a file the package itself ships or its maintainer scripts generate, such as `/etc/passwd` built from shipped masters. Check every extra slice and every write into the rootfs against this.
+- **The slice brings its own dependencies.** A test may add only what the test itself needs: the chroot setup in the patterns table above, inputs for the shipped files to act on, and the consumer a data slice is tested through. Whatever the shipped files need when they run -- interpreters, the programs and libraries they call, the paths they expect, and files the package's maintainer scripts would create -- must come from the slice's essentials or a mutate. An extra slice in `install-slices`, or a file copied, linked or written into the rootfs so that a shipped file works, is a missing dependency hidden by the test: fix the slices file, not the test. A test input is never a file the package ships or would create itself. Check every extra slice and every write into the rootfs against this.
 - **Set up the chroot before weakening a test.** If a chroot command fails on missing `/dev/null`, `/bin/sh`, or DNS, fix the environment per the chroot patterns table above -- do not retreat to file-existence checks.
-- **Hermetic by default.** Generate inputs (secrets, digests, fixtures) inline; never apt-install extras into the test env. Exception: when the package's function IS the network path (CA bundles, TLS/http clients), hitting one stable well-known endpoint (e.g. `https://example.com`) is accepted upstream -- copy `resolv.conf` in per the chroot patterns table.
+- **Hermetic by default.** Generate inputs (secrets, digests, fixtures) inline; never apt-install extras into the test env. Exception: when the package's function IS the network path, hitting one stable well-known endpoint is accepted upstream -- copy `resolv.conf` in per the chroot patterns table.
 
 ## Test hygiene
 
