@@ -866,6 +866,11 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
         ("slices/foo.yaml", "bins", "removed")
     ], doc
 
+    # a new slices file not yet added to git is still a change in the worktree
+    (tmp_path / "slices" / "bar.yaml").write_text(SPLIT_BASE, encoding="utf-8")
+    doc = check_diff()
+    assert doc["changed"] == ["slices/foo.yaml", "slices/bar.yaml"], doc
+
 
 def test_scaffold_test() -> None:
     with tempfile.TemporaryDirectory() as td:
