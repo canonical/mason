@@ -68,7 +68,7 @@ or local dir, and a tag if not the latest release); the **release** (default:
 orientation's `default rock base`; a release the user names must be one
 rockcraft takes as a base); **service or CLI** -- for a service, its
 foreground command line, absolute binary first (e.g.
-`/usr/sbin/nginx -g 'daemon off;'`).
+`/usr/bin/redis-server --protected-mode no`).
 
 ## 3. start the file
 
@@ -88,8 +88,8 @@ init offers it, so that it does not start one.
 ## 4. packages
 
 ```bash
-uv run "<skill-root>/scripts/rock-packages.py" hello --release 24.04
-uv run "<skill-root>/scripts/rock-packages.py" git --ppa git-core/ppa --release 24.04
+uv run "<skill-root>/scripts/rock-packages.py" xxd --release 24.04
+uv run "<skill-root>/scripts/rock-packages.py" python3.13 --ppa deadsnakes/ppa --release 24.04
 ```
 
 Run it for every Ubuntu package the rock stages: the workload from the archive
