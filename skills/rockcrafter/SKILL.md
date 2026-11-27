@@ -1,8 +1,8 @@
 ---
 name: rockcrafter
 description: >-
-  Builds and fixes rocks (OCI images) with rockcraft and chisel. Starts a
-  rockcraft.yaml with `rockcraft init`, then fills in, checks, packs and tests
+  Builds and fixes rocks (OCI images) with rockcraft and chisel. Drafts a
+  rockcraft.yaml from `rockcraft init`, then fills in, checks, packs and tests
   it, from Ubuntu archive or PPA packages, or from a project built from source
   (Go, Rust, Python, Node, Java, C/C++, rockcraft framework extensions), with
   spread tests run by `rockcraft test`.
@@ -16,7 +16,7 @@ description: >-
 
 Build [rocks](https://ubuntu.com/containers/rockcraft/docs) in the user's
 project, and fix the ones that fail to pack or fail their tests. **Do the work
-yourself** -- do not hand the task to a subagent (the slice hand-over in step 4
+yourself** -- do not hand the task to a subagent (the slice hand-over in step 3
 is the one exception).
 
 ## roots and boundaries
@@ -70,22 +70,7 @@ rockcraft takes as a base); **service or CLI** -- for a service, its
 foreground command line, absolute binary first (e.g.
 `/usr/sbin/nginx -g 'daemon off;'`).
 
-## 3. start the file
-
-```bash
-rockcraft init --name <rock-name>                         # any rock
-rockcraft init --name <rock-name> --profile <profile>     # a framework application
-```
-
-Rockcraft writes the first `rockcraft.yaml`; never write one from scratch.
-`rockcraft init --help` lists the profiles and options of the installed
-version. Use a framework profile when the project is an application its
-extension supports (`kb/rock-upstream-sources.md`), else the default. Init
-does not overwrite, so first remove a `rockcraft.yaml` the user asked to
-replace. In a project that is not a git repository, pass `--vcs none` when
-init offers it, so that it does not start one.
-
-## 4. packages
+## 3. packages
 
 ```bash
 uv run "<skill-root>/scripts/rock-packages.py" hello --release 24.04
@@ -112,17 +97,41 @@ versions, executables and slice names from its report, never from memory. A
   cannot push, keep the local source and report the push as remaining. If
   authoring fails, go unchiseled and say why.
 
+## 4. start the file
+
+Pick the profile: `rockcraft init -h` lists the installed version's, and the
+docs describe each (`kb/rock-upstream-sources.md`). Use a framework profile
+when the project is an application its extension supports, else `simple`.
+Then draft:
+
+```bash
+uv run "<skill-root>/scripts/draft-rock.py" --name hello --package hello --release 24.04
+uv run "<skill-root>/scripts/draft-rock.py" --name git --package git --ppa git-core/ppa --release 24.04
+uv run "<skill-root>/scripts/draft-rock.py" --name yq --source https://github.com/mikefarah/yq \
+  --plugin go --source-tag v4.44.3 --slice base-files_base --slice ca-certificates_data --release 24.04
+uv run "<skill-root>/scripts/draft-rock.py" --name app --profile flask-framework --release 24.04
+```
+
+It runs `rockcraft init`, fills in only what you pass and has rockcraft
+validate the result; never write `rockcraft.yaml` from scratch. Its report
+names the schema the installed rockcraft ships (`schema`): read the structure
+of anything you add or change there. Add `--service "<command>"` for a service
+and `--unchiseled` when the user chose it. A source build takes its plugin from
+upstream's reference (`kb/rock-upstream-sources.md`), pinned to the tag the
+user named, else the newest release tag, and its runtime slices from
+`kb/rock-slices.md`. A `rejected` finding is rockcraft's own complaint: correct
+the option it names. To replace a `rockcraft.yaml` the user asked to replace,
+pass `--force`.
+
 ## 5. fill in
 
-Edit the file init wrote: keep its structure, replace every placeholder (the
-summary, the description, the sample part) and add only what the rock needs.
+Edit the draft: keep its structure, settle everything under its `review`, and
+add only what the rock needs.
 Read `kb/rockcraft-yaml.md` for keys, parts, the version and services,
 `kb/rock-slices.md` for the base and what to stage, and `kb/hardening.md` for
-the non-root user and what the rock ships. A source build
-takes its plugin and that plugin's keys from upstream's reference
-(`kb/rock-upstream-sources.md`), pinned to the tag the user named, else the
-newest release tag. A service also needs its config files, its writable dirs
-and a non-privileged port.
+the non-root user and what the rock ships. A source build takes its plugin's
+other keys from upstream's reference. A service also needs its config files,
+its writable dirs and a non-privileged port.
 
 ## 6. check and pack
 
