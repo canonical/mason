@@ -57,17 +57,23 @@ sandboxes:
     steps:
       driver: docker
       egress: ~
-    # the rock skills pack with rockcraft and test with `rockcraft test`, which
-    # both run lxd instances: a system container with nesting (no kvm needed,
-    # so it runs on a github runner) holding snapd, lxd and rockcraft. open
-    # egress -- rockcraft's own instances need the archive, the snap store and
-    # the sources they build, and no rock task has an answer to hide.
+    # the rock skills pack with rockcraft and test with `rockcraft test`: a
+    # system container (no kvm needed, so it runs on a github runner) holding
+    # snapd, lxd and rockcraft. a pack runs in an lxd container nested in it,
+    # the tests on the sandbox itself (README.md has how). open egress --
+    # rockcraft's own instances need the archive, the snap store and the
+    # sources they build, and no rock task has an answer to hide.
     rock-lxd:
       driver: lxd
+      base: ubuntu:24.04 # the system `rockcraft init` tests on, which provision checks
       provision: provision --rock
       egress: ~
-      config:
-        security.nesting: "true"
+      nested: containers
+      # no kvm in a container: with CI set, `rockcraft test` runs the tests on
+      # the sandbox itself, as on a ci runner, and sets up root's login to it.
+      env:
+        CI: "1"
+      sudo: true
       limits:
         cpu: 2
         memory: 6GiB
