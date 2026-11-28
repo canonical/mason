@@ -1,0 +1,9 @@
+# back port: 26.04's slice depends on fine-grained coreutils and dpkg slices
+# that 24.04 doesn't have.
+# key.yaml holds the adaptations the port must make. the target's own slice
+# (knocked out) is supporting evidence only.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-24.04 --source ubuntu-26.04 --knockout debianutils
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

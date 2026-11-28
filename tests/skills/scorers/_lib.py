@@ -48,11 +48,13 @@ __all__ = [
     "SLICE",
     "TASK",
     "avg",
+    "calls",
     "case",
     "content_paths",
     "declared_binaries",
     "emit",
     "expected",
+    "final_text",
     "fmt",
     "fmt_compat",
     "has_slices",
@@ -64,6 +66,8 @@ __all__ = [
     "parts",
     "path_penalty",
     "produced",
+    "raw_text",
+    "review_key",
     "rock",
     "rock_file",
     "slices_used",
@@ -228,12 +232,13 @@ def path_penalty(matches: Callable[[str], bool], allow: Callable[[str, Any], boo
 
 # --- transcript parsing ------------------------------------------------------
 # shared by scorers that read the agent's event stream rather than its files.
-# scorer_orientation-called.py and scorer_chisel-cut.py predate this helper and
-# carry their own copies of the same format detection.
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _WRITE_TOOLS = {"write", "edit", "multiedit", "notebookedit", "patch"}
 _PATH_KEYS = ("file_path", "filePath", "path", "notebook_path")
+_PI_EVENTS = {"session", "agent_start", "turn_start", "message_start", "message_update", "message_end",
+              "turn_end", "agent_end", "agent_settled", "tool_execution_start", "tool_execution_update",
+              "tool_execution_end"}
 
 
 def _jsonl(path: Path):
@@ -251,8 +256,147 @@ def _jsonl(path: Path):
             continue
 
 
+def _text_of(content: Any) -> str:
+    if isinstance(content, list):
+        return " ".join(str(b.get("text", "")) for b in content if isinstance(b, dict))
+    return str(content or "")
+
+
+def calls() -> dict:
+    """the agent's tool calls and text from stdout.log, in order, any harness.
+
+        calls   one dict per tool call: tool (lowercased name), input (dict),
+                command (bash command or ""), output (str), error (bool),
+                done (a result came back), paths (files a write/edit-style
+                call touched)
+        texts   assistant-visible text, not tool results
+        parsed  False when no known format matched (only stderr/raw left)
+
+    formats: claude stream-json, opencode --format json, codex --json, pi
+    --mode json.
+    """
+    out: list[dict] = []
+    texts: list[str] = []
+    by_id: dict[str, dict] = {}
+    parsed = False
+
+    def add(tool: str, inp: Any, cid: Any = None, output: str = "", error: bool = False, done: bool = True) -> dict:
+        inp = inp if isinstance(inp, dict) else {}
+        tool = str(tool or "").lower()
+        c = {
+            "tool": tool,
+            "input": inp,
+            "command": str(inp.get("command", "")) if tool in ("bash", "shell") or "command" in inp else "",
+            "output": output,
+            "error": error,
+            "done": done,
+            "paths": [str(inp[k]) for k in _PATH_KEYS if k in inp] if tool in _WRITE_TOOLS else [],
+        }
+        out.append(c)
+        if cid is not None:
+            by_id[str(cid)] = c
+        return c
+
+    for ev in _jsonl(OUT / "stdout.log"):
+        t = ev.get("type")
+        # codex: {"type": "item.completed", "item": {...}}. item.started would double-count.
+        item = ev.get("item")
+        if isinstance(item, dict) and str(t or "").startswith("item."):
+            parsed = True
+            if t != "item.completed":
+                continue
+            kind = item.get("type")
+            if kind == "agent_message":
+                texts.append(str(item.get("text", "")))
+            elif kind == "command_execution":
+                add("bash", {"command": item.get("command", "")}, output=str(item.get("aggregated_output") or ""),
+                    error=item.get("exit_code") not in (0, None))
+            elif kind == "file_change":
+                c = add("patch", {})
+                c["paths"] = [str(ch["path"]) for ch in item.get("changes") or [] if isinstance(ch, dict) and ch.get("path")]
+            continue
+        # opencode: a tool_use event carries input and result together.
+        part = ev.get("part")
+        if isinstance(part, dict):
+            parsed = True
+            if t == "text":
+                texts.append(str(part.get("text", "")))
+            elif t == "tool_use":
+                st = part.get("state") or {}
+                add(part.get("tool", ""), st.get("input"), output=str(st.get("output") or st.get("error") or ""),
+                    error=st.get("status") == "error")
+            continue
+        # pi: calls and results as their own events, text on the finished message.
+        if t in _PI_EVENTS and "session_id" not in ev:
+            parsed = True
+            if t == "tool_execution_start":
+                add(ev.get("toolName", ""), ev.get("args"), ev.get("toolCallId"), done=False)
+            elif t == "tool_execution_end":
+                c = by_id.get(str(ev.get("toolCallId")))
+                if c is not None:
+                    r = ev.get("result")
+                    c["output"] = _text_of(r.get("content")) if isinstance(r, dict) else str(r or "")
+                    c["error"] = bool(ev.get("isError"))
+                    c["done"] = True
+            elif t == "message_end":
+                m = ev.get("message") or {}
+                if m.get("role") == "assistant":
+                    texts.extend(str(c.get("text", "")) for c in m.get("content") or []
+                                 if isinstance(c, dict) and c.get("type") == "text")
+            continue
+        # claude: tool_use on assistant messages, tool_result on user messages.
+        if "message" in ev or "session_id" in ev:
+            parsed = True
+        msg = ev.get("message")
+        if not isinstance(msg, dict):
+            continue
+        for c in msg.get("content") or []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") == "text" and msg.get("role") == "assistant":
+                texts.append(str(c.get("text", "")))
+            elif c.get("type") == "tool_use":
+                add(c.get("name", ""), c.get("input"), c.get("id"), done=False)
+            elif c.get("type") == "tool_result":
+                r = by_id.get(str(c.get("tool_use_id")))
+                if r is not None:
+                    r["output"] = _text_of(c.get("content"))
+                    r["error"] = bool(c.get("is_error"))
+                    r["done"] = True
+    return {"calls": out, "texts": texts, "parsed": parsed}
+
+
+def raw_text() -> str:
+    """ansi-stripped stdout + stderr, for the plain-text fallback."""
+    chunks = []
+    for name in ("stdout.log", "stderr.log"):
+        p = OUT / name
+        if p.exists():
+            chunks.append(_ANSI.sub("", p.read_text(encoding="utf-8", errors="replace")))
+    return "\n".join(chunks)
+
+
+def final_text() -> str:
+    """the agent's last non-empty message: the answer an autonomous run ends on."""
+    c = calls()
+    texts = [t for t in c["texts"] if t.strip()]
+    if texts:
+        return texts[-1]
+    if not c["parsed"]:
+        return raw_text()
+    return ""
+
+
+def review_key() -> dict:
+    """the reviewer task's key.yaml: expected verdict and seeded defects."""
+    p = Path(os.environ.get("PATS_SCORED_TASK_DIR", "")) / "key.yaml"
+    if not p.is_file():
+        raise NA
+    return yaml.safe_load(p.read_text()) or {}
+
+
 def transcript() -> dict:
-    """parse the run transcript (stdout.log) into what the agent said and did.
+    """what the agent said and did, flattened (see calls() for the ordered form).
 
         texts     assistant-visible output text (NOT tool results -- a scorer
                   grepping for skill phrases must not match the skill file the
@@ -262,80 +406,14 @@ def transcript() -> dict:
         parsed    True when a structured format matched; False -> plain-text
                   fallback, only `raw` is meaningful
         raw       ansi-stripped stdout+stderr, all formats
-
-    formats tried in order: claude stream-json (lines carry "message" /
-    "session_id"), opencode --format json (lines carry a "part" object), codex
-    (lines are item.started/item.completed carrying an "item" object).
     """
-    texts: list[str] = []
-    commands: list[str] = []
-    writes: list[str] = []
-    saw_claude = saw_oc = saw_codex = False
-
-    for ev in _jsonl(OUT / "stdout.log"):
-        # codex: {"type": "item.completed", "item": {"type": ..., ...}}. only
-        # the completed events carry a result; item.started would double-count.
-        item = ev.get("item")
-        if isinstance(item, dict) and str(ev.get("type", "")).startswith("item."):
-            saw_codex = True
-            if ev.get("type") == "item.completed":
-                kind = item.get("type")
-                if kind == "agent_message":
-                    texts.append(str(item.get("text", "")))
-                elif kind == "command_execution":
-                    commands.append(str(item.get("command", "")))
-                elif kind == "file_change":
-                    for ch in item.get("changes") or []:
-                        if isinstance(ch, dict) and ch.get("path"):
-                            writes.append(str(ch["path"]))
-            continue
-
-        if "message" in ev or "session_id" in ev:
-            saw_claude = True
-        msg = ev.get("message")
-        if not isinstance(msg, dict):
-            msg = {}
-        for c in (msg.get("content") or []):
-            if not isinstance(c, dict):
-                continue
-            if c.get("type") == "text" and msg.get("role") == "assistant":
-                texts.append(str(c.get("text", "")))
-            elif c.get("type") == "tool_use":
-                inp = c.get("input") or {}
-                name = str(c.get("name", "")).lower()
-                if name == "bash":
-                    commands.append(str(inp.get("command", "")))
-                elif name in _WRITE_TOOLS:
-                    writes.extend(str(inp[k]) for k in _PATH_KEYS if k in inp)
-
-        part = ev.get("part")
-        if not isinstance(part, dict):
-            continue
-        saw_oc = True
-        if ev.get("type") == "text":
-            texts.append(str(part.get("text", "")))
-        elif ev.get("type") == "tool_use":
-            state = part.get("state") or {}
-            inp = state.get("input") or {}
-            tool = str(part.get("tool", "")).lower()
-            if "command" in inp:
-                commands.append(str(inp.get("command", "")))
-            elif tool in _WRITE_TOOLS:
-                # NOTE: gate on the tool name only -- a bare path-key check
-                # counted opencode reads (read has file_path too) as writes.
-                writes.extend(str(inp[k]) for k in _PATH_KEYS if k in inp)
-
-    chunks = []
-    for name in ("stdout.log", "stderr.log"):
-        p = OUT / name
-        if p.exists():
-            chunks.append(_ANSI.sub("", p.read_text(encoding="utf-8", errors="replace")))
+    c = calls()
     return {
-        "texts": texts,
-        "commands": commands,
-        "writes": writes,
-        "parsed": saw_claude or saw_oc or saw_codex,
-        "raw": "\n".join(chunks),
+        "texts": c["texts"],
+        "commands": [x["command"] for x in c["calls"] if x["command"]],
+        "writes": [p for x in c["calls"] for p in x["paths"]],
+        "parsed": c["parsed"],
+        "raw": raw_text(),
     }
 
 

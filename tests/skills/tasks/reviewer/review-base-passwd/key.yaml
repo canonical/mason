@@ -1,0 +1,10 @@
+verdict: request-changes
+defects:
+  - id: no-etc-passwd
+    severity: blocking
+    what: the data slice ships only passwd.master and group.master, so /etc/passwd and /etc/group never exist in a chisel rootfs. consumers such as cron and passwd depend on base-passwd_data for the system accounts. the spread test hides it by copying the masters into /etc itself. upstream writes the two files with a mutate from the masters
+    locators: [/etc/passwd, /etc/group]
+  - id: dangling-libdebconfclient0
+    severity: blocking
+    what: bins depends on libdebconfclient0_libs, but ubuntu-24.04 has no libdebconfclient0 slices file, so the release no longer loads and every chisel cut fails
+    locators: [libdebconfclient0]

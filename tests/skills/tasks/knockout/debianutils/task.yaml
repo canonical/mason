@@ -1,0 +1,7 @@
+# hard: a dozen small script slices with fine-grained deps on coreutils and
+# friends, a `which` alternative, and consumers that depend on debianutils_which.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --knockout debianutils
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

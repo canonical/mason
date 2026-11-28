@@ -1,0 +1,9 @@
+# upstream unchanged, but its etc slice has no test and no consumer in the
+# spread test: the kb says reviewers push to drop rather than ship untested
+# slices. the rare name etc (not config) wants a reason too.
+verdict: request-changes
+defects:
+  - id: untested-etc-slice
+    severity: should-fix
+    what: the etc slice (/etc/libnl-3/classid, pktloc) is not exercised by the spread test; test it through a consumer or drop it
+    locators: [etc]

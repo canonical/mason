@@ -1,0 +1,6 @@
+# 24.04's debianutils 5.17 ships every program 26.04's slice names (shells.d/
+# too, as an empty dir). nine of the source's dependencies name slices 24.04
+# doesn't define.
+present: [/usr/bin/ischroot, /usr/bin/run-parts, /usr/bin/savelog, /usr/bin/tempfile, /usr/bin/which.debianutils, /usr/sbin/add-shell, /usr/sbin/remove-shell, /usr/sbin/update-shells, /usr/share/debianutils/shells]
+essential: [libc6_libs, dash_bins]
+absent-essential: [coreutils_cat, coreutils_chgrp, coreutils_ln-bin, coreutils_ls-bin, coreutils_mv-bin, coreutils_realpath, coreutils_rm-bin, coreutils_sync, dpkg_realpath]

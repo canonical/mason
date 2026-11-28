@@ -1,0 +1,6 @@
+# 26.04's libssl3t64 lost ossl-modules/legacy.so (now openssl-provider-legacy)
+# and gained libzstd1 and zlib1g dependencies. grouping (a separate libcrypto
+# slice or not) is the porter's call.
+present: [/usr/lib/*-linux-*/libssl.so.*, /usr/lib/*-linux-*/libcrypto.so.*, /usr/lib/*-linux-*/engines-3/afalg.so, /usr/lib/*-linux-*/engines-3/loader_attic.so]
+absent: [/usr/lib/*-linux-*/ossl-modules/legacy.so]
+essential: [libc6_libs, libzstd1_libs, zlib1g_libs]

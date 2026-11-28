@@ -1,0 +1,6 @@
+verdict: request-changes
+defects:
+  - id: bins-deps
+    severity: blocking
+    what: update-ca-certificates is a /bin/sh script that runs coreutils, find and sed, and the bins slice pulls only openssl_bins and the data slice, so it fails in a chisel rootfs. the spread test hides it by installing dash, coreutils, findutils, sed and base-files beside the slice
+    locators: [update-ca-certificates, coreutils]

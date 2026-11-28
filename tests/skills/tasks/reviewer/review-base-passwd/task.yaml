@@ -1,0 +1,6 @@
+# natural-defect review: a cheap writer's slices file and spread test from the
+# base-passwd knockout, unedited. review-base-passwd/key.yaml lists the defects.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-24.04 --review base-passwd
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

@@ -1,0 +1,6 @@
+# natural-defect review: a cheap writer's 24.04 -> 26.04 port of libssl3t64,
+# slices file and spread test, unedited. review-libssl3t64/key.yaml lists the defects.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --review libssl3t64
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

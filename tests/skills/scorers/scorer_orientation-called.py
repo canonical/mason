@@ -5,125 +5,46 @@
 # ///
 """orientation-called: did the agent run scripts/orientation.py before anything else?
 
-reads the run transcript and checks for orientation's own output lines
-(ORIENTATION_MARKERS in _lib), the same way scorer_chisel-cut.py does. four
-transcript formats, tried in order (see that scorer's docstring):
-claude stream-json, opencode --format json, codex jsonl, plain text.
-  0.0  orientation never ran (no invocation attempt found)
-  0.5  invocation attempted but failed (e.g. wrong path -- no success marker)
-  1.0  ran successfully, before the first write to a slice file
-"""
-import json
-import re
+  0.0   orientation never ran (no bash command naming it)
+  0.5   a command ran it but none printed orientation's output (e.g. wrong path)
+  0.75  it ran, but only after the agent first wrote a slices file
+  1.0   it ran, before any write to a slices file
 
+reading the skill (which names the script) is not an attempt: only commands
+count, and only their own output counts as success. old plain-text transcripts
+fall back to a scan of the raw log.
+"""
 from _lib import *
 
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _SUCCESS_MARKERS = ORIENTATION_MARKERS
-_ATTEMPT_MARKERS = ("orientation",)
 
 
-def _jsonl(path):
-    """yield parsed json objects from a jsonl file, skipping non-json lines."""
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            continue
+def _writes_slice(c: dict) -> bool:
+    return any("slices/" in p for p in c["paths"])
 
 
-def _claude_events():
-    """yield the bash commands + tool outputs from claude stream-json in
-    stdout.log. None if no claude-shaped events (claude lines carry
-    "message"/"session_id"; opencode's json uses "sessionID" + "part")."""
-    events = []
-    saw_claude = False
-    for ev in _jsonl(OUT / "stdout.log"):
-        if "message" in ev or "session_id" in ev:
-            saw_claude = True
-        msg = ev.get("message")
-        for c in ((msg if isinstance(msg, dict) else {}).get("content") or []):
-            if not isinstance(c, dict):
-                continue
-            if c.get("type") == "tool_use" and c.get("name") == "Bash":
-                events.append(str((c.get("input") or {}).get("command", "")))
-            elif c.get("type") == "tool_result":
-                cont = c.get("content")
-                text = " ".join(b.get("text", "") for b in cont if isinstance(b, dict)) if isinstance(cont, list) else str(cont or "")
-                events.append(text)
-    return events if saw_claude else None
-
-
-def _opencode_events():
-    """yield the bash commands + tool outputs + assistant/reasoning text from
-    opencode --format json events in stdout.log. None if no opencode-shaped
-    events (each carries a "part" object)."""
-    events = []
-    saw_oc = False
-    for ev in _jsonl(OUT / "stdout.log"):
-        part = ev.get("part")
-        if not isinstance(part, dict):
-            continue
-        saw_oc = True
-        if ev.get("type") == "tool_use":
-            state = part.get("state") or {}
-            events.append(str((state.get("input") or {}).get("command", "")))
-            events.append(str(state.get("output") or state.get("error") or ""))
-        elif ev.get("type") in ("text", "reasoning"):
-            events.append(str(part.get("text", "")))
-    return events if saw_oc else None
-
-
-def _codex_events():
-    """yield commands, their output, and assistant text from codex's jsonl
-    (item.started/item.completed wrapping an "item"). None if not codex."""
-    events = []
-    saw_codex = False
-    for ev in _jsonl(OUT / "stdout.log"):
-        item = ev.get("item")
-        if not isinstance(item, dict) or not str(ev.get("type", "")).startswith("item."):
-            continue
-        saw_codex = True
-        if ev.get("type") != "item.completed":
-            continue
-        kind = item.get("type")
-        if kind == "command_execution":
-            events.append(str(item.get("command", "")))
-            events.append(str(item.get("aggregated_output") or ""))
-        elif kind == "agent_message":
-            events.append(str(item.get("text", "")))
-    return events if saw_codex else None
-
-
-def _score_events(events) -> float:
-    joined = "\n".join(events)
-    if not any(m in joined for m in _ATTEMPT_MARKERS):
-        return 0.0
-    return 1.0 if any(m in joined for m in _SUCCESS_MARKERS) else 0.5
+def _score_calls(cs: list[dict]) -> float:
+    attempted = wrote = False
+    for c in cs:
+        if "orientation" in c["command"]:
+            attempted = True
+            if any(m in c["output"] for m in _SUCCESS_MARKERS):
+                return 0.75 if wrote else 1.0
+        if _writes_slice(c):
+            wrote = True
+    return 0.5 if attempted else 0.0
 
 
 def _score_text() -> float:
-    chunks = []
-    for name in ("stderr.log", "stdout.log"):
-        p = OUT / name
-        if p.exists():
-            chunks.append(_ANSI.sub("", p.read_text(encoding="utf-8", errors="replace")))
-    text = "\n".join(chunks)
-    if not any(m in text for m in _ATTEMPT_MARKERS):
+    text = raw_text()
+    if "orientation" not in text:
         return 0.0
     return 1.0 if any(m in text for m in _SUCCESS_MARKERS) else 0.5
 
 
 def score() -> float:
-    for events in (_claude_events(), _opencode_events(), _codex_events()):
-        if events is not None:
-            return _score_events(events)
-    return _score_text()
+    c = calls()
+    return _score_calls(c["calls"]) if c["parsed"] else _score_text()
 
 
 emit(score)

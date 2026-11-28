@@ -1,0 +1,40 @@
+summary: Integration tests for libssl3t64
+
+execute: |
+  # libssl3t64_libs: fresh rootfs so a missing dep can't hide behind another test.
+  rootfs="$(install-slices libssl3t64_libs)"
+
+  # The shared libraries must be present and valid ELF.
+  for lib in \
+    "$rootfs/usr/lib/x86_64-linux-gnu/libssl.so.3" \
+    "$rootfs/usr/lib/x86_64-linux-gnu/engines-3/afalg.so" \
+    "$rootfs/usr/lib/x86_64-linux-gnu/engines-3/loader_attic.so" \
+    "$rootfs/usr/lib/x86_64-linux-gnu/engines-3/padlock.so"
+  do
+    [ -f "$lib" ]
+    file "$lib" | grep -F "ELF"
+  done
+
+  # libssl.so.3 depends on libcrypto.so.3; check the slice's dependency graph
+  # supplies it. Without it the linker fails to resolve the SONAME.
+  printf '/usr/lib/x86_64-linux-gnu\n' > "$rootfs/etc/ld.so.conf"
+  ldconfig -r "$rootfs"
+
+  # libssl3t64_libcrypto: fresh rootfs so a missing dep can't hide behind another test.
+  rootfs="$(install-slices libssl3t64_libcrypto)"
+
+  # The shared library must be present and valid ELF, and its zlib/zstd
+  # dependencies must resolve from the slice's essential graph.
+  for lib in \
+    "$rootfs/usr/lib/x86_64-linux-gnu/libcrypto.so.3" \
+    "$rootfs/usr/lib/x86_64-linux-gnu/libz.so.1" \
+    "$rootfs/usr/lib/x86_64-linux-gnu/libzstd.so.1"
+  do
+    [ -f "$lib" ]
+    file "$lib" | grep -F "ELF"
+  done
+
+  # Functional check: libcrypto must compute a digest. Run it via the openssl
+  # consumer, which depends on libssl3t64_libs (and hence libcrypto).
+  rootfs="$(install-slices openssl_bins)"
+  echo "test" | chroot "$rootfs" openssl sha1 | grep -F "4e1243bd22c66e76c2ba9eddc1f91394e57f9f83"

@@ -1,0 +1,8 @@
+# forward port where 26.04 moved the awk helpers to /usr/libexec.
+# key.yaml holds the adaptations the port must make. the target's own slice
+# (knocked out) is supporting evidence only.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --source ubuntu-24.04 --knockout gawk
+collect: collect
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

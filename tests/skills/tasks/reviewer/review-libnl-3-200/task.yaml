@@ -1,0 +1,5 @@
+# natural defect: upstream unchanged, flagged by the kb. review-libnl-3-200/key.yaml lists it.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --review libnl-3-200
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

@@ -1,0 +1,5 @@
+# seeded-defect review: review-net-tools/key.yaml lists the defects and the expected verdict.
+prompt-cmd: prompt
+stage: stage --branch ubuntu-26.04 --review net-tools
+timeout: 20m
+step-sandbox: steps # the pats snap runs no host steps

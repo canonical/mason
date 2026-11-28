@@ -1,0 +1,25 @@
+summary: Integration tests for ca-certificates
+
+execute: |
+  # ca-certificates_data ships the generated CA bundle but not the individual
+  # certificates. Prove a TLS client trusts it by validating a live endpoint.
+  rootfs="$(install-slices ca-certificates_data openssl_bins)"
+  cp /etc/resolv.conf "${rootfs}/etc/"
+  mkdir -p "${rootfs}/dev"
+  touch "${rootfs}/dev/null"
+  test -s "${rootfs}/etc/ssl/certs/ca-certificates.crt"
+  chroot "${rootfs}" openssl s_client -connect example.com:443 \
+      -servername example.com -CAfile /etc/ssl/certs/ca-certificates.crt \
+      </dev/null 2>&1 | grep -Fiq "Verify return code: 0 (ok)"
+
+  # ca-certificates_data-with-certs keeps the individual Mozilla certificates
+  # and the /etc/ca-certificates.conf list, so update-ca-certificates (shipped by
+  # ca-certificates_bins) can regenerate the bundle and the per-CA PEM symlinks.
+  rootfs="$(install-slices ca-certificates_bins ca-certificates_data-with-certs \
+      base-files_bin base-files_tmp coreutils_bins dash_bins findutils_bins sed_bins)"
+  test -s "${rootfs}/etc/ca-certificates.conf"
+  grep -q '^mozilla/' "${rootfs}/etc/ca-certificates.conf"
+  test "$(find "${rootfs}/usr/share/ca-certificates/mozilla" -name '*.crt' | wc -l)" -gt 100
+  chroot "${rootfs}" /usr/sbin/update-ca-certificates
+  test -s "${rootfs}/etc/ssl/certs/ca-certificates.crt"
+  test "$(find "${rootfs}/etc/ssl/certs" -maxdepth 1 -name '*.pem' | wc -l)" -gt 100
