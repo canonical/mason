@@ -16,8 +16,7 @@ and [Chisel a rock](https://ubuntu.com/containers/rockcraft/docs/stable/how-to/c
   -- and the report says so.
 - One package without slices does not make the rock unchiseled. Keep
   `base: bare`, stage that package as a whole deb in a `plugin: nil` part of
-  its own, and leave every package that has slices in its sliced part. Stage
-  what the deb depends on as slices where those exist.
+  its own, and leave every package that has slices in its sliced part.
 - Packages from a PPA are always staged whole, on an `ubuntu@` base: chisel
   only reads the Ubuntu archive.
 - A part's `stage-packages` is all slices or all whole debs, never a mix; the
