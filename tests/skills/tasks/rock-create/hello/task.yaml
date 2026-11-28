@@ -3,7 +3,7 @@ prompt: |
 
   This is an automated eval: work autonomously and do not ask questions -- defaults are fine for anything not stated above. Write `rockcraft.yaml` and its tests in the current directory, pack the rock, run its tests, and stop with the final report.
 stage: stage --rock
-prepare: | # inside the sandbox, as root: lxd up before the agent (rockcraft's builds and tests)
+prepare: | # as root in the sandbox, before the agent starts: wait until snapd and lxd are up
   snap wait system seed.loaded
   lxd waitready --timeout=120
 collect: collect --rock

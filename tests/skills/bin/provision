@@ -29,7 +29,7 @@ chisel version
 
 if [ "${1:-}" = --rock ]; then
     apt-get update
-    apt-get install -y --no-install-recommends git snapd
+    apt-get install -y --no-install-recommends git openssh-server snapd sudo
     apt-get clean
     rm -rf /var/lib/apt/lists/*
     snap wait system seed.loaded
@@ -37,18 +37,15 @@ if [ "${1:-}" = --rock ]; then
     lxd waitready --timeout=120
     lxd init --auto
 
-    # three settings without which no rock packs here: rockcraft's build
+    # the agent drives lxd through its group. pats makes that user after this
+    # script, unless it is there.
+    id -u pats >/dev/null 2>&1 || useradd -m -s /bin/bash pats
+    usermod -aG lxd pats
+
+    # two settings without which no rock packs here: rockcraft's build
     # instances are lxd containers inside this lxd container. each works around
     # something upstream (tests/skills/README.md has the references).
     #
-    # the agent has no supplementary groups, so the lxd socket goes to its own
-    # group. pats makes that user after this script, unless it is there.
-    id -u pats >/dev/null 2>&1 || useradd -m -s /bin/bash pats
-    snap set lxd daemon.group=pats
-    systemctl stop snap.lxd.daemon.service snap.lxd.daemon.unix.socket
-    systemctl start snap.lxd.daemon.unix.socket
-    lxd waitready --timeout=120
-    [ "$(stat -c %G /var/snap/lxd/common/lxd/unix.socket)" = pats ]
     # a second-level container gets no apparmor namespace of its own, and snapd
     # dies loading a profile it may not load. with no apparmor in sight (both
     # paths: snap-confine asks the module) it runs without.
@@ -60,5 +57,40 @@ lxc.mount.entry = tmpfs sys/module/apparmor tmpfs ro,nosuid,nodev,noexec 0 0'
     # still held by this container's own user namespace.
     lxc profile set default security.privileged true
     snap install rockcraft --classic
-    rockcraft --version
+
+    # a snap here cannot write to a regular file it inherits as stdout or
+    # stderr, which is what an agent's shell hands every command: the output is
+    # lost and rockcraft exits 120. a wrapper ahead of /snap/bin on PATH puts
+    # pipes in between.
+    cat >/usr/local/bin/rockcraft <<'EOF'
+#!/bin/bash
+snap="/snap/bin/$(basename "$0")"
+if [ ! -f /proc/self/fd/1 ] && [ ! -f /proc/self/fd/2 ]; then
+    exec "$snap" "$@"
+fi
+set -o pipefail
+{ "$snap" "$@" 2>&1 >&3 3>&- | cat >&2 3>&-; } 3>&1 | cat
+EOF
+    chmod +x /usr/local/bin/rockcraft
+    cp /usr/local/bin/rockcraft /usr/local/bin/lxc
+    hash -r
+    rockcraft --version >/root/wrapped.out
+    [ -s /root/wrapped.out ]
+    lxc version >/root/wrapped.out
+    [ -s /root/wrapped.out ]
+    rm /root/wrapped.out
+
+    # the sandbox sets CI, and `rockcraft test` then runs the tests on this
+    # machine in place of a virtual machine: only those of a project that lists
+    # this machine's system. `rockcraft init` has to write such a project.
+    system="$(. /etc/os-release && echo "$ID-$VERSION_ID")"
+    canary="$(mktemp -d)"
+    (cd "$canary" && rockcraft init --profile=test --name canary >/dev/null)
+    if ! grep -q "^ *- $system:" "$canary/spread.yaml"; then
+        echo "provision: rockcraft init tests on another system than this sandbox's $system:" >&2
+        grep -A2 'systems:' "$canary/spread.yaml" >&2
+        echo "provision: set the base of rock-lxd in pats.yaml to that system" >&2
+        exit 1
+    fi
+    rm -rf "$canary"
 fi
