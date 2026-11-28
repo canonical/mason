@@ -9,10 +9,10 @@ task's outcome.
 Before spending a test run it checks the suite is real: a rockcraft-test.yaml
 (not only the deprecated spread.yaml), and no task still holding the scaffold's
 placeholder. Then it runs every task -- or only the given spread expressions --
-and reports the failed tasks, and the prepare / restore scripts that failed,
-with the error spread printed for them. Either is a defect of the rock or of
-its tests; tasks that never ran for another reason (no test VM, no network)
-are unavailable, not failed.
+and reports the failed tasks, the prepare / restore scripts that failed, and a
+suite spread could not load, with the error spread printed for them. Each is a
+defect of the rock or of its tests; tasks that never ran for another reason (no
+test VM, no network) are unavailable, not failed.
 
 Usage: test-rock.py [<spread-expression> ...]
   e.g. test-rock.py craft:ubuntu-24.04:spread/general/greeting
@@ -45,6 +45,13 @@ OFFLINE = re.compile(
     r"Could not resolve|Temporary failure in name resolution|Network is unreachable"
     r"|unable to contact snap store|[Cc]onnection timed out"
 )
+# what spread's project loader stops at, before any task runs, when
+# rockcraft-test.yaml, a suite's directory or a task.yaml is wrong.
+LOAD_ERROR = re.compile(
+    r"error: ((?:cannot (?:load|list) |invalid (?:project|backend|suite|task|variable) name"
+    r"|must define at least one |no systems specified for ).*"
+    r"|.* is missing a summary|.* refers to invalid system name.*)$"
+)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 CODES = {
@@ -53,6 +60,7 @@ CODES = {
     "placeholder": "a task still holds the scaffold's placeholder instead of real checks",
     "task-failed": "a spread task failed: the rock or its test is wrong",
     "setup-failed": "a prepare / restore script failed: tasks behind a failed prepare never ran",
+    "suite-invalid": "spread could not load the suite: rockcraft-test.yaml, a suite's directory or a task.yaml is wrong",
 }
 
 
@@ -118,6 +126,10 @@ def main() -> int:
         m = SUMMARY.search(ln)
         if m:
             counts[m.group(1).lower()] = int(m.group(2))
+    for ln in lines:
+        m = LOAD_ERROR.search(ln)
+        if m:
+            report.add("block", "suite-invalid", "rockcraft-test.yaml", output=m.group(1))
     for task, block in failures(lines).items():
         report.add("block", "task-failed", task, output=" | ".join(block) or None)
     for step in ("preparing", "restoring"):
