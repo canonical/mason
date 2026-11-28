@@ -14,7 +14,7 @@ pats score
 
 the rock suites (`rockcrafter-create`, `rockcrafter-debug`) run in the `rock-lxd`
 sandbox: an lxd system container with nesting, provisioned with real rockcraft,
-since packing and `rockcraft test` both start lxd instances. locally they need
+since packing starts lxd instances and the tests run docker. locally they need
 an lxd server (`lxc` remote); in ci the pats action sets lxd up on the runner
 and the `ci-rockcrafter` suite runs a subset of both, as each pair takes
 minutes. their steps run with `--rock` (`stage`, `collect`, `provision`); a
@@ -24,14 +24,11 @@ debug task's project lives in its `project/`, with spread tasks stored as
 ## the rock sandbox's workarounds
 
 rockcraft's build instances are lxd containers inside the sandbox, itself an
-lxd container. out of the box no rock packs there. `provision --rock` sets
-three things, each for a fault that is not ours to fix. drop one when its
-fault is gone.
+lxd container. out of the box no rock packs there and no test runs. four
+things are set for it, each for a fault that is not ours to fix: the first
+three by `provision --rock`, the last in `pats.yaml`. drop one when its fault
+is gone.
 
-- **the lxd socket belongs to the `pats` group** (`snap set lxd daemon.group=pats`).
-  pats starts the agent with a uid and a gid and no supplementary groups, so
-  adding the agent user to `lxd` reaches nothing
-  ([lczyk/pats#18](https://github.com/lczyk/pats/pull/18)).
 - **build instances see no apparmor** (two `lxc.mount.entry` lines on the inner
   lxd's default profile, over `/sys/kernel/security` and `/sys/module/apparmor`).
   a second-level container gets no apparmor namespace of its own, and snapd in
@@ -46,13 +43,26 @@ fault is gone.
   directory: /root/snap/rockcraft/<rev>: Permission denied`
   ([canonical/lxd#19608](https://github.com/canonical/lxd/issues/19608)). a
   privileged instance has no id map. it is still held by the sandbox's own user namespace.
+- **a snap's output goes through pipes** (a wrapper, `/usr/local/bin/rockcraft`
+  and `lxc`, ahead of `/snap/bin` on `PATH`). in this container a snap cannot
+  write to a regular file it inherits as stdout or stderr: the output is lost
+  and rockcraft exits 120. an agent's shell hands every command such a file.
+- **`rockcraft test` runs with `CI` set** (`env` on `rock-lxd`). its spread
+  backend boots an lxd virtual machine, and a container has no `/dev/kvm`
+  (`Instance type "virtual-machine" is not supported on this server`). with
+  `CI` set rockcraft takes its `ci` backend, the one a github workflow gets:
+  the tests run on the machine itself, over root's login to `localhost`. the
+  sandbox so has `sudo: true` and an ssh server, and a test's `docker` is the
+  sandbox's own.
 
-what to look for when one comes back: `rockcraft pack` fails with `LXD
-requires additional permissions` (the first), `Failed to enable snapd service`
-(the second) or the `Permission denied` above (the third).
+what to look for when one comes back: `rockcraft pack` fails with `Failed to
+enable snapd service` (the first) or the `Permission denied` above (the
+second), rockcraft exits 120 and prints nothing (the third), or spread aborts
+every task with `allocate must print ADDRESS=<SSH address>` (the fourth).
 
-`rockcraft test` does not run in this sandbox, and nothing here makes it: its
-spread backend boots an lxd virtual machine, and a container has no `/dev/kvm`
-(`Instance type "virtual-machine" is not supported on this server`). spread
-reports every task as aborted, `test-rock.py` reports the check unavailable,
-and `rock-tests-passed` tops out at 0.5.
+the `ci` backend runs only the tests of a project that lists the machine's own
+system (`ubuntu-24.04` under `systems:`), which is why `rock-lxd` has a `base`.
+`provision --rock` checks that `rockcraft init` writes that system, and fails
+the image build when it does not: set `base` to the system it names. a project
+listing only other systems fails its tests here with `nothing matches provider
+filter`, though a machine with kvm would run them.
