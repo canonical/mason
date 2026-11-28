@@ -200,6 +200,50 @@ def test_run_prepare_offline_is_unavailable(suite):
     assert ["network" in u["reason"] for u in doc["unavailable"]] == [True]
 
 
+# real rockcraft 1.21 output for a suite whose directory does not exist
+UNLOADED_SUITE_RUN = """\
+Running spread tests
+:: error: cannot list suite spread/hello/: open /workspace/spread/hello: no such file or directory
+Testing failed.
+Full execution log: '/root/.local/state/rockcraft/log/rockcraft-20261110-100000.000000.log'
+"""
+
+
+def test_run_suite_not_loaded_is_failed(suite):
+    code, doc = run(suite, UNLOADED_SUITE_RUN, 1)
+    assert (code, doc["status"]) == (1, "failed")
+    assert "unavailable" not in doc
+    finding = doc["findings"]["rockcraft-test.yaml"][0]
+    assert finding["code"] == "suite-invalid"
+    assert finding["output"].startswith("cannot list suite spread/hello/")
+
+
+# the messages spread's project loader ends with (spread/project.go)
+@pytest.mark.parametrize(
+    "message",
+    [
+        "cannot load spread/general/greeting/task.yaml: yaml: line 3: did not find expected key",
+        "cannot load project file from /workspace: yaml: unmarshal errors",
+        "suite spread/general/ is missing a summary",
+        'invalid suite name (must end with /): "spread/general"',
+        "must define at least one task suite",
+        'no systems specified for backend "craft"',
+        'suite spread/general/ refers to invalid system name: "ubuntu 24.04"',
+    ],
+)
+def test_run_load_errors_are_failed(suite, message):
+    code, doc = run(suite, f"Running spread tests\n:: error: {message}\nTesting failed.\n", 1)
+    assert (code, doc["status"]) == (1, "failed")
+    assert doc["findings"]["rockcraft-test.yaml"][0]["output"] == message
+
+
+def test_run_nothing_matched_is_unavailable(suite):
+    # the filter or the machine's system, not the suite's files
+    code, doc = run(suite, ":: error: nothing matches provider filter\nTesting failed.\n", 1)
+    assert (code, doc["status"]) == (3, "unavailable")
+    assert "findings" not in doc
+
+
 def test_run_no_verdict_is_unavailable(suite):
     code, doc = run(suite, "Failed to launch the test instance\n", 1)
     assert (code, doc["status"]) == (3, "unavailable")
