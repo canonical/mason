@@ -1,7 +1,7 @@
-skill behaviour tests using [`pats`](https://github.com/lczyk/pats) 1.0
+skill behavior tests using [`pats`](https://github.com/lczyk/pats) 1.3
 
 ```
-go install github.com/lczyk/pats/cmd/pats@v1.0.0
+go install github.com/lczyk/pats/cmd/pats@v1.3.1
 pats init     # builds and pins the sandbox image
 pats run
 pats score

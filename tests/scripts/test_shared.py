@@ -114,7 +114,7 @@ def test_dropping_an_entry_removes_the_copy() -> None:
 
 
 def test_a_leftover_whose_source_changed_too_is_not_seen() -> None:
-    """The known blind spot: a copy is recognised by matching a shared/ source
+    """The known blind spot: a copy is recognized by matching a shared/ source
     byte for byte, so one that moved in the same change that rewrote its source
     matches nothing and survives. Syncing after a plain retarget catches it."""
     with tempfile.TemporaryDirectory() as td:

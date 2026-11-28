@@ -1,6 +1,6 @@
 ---
 name: bug
-about: catch-all bug *except* for unexpected skill behaviour
+about: catch-all bug *except* for unexpected skill behavior
 title: "bug: "
 labels: bug
 ---

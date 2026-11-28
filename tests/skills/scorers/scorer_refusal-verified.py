@@ -13,7 +13,7 @@ existence check -- any of the routes seen in live runs counts:
   - apt-cache / apt-get / (r)madison
   - an archive index fetch (Packages.gz) or packages.ubuntu.com / launchpad
   - probing chisel-releases branches for slices/<pkg>.yaml (denied by the
-    sandbox, but the attempt is verification behaviour)
+    sandbox, but the attempt is verification behavior)
 
 binary: 1.0 if any check ran, 0.0 if none.
 """

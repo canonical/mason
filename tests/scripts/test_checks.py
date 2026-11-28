@@ -458,7 +458,7 @@ def test_orientation_release_discovery() -> None:
         assert doc["chisel-releases"]["manifest format"] == "v3", out
         assert doc["tools"]["git"]["present"] is True, out
         assert doc["status"] == "passed", out
-        # every branch is listed, formats normalised, and one whose end-of-life
+        # every branch is listed, formats normalized, and one whose end-of-life
         # has passed says so rather than going missing.
         assert doc["releases"]["40.04"]["chisel-releases"] == {
             "branch": "ubuntu-40.04",
@@ -770,7 +770,7 @@ def test_check_diff_arch_limited_path_moved(
         ),
         pytest.param("", " {until: mutate}", True, id="until-mutate-added"),
         pytest.param(" {arch: [amd64]}", "", False, id="arch-lifted"),
-        pytest.param(" {arch: amd64}", " {arch: [amd64]}", False, id="arch-respelt"),
+        pytest.param(" {arch: amd64}", " {arch: [amd64]}", False, id="arch-respelled"),
         pytest.param(" {until: mutate}", " {until: mutate}", False, id="until-kept"),
         pytest.param(" {until: mutate}", "", False, id="until-lifted"),
         pytest.param("", ' {until: ""}', False, id="until-empty"),
@@ -865,6 +865,26 @@ def test_check_diff_base_mode(tmp_path: Path) -> None:
     assert [(f["file"], f["slice"], f["code"]) for f in found(doc, "warn")] == [
         ("slices/foo.yaml", "bins", "removed")
     ], doc
+
+    # a new slices file not yet added to git is still a change in the worktree
+    (tmp_path / "slices" / "bar.yaml").write_text(SPLIT_BASE, encoding="utf-8")
+    doc = check_diff()
+    assert doc["changed"] == ["slices/foo.yaml", "slices/bar.yaml"], doc
+
+    # git refusing the worktree (dubious ownership) is unavailable, not a clean diff
+    shim = tmp_path.parent / f"{tmp_path.name}-bin"
+    shim.mkdir()
+    real = subprocess.run(
+        ["sh", "-c", "command -v git"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    (shim / "git").write_text(
+        f'#!/bin/sh\nfor a; do [ "$a" = ls-files ] && exit 128; done\nexec {real} "$@"\n',
+        encoding="utf-8",
+    )
+    (shim / "git").chmod(0o755)
+    env["PATH"] = f"{shim}:{env['PATH']}"
+    doc = check_diff()
+    assert doc["status"] == "unavailable", doc
 
 
 def test_scaffold_test() -> None:

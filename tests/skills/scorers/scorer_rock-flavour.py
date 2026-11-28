@@ -5,8 +5,10 @@
 # ///
 """rock-flavour: is the rock built the way the case expects?
 
-  chiselled    base: bare, build-base on the release, stage-packages all slices
-  unchiselled  base: ubuntu@<release>, the workload debs staged whole
+  chiselled       base: bare, build-base on the release, stage-packages all slices
+  part-chiselled  base: bare, build-base on the release, the workload debs
+                  staged whole (they have no slices)
+  unchiselled     base: ubuntu@<release>, the workload debs staged whole
 each condition is an equal share.
 """
 from _lib import *
@@ -26,6 +28,12 @@ def score() -> float:
             doc.get("base") == "bare",
             doc.get("build-base") == base,
             bool(sp) and all(SLICE.match(s) for s in sp),
+        ]
+    elif c["flavour"] == "part-chiselled":
+        checks = [
+            doc.get("base") == "bare",
+            doc.get("build-base") == base,
+            all(p in sp for p in c.get("workload", [])),
         ]
     else:
         checks = [doc.get("base") == base, all(p in sp for p in c.get("workload", []))]

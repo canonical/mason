@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent authors a multi-component chisel contribution for nmap on ubuntu-26.04 (v3 format). On this branch nmap's data files live in the separate nmap-common package, and three of nmap's Depends: -- nmap-common, liblinear4 and libpcap0.8t64 -- have no slice yet, so the dependency tree must be sliced leaves-first before nmap itself. nmap-common ships an upstream 3rd-party-licenses.txt.gz and a lot of doc clutter. Every check inspects artefacts under chisel-releases/.",
+  "context": "Tests whether the agent authors a multi-component chisel contribution for nmap on ubuntu-26.04 (v3 format). On this branch nmap's data files live in the separate nmap-common package, and three of nmap's Depends: -- nmap-common, liblinear4 and libpcap0.8t64 -- have no slice yet, so the dependency tree must be sliced leaves-first before nmap itself. nmap-common ships an upstream 3rd-party-licenses.txt.gz and a lot of doc clutter. Every check inspects artifacts under chisel-releases/.",
   "type": "weighted_checklist",
   "checklist": [
     {

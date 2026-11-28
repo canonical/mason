@@ -3,12 +3,12 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""shared: materialise shared/ into the skills that ask for it.
+"""shared: materialize shared/ into the skills that ask for it.
 
 Installers copy a skill directory verbatim and know nothing about siblings, so
 anything a skill needs has to live inside it. shared/ is the single source of
 truth for material used by more than one skill -- knowledge-base markdown and
-helper scripts alike -- and this script materialises it.
+helper scripts alike -- and this script materializes it.
 
 Everything is declared in .shared.yaml at the repo root: a `shared:` map keyed
 by skill, then by shared/-relative source, each entry naming where the copy
@@ -25,7 +25,7 @@ where its copies live and what they are called:
 A copy is byte-for-byte its source, carrying its mode, so nothing in a skill
 marks a file as synced. The manifest is the record of which files a skill owns
 and which it was given (`shared.py list` prints it). Being an exact duplicate
-is also how a copy is recognised, so no record of past writes is kept: a file
+is also how a copy is recognized, so no record of past writes is kept: a file
 inside a skill whose bytes match some shared/ file but which nothing declares
 is a leftover, and is removed. Drop an entry or point it somewhere else and the
 file at the old path goes away rather than lingering.

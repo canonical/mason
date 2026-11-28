@@ -12,11 +12,15 @@ and [Chisel a rock](https://ubuntu.com/containers/rockcraft/docs/stable/how-to/c
 - Prefer chiseled: `base: bare` with slices (`<pkg>_<slice>`) in
   `stage-packages`. List only the top-level slices the workload needs; their
   `essential:` slices come with them.
-- Unchiseled (an `ubuntu@` base with whole debs) only when the user chooses it,
-  or slices can't be authored -- and the report says so.
+- Unchiseled (an `ubuntu@` base with whole debs) only when the user chooses it
+  -- and the report says so.
+- One package without slices does not make the rock unchiseled. Keep
+  `base: bare`, stage that package as a whole deb in a `plugin: nil` part of
+  its own, and leave every package that has slices in its sliced part.
 - Packages from a PPA are always staged whole, on an `ubuntu@` base: chisel
   only reads the Ubuntu archive.
-- Don't mix slices and whole debs in one part's `stage-packages`.
+- A part's `stage-packages` is all slices or all whole debs, never a mix; the
+  parts of one rock may differ.
 
 ## Foundation slices
 

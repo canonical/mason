@@ -1,6 +1,6 @@
 {
   "name": "mason",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Agent kit for chisel, chisel-releases and rocks work. Cross-agent skills + scripts for authoring and reviewing chisel package slices files, and building rocks with rockcraft.",
   "author": {
     "name": "canonical",
