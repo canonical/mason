@@ -1,7 +1,8 @@
-# no slices on any branch and the user declines authoring them -> unchiselled.
+# no slices on any branch, and the skill writes none -> the deb is staged
+# whole on a bare base, and whatever has slices stays sliced.
 name: figlet
 release: ubuntu-24.04
-flavour: unchiselled
+flavour: part-chiselled
 fallback: true
 version: "2.2"
 service: false
