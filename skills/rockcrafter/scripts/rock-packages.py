@@ -36,7 +36,7 @@ import rocklib as rl
 
 CODES = {
     "package-not-found": "the package is not in the archive / PPA for this release and architecture",
-    "missing-slices": "an archive package has no slices on the release: author them, or build unchiseled",
+    "missing-slices": "an archive package has no slices on the release: stage it as a whole deb in a part of its own, or read slices from a checkout that has them (--chisel-release)",
 }
 
 

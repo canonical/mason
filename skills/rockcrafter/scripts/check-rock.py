@@ -63,7 +63,7 @@ CODES = {
     "service-command": "a Pebble service command must start with an absolute path",
     "service-override": "a Pebble service without `override: replace`",
     "mixed-stage": "a part mixes slices and whole debs in stage-packages",
-    "debs-on-bare": "whole debs on base: bare -- use slices, or an ubuntu@ base for an unchiseled rock",
+    "debs-on-bare": "whole debs on base: bare -- right only for a package without slices; otherwise use its slices, or an ubuntu@ base for an unchiseled rock",
     "ppa-on-bare": "package-repositories feed whole debs, not slices -- use an ubuntu@ base",
     "unknown-slice": "a slice that does not exist on the release",
 }

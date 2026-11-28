@@ -15,9 +15,7 @@ description: >-
 # rockcrafter
 
 Build [rocks](https://ubuntu.com/containers/rockcraft/docs) in the user's
-project, and fix the ones that fail to pack or fail their tests. **Do the work
-yourself** -- do not hand the task to a subagent (the slice hand-over in step 4
-is the one exception).
+project, and fix the ones that fail to pack or fail their tests.
 
 ## roots and boundaries
 
@@ -41,8 +39,8 @@ defect to fix; **unavailable** means a tool or a network source could not be
 reached -- report it, do not work around it, and never read it as evidence
 (a denied fetch does not mean a package or slice is absent).
 
-**Slicing never blocks delivery**: when slices can't be authored, ship an
-unchiseled rock and say so.
+**Slices are used, never written here**: a package without slices is staged
+as a whole deb, the rest of the rock stays chiseled, and the report says so.
 
 Every rock starts at step 1. After it, a rock that already exists and fails to
 pack or fails its tests goes to step 6, under "fixing a failure".
@@ -95,22 +93,15 @@ uv run "<skill-root>/scripts/rock-packages.py" python3.13 --ppa deadsnakes/ppa -
 Run it for every Ubuntu package the rock stages: the workload from the archive
 or a PPA, and the runtime a source build needs (`kb/rock-slices.md`). Take
 versions, executables and slice names from its report, never from memory. A
-`package-not-found` is a name to correct. For `missing-slices`, ask the user
-**once**: author the slices, or build unchiseled?
+`package-not-found` is a name to correct. Writing slices is not this skill's
+work: for `missing-slices`, ask the user **once** whether a chisel-releases
+checkout or fork already has them.
 
-- **Unchiseled**: stage whole debs on an Ubuntu base (`kb/rock-slices.md`);
-  the report says unchiseled.
-- **Author**: needs the chisel-slicer skill installed beside this one
-  (`<skill-root>/../chisel-slicer/SKILL.md`); without it the user installs it,
-  or the rock goes unchiseled.
-  Use the user's chisel-releases checkout or a fork, branched off the target
-  release. In it, follow chisel-slicer's `SKILL.md` for each missing package
-  (a subagent is fine here). Then run rock-packages again with
-  `--chisel-release <checkout>` and cut the slices from the checkout
-  (`kb/rock-slices.md`; chisel itself in `kb/chisel-cli.md`). After a
-  successful pack, push the branch and point the part at the fork; if you
-  cannot push, keep the local source and report the push as remaining. If
-  authoring fails, go unchiseled and say why.
+- **None does**: stage each package without slices as a whole deb, in a part
+  of its own; every other package keeps its slices (`kb/rock-slices.md`).
+- **One does**: run rock-packages again with `--chisel-release <checkout>`
+  and cut the slices from it (`kb/rock-slices.md`; chisel itself in
+  `kb/chisel-cli.md`).
 
 ## 5. fill in
 
@@ -202,12 +193,13 @@ A packed rock is not proof the workload runs; only passing tests are.
 Summarize for the user (or the parent agent when delegated):
 
 - the rock (file, or why not), its flavor -- chiseled, chiseled from local
-  slices, or unchiseled and why -- and the service command or CLI
+  slices, chiseled but for the packages named as having no slices, or
+  unchiseled and why -- and the service command or CLI
 - the tests: what each task proves, and their result
 - each fix round: the failure (pack category and step / part, or the failed
   task), the cause, and the change made -- to the rock or to a wrong assertion
-- checks passed, failed or unavailable, and what remains (push, upstreaming
-  slices, an unrun test suite)
+- checks passed, failed or unavailable, and what remains (packages that need
+  slices, slices not yet upstream, an unrun test suite)
 - for a new rock, the choices the user did not make (release, profile or
   plugin, slices), and why
 
