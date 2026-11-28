@@ -3,11 +3,14 @@
 # requires-python = ">=3.10"
 # dependencies = ["pyyaml"]
 # ///
-"""rock-fallback-reported: when slices are missing and the rock goes
-unchiseled, the agent says so. na unless the case is such a fallback."""
+"""rock-fallback-reported: when a package has no slices and is staged as a
+whole deb, the agent says so. na unless the case is such a fallback."""
 from _lib import *
 
-_PHRASES = ("unchiselled", "unchiseled", "not chiselled", "not chiseled", "without chisel")
+_PHRASES = (
+    "no slices", "without slices", "whole deb",
+    "unchiselled", "unchiseled", "not chiselled", "not chiseled", "without chisel",
+)  # fmt: skip
 
 
 def score() -> float:
