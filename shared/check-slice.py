@@ -8,9 +8,9 @@
 Checks the mechanical conventions reviewers and CI enforce -- the rules that do
 NOT need judgment or a rootfs cut. Use it two ways:
 
-  - authoring: self-check a slices file while writing it (chisel-slicer).
-  - review:    the deterministic first pass of a review (chisel-slice-reviewer),
-               so the agent only spends judgment on deps, tests, and design.
+  - authoring: self-check a slices file while writing it.
+  - review:    the deterministic first pass of a review, so the agent only
+               spends judgment on deps, tests, and design.
 
 It does NOT replace `chisel cut` (installability) or spread tests
 (functionality). It only checks the slices file text. yamllint cosmetics (line
